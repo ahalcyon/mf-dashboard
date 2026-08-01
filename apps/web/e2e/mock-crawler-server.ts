@@ -6,6 +6,16 @@ const clients = new Set<ServerResponse>();
 
 const startedAt = "2026-01-01T00:00:00.000Z";
 const finishedAt = "2026-01-01T00:00:10.000Z";
+const authenticationDetails = {
+  label: "MoneyForward に認証",
+  step: "authentication",
+  metadata: null,
+} as const;
+const currentAuthentication = {
+  timelineItemId: "authentication",
+  ...authenticationDetails,
+};
+const authenticationFailure = { code: "auth_failed", message: "E2E用の認証エラー" } as const;
 
 type MockState = Record<string, unknown> & { running: boolean };
 
@@ -16,28 +26,27 @@ function idleState(): MockState {
   return { available: true, running: false };
 }
 
-function runningState(): MockState {
+function currentRunDetails() {
   return {
-    running: true,
     version: 1,
     runId: `e2e-run-${runCount}`,
-    runStatus: "running",
     source: "manual",
     startedAt,
+  } as const;
+}
+
+function runningState(): MockState {
+  return {
+    ...currentRunDetails(),
+    running: true,
+    runStatus: "running",
     finishedAt: null,
-    current: {
-      timelineItemId: "authentication",
-      label: "MoneyForward に認証",
-      step: "authentication",
-      metadata: null,
-    },
+    current: currentAuthentication,
     progress: { completed: 0, total: 1 },
     timeline: [
       {
         id: "authentication",
-        label: "MoneyForward に認証",
-        step: "authentication",
-        metadata: null,
+        ...authenticationDetails,
         status: "running",
         startedAt,
         finishedAt: null,
@@ -50,21 +59,16 @@ function runningState(): MockState {
 
 function completedState(): MockState {
   return {
+    ...currentRunDetails(),
     running: false,
-    version: 1,
-    runId: `e2e-run-${runCount}`,
     runStatus: "success",
-    source: "manual",
-    startedAt,
     finishedAt,
     current: null,
     progress: { completed: 1, total: 1 },
     timeline: [
       {
         id: "authentication",
-        label: "MoneyForward に認証",
-        step: "authentication",
-        metadata: null,
+        ...authenticationDetails,
         status: "done",
         startedAt,
         finishedAt,
@@ -76,35 +80,24 @@ function completedState(): MockState {
 }
 
 function failedState(): MockState {
-  const reason = { code: "auth_failed", message: "E2E用の認証エラー" };
   return {
+    ...currentRunDetails(),
     running: false,
-    version: 1,
-    runId: `e2e-run-${runCount}`,
     runStatus: "failed",
-    source: "manual",
-    startedAt,
     finishedAt,
-    current: {
-      timelineItemId: "authentication",
-      label: "MoneyForward に認証",
-      step: "authentication",
-      metadata: null,
-    },
+    current: currentAuthentication,
     progress: null,
     timeline: [
       {
         id: "authentication",
-        label: "MoneyForward に認証",
-        step: "authentication",
-        metadata: null,
+        ...authenticationDetails,
         status: "failed",
         startedAt,
         finishedAt,
-        reason,
+        reason: authenticationFailure,
       },
     ],
-    reason,
+    reason: authenticationFailure,
   };
 }
 
@@ -113,9 +106,12 @@ function writeJson(response: ServerResponse, status: number, body: unknown): voi
   response.end(JSON.stringify(body));
 }
 
+function eventMessage(): string {
+  return `data: ${JSON.stringify(state)}\n\n`;
+}
+
 function broadcast(): void {
-  const message = `data: ${JSON.stringify(state)}\n\n`;
-  for (const client of clients) client.write(message);
+  for (const client of clients) client.write(eventMessage());
 }
 
 function setState(nextState: MockState): void {
@@ -167,7 +163,7 @@ const server = createServer((request, response) => {
       "content-type": "text/event-stream",
     });
     clients.add(response);
-    response.write(`data: ${JSON.stringify(state)}\n\n`);
+    response.write(eventMessage());
     request.once("close", () => clients.delete(response));
     return;
   }

@@ -1,6 +1,17 @@
-import { expect, test } from "@playwright/test";
+import { expect, type APIRequestContext, type Page, test } from "@playwright/test";
 
 const mockCrawlerUrl = "http://127.0.0.1:18766";
+
+async function resetCrawler(request: APIRequestContext): Promise<void> {
+  const response = await request.post(`${mockCrawlerUrl}/__test/reset`);
+  expect(response.ok()).toBe(true);
+}
+
+async function startRefresh(page: Page): Promise<void> {
+  await page.goto("/");
+  await page.getByRole("button", { name: "金融機関データを更新" }).click();
+  await expect(page.getByRole("button", { name: "同期タイムラインを表示" })).toBeVisible();
+}
 
 test.describe("Crawler refresh flow", () => {
   test.describe.configure({ mode: "serial" });
@@ -8,14 +19,12 @@ test.describe("Crawler refresh flow", () => {
   test.beforeEach(async ({ request }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "The shared mock crawler runs once on desktop");
 
-    const response = await request.post(`${mockCrawlerUrl}/__test/reset`);
-    expect(response.ok()).toBe(true);
+    await resetCrawler(request);
   });
 
   test("starts and completes a refresh through the web proxy", async ({ page, request }) => {
-    await page.goto("/");
-
     const startButton = page.getByRole("button", { name: "金融機関データを更新" });
+    await page.goto("/");
     await expect(startButton).toBeEnabled();
     await startButton.click();
 
@@ -37,9 +46,7 @@ test.describe("Crawler refresh flow", () => {
   });
 
   test("returns the running state for a duplicate refresh request", async ({ page, request }) => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "金融機関データを更新" }).click();
-    await expect(page.getByRole("button", { name: "同期タイムラインを表示" })).toBeVisible();
+    await startRefresh(page);
 
     const duplicate = await page.evaluate(async () => {
       const response = await fetch("/api/crawler/refresh/", { method: "POST" });
@@ -52,9 +59,7 @@ test.describe("Crawler refresh flow", () => {
   });
 
   test("shows a failed refresh and allows retry", async ({ page, request }) => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "金融機関データを更新" }).click();
-    await expect(page.getByRole("button", { name: "同期タイムラインを表示" })).toBeVisible();
+    await startRefresh(page);
 
     const failResponse = await request.post(`${mockCrawlerUrl}/__test/fail`);
     expect(failResponse.ok()).toBe(true);
