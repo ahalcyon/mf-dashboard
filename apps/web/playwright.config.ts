@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const mockCrawlerUrl = "http://127.0.0.1:18766";
+const mockCrawlerToken = "e2e-refresh-token";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -25,9 +28,26 @@ export default defineConfig({
       use: { ...devices["iPhone 14"] },
     },
   ],
-  webServer: {
-    command: "pnpm dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: [
+    {
+      command: "pnpm exec tsx e2e/mock-crawler-server.ts",
+      url: `${mockCrawlerUrl}/__test/health`,
+      env: {
+        MOCK_CRAWLER_PORT: "18766",
+        MOCK_CRAWLER_TOKEN: mockCrawlerToken,
+      },
+      reuseExistingServer: false,
+    },
+    {
+      command: "pnpm dev",
+      url: "http://localhost:3000",
+      env: {
+        CRAWLER_URL: mockCrawlerUrl,
+        DB_PATH: "../../data/demo.db",
+        DEMO_MODE: "true",
+        REFRESH_TOKEN: mockCrawlerToken,
+      },
+      reuseExistingServer: false,
+    },
+  ],
 });
