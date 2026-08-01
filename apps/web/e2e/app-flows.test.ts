@@ -58,6 +58,10 @@ test.describe("App flows", () => {
   });
 
   test("navigates between primary pages from the sidebar", async ({ page }) => {
+    // This scenario compiles and visits six routes. WebKit on CI can exceed
+    // Playwright's 30-second default while the Next.js dev server warms up.
+    test.setTimeout(60_000);
+
     await page.goto("/");
     await expectHeading(page, "ダッシュボード");
 
@@ -80,6 +84,10 @@ test.describe("App flows", () => {
   });
 
   test("keeps navigation in the selected group context", async ({ page }) => {
+    // This scenario performs multiple client-side route transitions and select
+    // animations, which can exceed the default timeout on mobile WebKit in CI.
+    test.setTimeout(60_000);
+
     await page.goto("/cf");
     await expectHeading(page, "収支");
 
