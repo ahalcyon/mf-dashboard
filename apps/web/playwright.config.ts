@@ -1,7 +1,10 @@
+import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 const mockCrawlerUrl = "http://127.0.0.1:18766";
 const mockCrawlerToken = "e2e-refresh-token";
+const demoDbPath = resolve(__dirname, "../../data/demo.db");
+const webServerCommand = process.env.CI ? "node .next/standalone/apps/web/server.js" : "pnpm dev";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -9,7 +12,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 2,
-  reporter: "html",
+  reporter: process.env.CI ? "blob" : "html",
   use: {
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
@@ -39,12 +42,14 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
-      command: "pnpm dev",
+      command: webServerCommand,
       url: "http://localhost:3000",
       env: {
         CRAWLER_URL: mockCrawlerUrl,
-        DB_PATH: "../../data/demo.db",
+        DB_PATH: demoDbPath,
         DEMO_MODE: "true",
+        HOSTNAME: "127.0.0.1",
+        PORT: "3000",
         REFRESH_TOKEN: mockCrawlerToken,
       },
       reuseExistingServer: false,
