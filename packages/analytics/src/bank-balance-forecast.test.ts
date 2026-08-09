@@ -31,6 +31,7 @@ describe("calculateMonthlyBankBalanceForecasts", () => {
       type: "expense",
       classification: "card",
       description: "Card payment",
+      recurrenceIntervalMonths: 2,
       predictedDate: "2026-08-31",
       predictedAmount: 50_000,
       evidence: {
@@ -46,6 +47,7 @@ describe("calculateMonthlyBankBalanceForecasts", () => {
       status: "forecast",
       classification: "card",
       evidence: { occurrenceCount: 3 },
+      recurrenceIntervalMonths: 2,
     });
   });
 

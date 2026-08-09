@@ -151,6 +151,34 @@ describe("BankCashFlowForecastClient", () => {
     expect(screen.queryByRole("dialog", { name: "銀行 Aの入出金詳細" })).toBeNull();
   });
 
+  it("隔月候補の推定根拠に周期を表示する", () => {
+    const recurringEvent = forecast.days[0]!.events[0]!;
+    render(
+      <BankCashFlowForecastClient
+        forecasts={[
+          {
+            ...forecast,
+            days: [
+              {
+                ...forecast.days[0]!,
+                events: [
+                  {
+                    ...recurringEvent,
+                    classification: "other",
+                    recurrenceIntervalMonths: 2,
+                  },
+                ],
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "銀行 Aの入出金詳細を開く" }));
+    expect(screen.getByText(/隔月の定期的な入出金の過去3回/)).toBeTruthy();
+  });
+
   it("口座アンカーから対応する予想ダイアログを開く", async () => {
     window.history.replaceState(null, "", "/cf#bank-forecast-account-1");
     render(<BankCashFlowForecastClient forecasts={[forecast]} />);

@@ -59,6 +59,12 @@ const classificationLabels: Record<RecurringCandidateClassification, string> = {
   other: "定期的な入出金",
 };
 
+function getRecurrencePrefix(intervalMonths: number | undefined): string {
+  if (intervalMonths === 2) return "隔月の";
+  if (intervalMonths === 3) return "3か月ごとの";
+  return "";
+}
+
 function getEvidenceText(event: CalculatedBankCashFlowEvent): string {
   if (event.status === "actual") return "Money Forwardの実績データ";
 
@@ -84,7 +90,8 @@ function getEvidenceText(event: CalculatedBankCashFlowEvent): string {
     evidence.dateRange.from === evidence.dateRange.to
       ? formatDateShort(evidence.dateRange.from)
       : `${formatDateShort(evidence.dateRange.from)}〜${formatDateShort(evidence.dateRange.to)}`;
-  return `${classification}の過去${evidence.occurrenceCount}回（${dateRange}、${amountRange}）から推定`;
+  const recurrencePrefix = getRecurrencePrefix(event.recurrenceIntervalMonths);
+  return `${recurrencePrefix}${classification}の過去${evidence.occurrenceCount}回（${dateRange}、${amountRange}）から推定`;
 }
 
 function ForecastEvent({

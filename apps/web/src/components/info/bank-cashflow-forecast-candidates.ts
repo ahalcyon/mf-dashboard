@@ -105,6 +105,7 @@ export function generateBankForecastCandidates(
   )
     .filter(
       (staleCandidate) =>
+        (staleCandidate.recurrenceIntervalMonths ?? 1) === 1 &&
         staleCandidate.evidence.occurrenceCount >= 2 &&
         !currentCandidates.some(
           (currentCandidate) =>

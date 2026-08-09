@@ -26,6 +26,7 @@ export interface BankCashFlowEventInput {
   classification?: RecurringCandidateClassification;
   evidence?: RecurringCandidateEvidence;
   recurringIdentity?: string;
+  recurrenceIntervalMonths?: number;
   amountSource?: "scheduled_withdrawal" | "liability";
   isTransfer?: boolean;
   isExcludedFromCalculation?: boolean;
@@ -81,6 +82,7 @@ export function recurringCandidateToBankCashFlowEvent(
     classification: candidate.classification,
     evidence: candidate.evidence,
     recurringIdentity: candidate.recurringIdentity,
+    recurrenceIntervalMonths: candidate.recurrenceIntervalMonths,
     amountSource: candidate.amountSource,
   };
 }
