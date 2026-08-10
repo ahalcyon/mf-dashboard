@@ -236,17 +236,12 @@ function BalanceSummary({
   forecast: BankCashFlowForecastView;
   className?: string;
 }) {
-  const forecastBalanceLabel = forecast.forecastEndDate.startsWith(
-    forecast.monthStartDate.slice(0, 7),
-  )
-    ? "月末予測残高"
-    : `${formatDate(forecast.forecastEndDate)}予測残高`;
   return (
     <span
       className={cn("grid shrink-0 grid-cols-2 gap-x-4 gap-y-1 text-right sm:gap-x-6", className)}
     >
       <span className="text-xs text-muted-foreground">現在残高</span>
-      <span className="text-xs text-muted-foreground">{forecastBalanceLabel}</span>
+      <span className="text-xs text-muted-foreground">今月末予測残高</span>
       <AmountDisplay amount={forecast.currentBalance} type="balance" weight="semibold" />
       <AmountDisplay amount={forecast.forecastEndBalance} type="balance" weight="bold" />
     </span>
@@ -469,7 +464,7 @@ export function BankCashFlowForecastClient({
                 </div>
               </dl>
               <p className="border-t pt-3 text-xs leading-relaxed text-muted-foreground">
-                当月末までを基本とし、手入力予定がある場合はその日まで表示します。定期性を判定できない臨時入出金は、手入力しない限り反映されず、将来の残高を保証しません。過去月表示と任意月への切替は対象外です。
+                今月末までの実績と予測を表示します。将来月の手入力予定は、その月になると予測へ反映されます。定期性を判定できない臨時入出金は、手入力しない限り反映されず、将来の残高を保証しません。過去月表示と任意月への切替は対象外です。
               </p>
             </PopoverContent>
           </Popover>

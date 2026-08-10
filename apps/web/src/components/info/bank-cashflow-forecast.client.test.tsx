@@ -119,30 +119,12 @@ describe("BankCashFlowForecastClient", () => {
     expect(screen.queryByText(/入出金の詳細（/)).toBeNull();
   });
 
-  it("複数年にまたがる予測日を年付きで表示する", () => {
-    const recurringEvent = forecast.days[0]!.events[0]!;
-    render(
-      <BankCashFlowForecastClient
-        forecasts={[
-          {
-            ...forecast,
-            forecastEndDate: "2027-10-15",
-            days: [
-              {
-                date: "2027-10-15",
-                closingBalance: 90_000,
-                events: [{ ...recurringEvent, date: "2027-10-15" }],
-              },
-            ],
-          },
-        ]}
-      />,
-    );
+  it("残高と詳細期間を今月末の予測として表示する", () => {
+    render(<BankCashFlowForecastClient forecasts={[forecast]} />);
 
-    expect(screen.getByText("2027年10月15日予測残高")).toBeTruthy();
+    expect(screen.getByText("今月末予測残高")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "銀行 Aの入出金詳細を開く" }));
-    expect(screen.getByText("2026年8月1日〜2027年10月15日の実績と予測")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "2027年10月15日", level: 3 })).toBeTruthy();
+    expect(screen.getByText("8月1日〜8月31日の実績と予測")).toBeTruthy();
   });
 
   it("実績・予測の意味と今月予測の限界を説明する", () => {
@@ -158,7 +140,9 @@ describe("BankCashFlowForecastClient", () => {
     expect(screen.getByText("実績").className).not.toBe(screen.getByText("確定").className);
     expect(screen.getByText("残高参考")).toBeTruthy();
     expect(screen.getByText("登録した将来の入出金予定です。")).toBeTruthy();
-    expect(screen.getByText(/当月末までを基本.*手入力予定がある場合はその日まで表示/)).toBeTruthy();
+    expect(
+      screen.getByText(/今月末までの実績と予測.*将来月の手入力予定は、その月になる/),
+    ).toBeTruthy();
   });
 
   it("詳細ボタンで日付別の入出金と取引後残高をダイアログに表示する", () => {
@@ -174,7 +158,7 @@ describe("BankCashFlowForecastClient", () => {
     expect(dialog.className).toContain("max-w-4xl");
     expect(dialog.className).toContain("overflow-hidden");
     expect(within(dialog).getByText("現在残高")).toBeTruthy();
-    expect(within(dialog).getByText("月末予測残高")).toBeTruthy();
+    expect(within(dialog).getByText("今月末予測残高")).toBeTruthy();
     const dialogHeader = within(dialog).getByRole("heading", {
       name: "銀行 Aの入出金詳細",
     }).parentElement?.parentElement;

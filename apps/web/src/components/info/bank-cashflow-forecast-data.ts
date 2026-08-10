@@ -9,12 +9,7 @@ import {
   matchesRecurringCandidateIdentity,
   type RecurringCandidate,
 } from "@mf-dashboard/analytics/recurring-candidates";
-import {
-  formatIsoDateKey,
-  getDaysInMonth,
-  parseIsoDateKey,
-  shiftYearMonthKey,
-} from "@mf-dashboard/date-utils";
+import { formatIsoDateKey, getDaysInMonth, parseIsoDateKey } from "@mf-dashboard/date-utils";
 import type { BankForecastManualEvent } from "@mf-dashboard/db/queries/bank-forecast-manual-event";
 import {
   createNormalTransactionMirrorKeys,
@@ -245,7 +240,10 @@ export function buildBankCashFlowForecastViews(
     ({ date }) => date.startsWith(month) && date <= currentDate,
   );
   const candidateManualEvents = manualEvents.filter(
-    (event) => bankAccountIds.has(event.accountId) && event.date >= manualEventMinDate,
+    (event) =>
+      bankAccountIds.has(event.accountId) &&
+      event.date.startsWith(month) &&
+      event.date >= manualEventMinDate,
   );
   const { year, month: monthNumber } = parseIsoDateKey(currentDate);
   const currentMonthEnd = formatIsoDateKey({
@@ -253,10 +251,7 @@ export function buildBankCashFlowForecastViews(
     month: monthNumber,
     day: getDaysInMonth(year, monthNumber),
   });
-  const forecastEndDate = candidateManualEvents.reduce(
-    (latest, event) => (event.date > latest ? event.date : latest),
-    currentMonthEnd,
-  );
+  const forecastEndDate = currentMonthEnd;
   let forecastCandidates: RecurringCandidate[];
   if (candidates !== undefined) {
     forecastCandidates = projectRecurringCandidatesThroughDate(candidates, forecastEndDate);
@@ -269,15 +264,7 @@ export function buildBankCashFlowForecastViews(
       cardLiabilityAmounts,
       currentDate,
     );
-    const recurringSeeds: RecurringCandidate[] = [];
-    const forecastEndMonth = forecastEndDate.slice(0, 7);
-    for (
-      let targetMonth = month;
-      targetMonth <= forecastEndMonth;
-      targetMonth = shiftYearMonthKey(targetMonth, 1)
-    ) {
-      recurringSeeds.push(...generateBankForecastCandidates(candidateTransactions, targetMonth));
-    }
+    const recurringSeeds = generateBankForecastCandidates(candidateTransactions, month);
 
     const uniqueCandidates = new Map<string, RecurringCandidate>();
     for (const candidate of projectRecurringCandidatesThroughDate(
