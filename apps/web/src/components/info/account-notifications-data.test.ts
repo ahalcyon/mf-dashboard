@@ -5,7 +5,7 @@ import type { BankCashFlowForecastView } from "./bank-cashflow-forecast-data";
 function forecast(
   accountId: number,
   accountName: string,
-  monthEndBalance: number,
+  forecastEndBalance: number,
   hasBalanceTrend = true,
 ): BankCashFlowForecastView {
   return {
@@ -14,13 +14,14 @@ function forecast(
     currentBalance: 150_000,
     forecastBoundaryDate: "2026-08-03",
     monthStartDate: "2026-08-01",
+    forecastEndDate: "2026-08-31",
     openingBalance: 150_000,
-    monthEndBalance,
+    forecastEndBalance,
     days: hasBalanceTrend
       ? [
           {
             date: "2026-08-20",
-            closingBalance: monthEndBalance,
+            closingBalance: forecastEndBalance,
             events: [
               {
                 id: `forecast-${accountId}`,
@@ -29,7 +30,7 @@ function forecast(
                 amount: 50_000,
                 direction: "expense",
                 status: "forecast",
-                balanceAfter: monthEndBalance,
+                balanceAfter: forecastEndBalance,
               },
             ],
           },
@@ -58,5 +59,26 @@ describe("buildBalanceForecastAlerts", () => {
 
   it("残高推移がない口座は閾値以下でも返さない", () => {
     expect(buildBalanceForecastAlerts([forecast(1, "銀行 A", -20_000, false)])).toEqual([]);
+  });
+
+  it("翌月以降の手入力収入があっても当月末の低残高を通知する", () => {
+    const extendedForecast = forecast(1, "銀行 A", 140_000);
+    extendedForecast.forecastEndDate = "2026-10-15";
+    extendedForecast.days = [
+      {
+        date: "2026-08-20",
+        closingBalance: 90_000,
+        events: [],
+      },
+      {
+        date: "2026-10-15",
+        closingBalance: 140_000,
+        events: [],
+      },
+    ];
+
+    expect(buildBalanceForecastAlerts([extendedForecast])).toEqual([
+      { accountId: 1, accountName: "銀行 A", forecastBalance: 90_000 },
+    ]);
   });
 });
