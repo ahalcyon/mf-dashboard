@@ -14,6 +14,14 @@ interface BalanceSheetChartProps {
   assets: Array<{ category: string; amount: number }>;
   liabilities: Array<{ category: string; amount: number }>;
   netAssets: number;
+  totalAssets: number;
+}
+
+export function formatBalanceSheetShare(amount: number, total: number) {
+  const percentage = total === 0 ? 0 : (amount / total) * 100;
+  const sign = percentage < 0 ? "-" : "";
+  const paddedPercentage = Math.abs(percentage).toFixed(1).padStart(4, "0");
+  return `(${sign}${paddedPercentage}%)`;
 }
 
 export function getBalanceSheetChartOrder(
@@ -50,6 +58,7 @@ export function BalanceSheetChartClient({
   assets,
   liabilities,
   netAssets,
+  totalAssets,
 }: BalanceSheetChartProps) {
   const [isMobile, setIsMobile] = useState(false);
 
@@ -60,7 +69,6 @@ export function BalanceSheetChartClient({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const totalAssets = assets.reduce((sum, a) => sum + a.amount, 0);
   const totalLiabilities = liabilities.reduce((sum, l) => sum + l.amount, 0);
   const { orderedAssets, stackedAssetKeys, legendKeys, stackedBalanceKeys } =
     getBalanceSheetChartOrder(assets, totalLiabilities, netAssets);
@@ -111,7 +119,12 @@ export function BalanceSheetChartClient({
               <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: p.fill }} />
               {p.name}
             </span>
-            <AmountDisplay amount={p.value} weight="medium" />
+            <span className="flex items-baseline gap-1">
+              <AmountDisplay amount={p.value} weight="medium" />
+              <span className="text-muted-foreground lining-nums tabular-nums">
+                {formatBalanceSheetShare(p.value, total)}
+              </span>
+            </span>
           </div>
         ))}
         <div className="flex justify-between gap-4 mt-2 pt-2 border-t font-bold">
