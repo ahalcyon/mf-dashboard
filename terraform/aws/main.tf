@@ -58,11 +58,11 @@ resource "aws_db_instance" "this" {
   vpc_security_group_ids = [aws_security_group.rds.id]
   publicly_accessible    = var.publicly_accessible
 
-  backup_retention_period   = 7
+  backup_retention_period    = 7
   auto_minor_version_upgrade = true
-  deletion_protection       = true
-  skip_final_snapshot       = false
-  final_snapshot_identifier = "${var.project_name}-db-final"
+  deletion_protection        = true
+  skip_final_snapshot        = false
+  final_snapshot_identifier  = "${var.project_name}-db-final"
 
   apply_immediately = true
 }
