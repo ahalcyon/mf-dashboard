@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { analyzeFinancialData } from "@mf-dashboard/analytics";
-import { initDb, type Db } from "@mf-dashboard/db";
+import { getAllGroups, initDb, type Db } from "@mf-dashboard/db";
 import { buildAccountIdMap } from "@mf-dashboard/db/repository/accounts";
 import { saveScrapedDataBatch } from "@mf-dashboard/db/repository/save-scraped-data";
 import {
@@ -40,15 +40,17 @@ import { isNoGroup, switchGroup, NO_GROUP_ID } from "./scrapers/group.js";
 import { scrapeInstitutionCategories } from "./scrapers/institution-categories.js";
 
 const DEFAULT_ENV_PATH = path.resolve(import.meta.dirname, "../../../.env");
-const DEFAULT_DB_PATH = path.join(import.meta.dirname, "../../../data/moneyforward.db");
+const DEFAULT_DB_PATH = path.join(import.meta.dirname, "../../../data/moneyforward-db");
 const DEBUG_DIR = path.resolve(import.meta.dirname, "../debug");
 
 export interface CrawlerConfig {
   skipRefresh: boolean;
   cleanupGroups: boolean;
   authState: "configured" | "none";
+  /** DATABASE_URL（リモートPostgreSQL）。設定時はdbPath/dbExistsを使用しない */
+  databaseUrl: string | null;
   dbPath: string;
-  dbExists: boolean;
+  dbExists: boolean | null;
   scrapeMode: string;
   isHistoryMode: boolean;
   isDebug: boolean;
@@ -92,14 +94,17 @@ export function loadCrawlerConfig(
 ): CrawlerConfig {
   const skipRefresh = env.SKIP_REFRESH === "true";
   const cleanupGroups = env.CLEANUP_GROUPS === "true";
+  const databaseUrl = env.DATABASE_URL || null;
   const dbPath = env.DB_PATH || DEFAULT_DB_PATH;
-  const dbExists = fileExists(dbPath);
-  const scrapeMode = env.SCRAPE_MODE || (dbExists ? "month" : "history");
+  // リモートDBはファイル存在で判定できないため、接続後にrunSetupPhaseで解決する
+  const dbExists = databaseUrl ? null : fileExists(dbPath);
+  const scrapeMode = env.SCRAPE_MODE || (databaseUrl ? "auto" : dbExists ? "month" : "history");
 
   return {
     skipRefresh,
     cleanupGroups,
     authState: authStateExists() ? "configured" : "none",
+    databaseUrl,
     dbPath,
     dbExists,
     scrapeMode,
@@ -113,7 +118,9 @@ function logCrawlerOptions(config: CrawlerConfig): void {
   phase("Options");
   log(`SKIP_REFRESH:   ${config.skipRefresh}`);
   info(`CLEANUP_GROUPS: ${config.cleanupGroups}`);
-  log(`SCRAPE_MODE:    ${config.scrapeMode} (DB exists: ${config.dbExists})`);
+  log(
+    `SCRAPE_MODE:    ${config.scrapeMode} (DB: ${config.databaseUrl ? "remote" : `exists=${config.dbExists}`})`,
+  );
   log(`DEBUG:          ${config.isDebug}`);
   log(`HEADED:         ${config.isHeaded}`);
   log(`AUTH_STATE:     ${config.authState}`);
@@ -123,6 +130,7 @@ export async function runSetupPhase(config: CrawlerConfig): Promise<CrawlerRunti
   phase("Setup");
   info("Initializing database");
   const db = await initDb();
+  await resolveAutoScrapeMode(config, db);
   const categoryDecision = await loadCategoryDecisionRuntime();
 
   let browser: Browser | null = null;
@@ -148,6 +156,22 @@ export async function runSetupPhase(config: CrawlerConfig): Promise<CrawlerRunti
     }
     throw err;
   }
+}
+
+/**
+ * リモートDB（DATABASE_URL）使用時はスキーマ適用後にデータ有無でscrape modeを決定する。
+ */
+async function resolveAutoScrapeMode(config: CrawlerConfig, db: Db): Promise<void> {
+  if (config.scrapeMode !== "auto") return;
+
+  const groups = await getAllGroups(db);
+  const hasData = groups.length > 0;
+  config.dbExists = hasData;
+  config.scrapeMode = hasData ? "month" : "history";
+  config.isHistoryMode = !hasData;
+  info(
+    `SCRAPE_MODE resolved to ${config.scrapeMode} (remote database ${hasData ? "has data" : "is empty"})`,
+  );
 }
 
 async function loadCategoryDecisionRuntime(): Promise<CategoryDecisionRuntime> {

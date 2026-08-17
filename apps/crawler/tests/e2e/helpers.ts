@@ -1,4 +1,4 @@
-import { existsSync, unlinkSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import { initDb } from "@mf-dashboard/db";
 import { mfUrls } from "@mf-dashboard/meta/urls";
@@ -65,8 +65,6 @@ export async function setupTestDb(dbPath: string): Promise<void> {
 }
 
 export function cleanupTestDb(dbPath: string): void {
-  for (const suffix of ["", "-shm", "-wal"]) {
-    const f = dbPath + suffix;
-    if (existsSync(f)) unlinkSync(f);
-  }
+  // PGliteのデータディレクトリごと削除する
+  if (existsSync(dbPath)) rmSync(dbPath, { recursive: true });
 }

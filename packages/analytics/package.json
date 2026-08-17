@@ -17,7 +17,7 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "generate:demo-insights": "DB_PATH=../../data/demo.db tsx --env-file=../../.env scripts/generate-demo-insights.ts"
+    "generate:demo-insights": "DB_PATH=../../data/demo-db tsx --env-file=../../.env scripts/generate-demo-insights.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.39",

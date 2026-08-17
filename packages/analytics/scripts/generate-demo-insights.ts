@@ -2,7 +2,7 @@
  * デモDB用のインサイトを LLM で生成し、JSON ファイルに保存するスクリプト
  *
  * 使い方:
- *   DB_PATH=../../data/demo.db AI_PROVIDER=openai AI_MODEL=gpt-4o-mini AI_API_KEY=sk-xxx \
+ *   DB_PATH=../../data/demo-db AI_PROVIDER=openai AI_MODEL=gpt-4o-mini AI_API_KEY=sk-xxx \
  *     pnpm --filter @mf-dashboard/analytics generate:demo-insights
  */
 

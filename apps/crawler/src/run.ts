@@ -139,7 +139,7 @@ export async function runCrawler(progress: CrawlerProgressReporter): Promise<voi
         await runtime.browser.close();
       }
     } finally {
-      closeDb();
+      await closeDb();
     }
   }
 }

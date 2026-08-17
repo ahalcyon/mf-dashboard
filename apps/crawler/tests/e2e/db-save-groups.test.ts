@@ -25,7 +25,7 @@ import {
 } from "./helpers.js";
 
 const TEST_DB_DIR = path.resolve(process.cwd(), "tests/e2e");
-const TEST_DB_PATH = path.join(TEST_DB_DIR, "test-groups-moneyforward.db");
+const TEST_DB_PATH = path.join(TEST_DB_DIR, "test-groups-moneyforward-db");
 const PROGRESS_STATE_PATH = path.join(os.tmpdir(), `db-save-groups-${randomUUID()}.json`);
 
 let browser: Browser;

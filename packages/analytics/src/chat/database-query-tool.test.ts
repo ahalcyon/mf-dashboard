@@ -34,7 +34,7 @@ describe("createDatabaseQueryTool", () => {
     expect(description).toContain("'expense'が支出・出金");
     expect(description).toContain("収入合計から支出合計を引いた値");
     expect(description).toContain("sub_category text");
-    expect(description).toContain("is_excluded_from_calculation integer NOT NULL");
+    expect(description).toContain("is_excluded_from_calculation boolean NOT NULL");
     expect(description).toContain("group_accounts(");
     expect(description).toContain("現在グループの総資産はasset_history.group_id = :groupId");
     expect(description).toContain("評価額・数量・単価・前日比・含み損益はholding_values");
@@ -80,7 +80,6 @@ describe("createDatabaseQueryTool", () => {
       db,
       "SELECT * FROM groups WHERE id = :groupId",
       "group-a",
-      undefined,
       abortController.signal,
     );
   });

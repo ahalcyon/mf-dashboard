@@ -10,7 +10,7 @@
     "build": "turbo build",
     "build:demo": "turbo build:demo",
     "generate:demo-insights": "pnpm --filter @mf-dashboard/analytics generate:demo-insights",
-    "db:clean": "rm -f data/moneyforward.db data/moneyforward.db-wal data/moneyforward.db-shm",
+    "db:clean": "rm -rf data/moneyforward-db",
     "db:dev": "pnpm --filter @mf-dashboard/crawler dev:scrape",
     "test": "turbo test",
     "test:e2e:web": "turbo test:e2e --filter=@mf-dashboard/web",

@@ -25,6 +25,8 @@ export default function createNextConfig(phase: string): NextConfig {
     env: {
       NEXT_PUBLIC_STATIC_DEMO_BUILD: isStaticDemoBuild ? "true" : "false",
     },
+    // PGliteはwasm/データファイルを実行時に解決するためbundleさせない
+    serverExternalPackages: ["@electric-sql/pglite", "pg"],
     typedRoutes: true,
     images: {
       unoptimized: true,

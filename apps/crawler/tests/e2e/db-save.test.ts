@@ -21,7 +21,7 @@ import {
 } from "./helpers.js";
 
 const TEST_DB_DIR = path.resolve(process.cwd(), "tests/e2e");
-const TEST_DB_PATH = path.join(TEST_DB_DIR, "test-moneyforward.db");
+const TEST_DB_PATH = path.join(TEST_DB_DIR, "test-moneyforward-db");
 
 let browser: Browser;
 let context: BrowserContext;

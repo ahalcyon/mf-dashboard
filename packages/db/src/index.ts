@@ -78,16 +78,17 @@ export async function closeDb(): Promise<void> {
   _db = null;
 }
 
-const MIGRATIONS_FOLDER = join(import.meta.dirname, "../drizzle");
-
 export async function initDb(): Promise<Db> {
   const db = getDb();
 
   // Apply migrations
+  // Note: import.meta.dirnameはbundler環境（Next.js）ではundefinedになるが、
+  // initDbを呼ぶのはNode直実行のcrawler/seedのみなので遅延評価で問題ない
+  const migrationsFolder = join(import.meta.dirname, "../drizzle");
   if (_nodePgDb) {
-    await migrateNodePg(_nodePgDb, { migrationsFolder: MIGRATIONS_FOLDER });
+    await migrateNodePg(_nodePgDb, { migrationsFolder });
   } else if (_pgliteDb) {
-    await migratePglite(_pgliteDb, { migrationsFolder: MIGRATIONS_FOLDER });
+    await migratePglite(_pgliteDb, { migrationsFolder });
   }
 
   return db;

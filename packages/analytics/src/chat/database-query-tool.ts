@@ -88,7 +88,7 @@ export function createDatabaseQueryTool(
       beforeExecute();
       const release = await acquireDatabaseQuerySlot(abortSignal);
       try {
-        return await executeReadOnlyQuery(db, sql, groupId, undefined, abortSignal);
+        return await executeReadOnlyQuery(db, sql, groupId, abortSignal);
       } finally {
         release();
       }

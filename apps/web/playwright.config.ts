@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const mockCrawlerUrl = "http://127.0.0.1:18766";
 const mockCrawlerToken = "e2e-refresh-token";
-const demoDbPath = resolve(__dirname, "../../data/demo.db");
+const demoDbPath = resolve(__dirname, "../../data/demo-db");
 const webServerCommand = process.env.CI ? "node .next/standalone/apps/web/server.js" : "pnpm dev";
 
 export default defineConfig({
