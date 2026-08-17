@@ -610,7 +610,7 @@ export async function getLatestAnalytics(
     .where(eq(schema.analyticsReports.groupId, groupId))
     .orderBy(desc(schema.analyticsReports.date))
     .limit(1)
-    .get();
+    .then((rows) => rows.at(0));
 
   const insights: AnalyticsInsights | null = dbReport
     ? {

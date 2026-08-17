@@ -6,17 +6,17 @@
  * 収支・振替・取引の整合性を保つ。
  *
  * 使い方:
- *   DB_PATH=../../data/demo.db npx tsx src/seed.ts
- *   DB_PATH=../../data/demo.db npx tsx src/seed.ts --period=2026-03  # 2026-03まで生成
+ *   DB_PATH=../../data/demo-db npx tsx src/seed.ts
+ *   DB_PATH=../../data/demo-db npx tsx src/seed.ts --period=2026-03  # 2026-03まで生成
  */
 
-import { existsSync, unlinkSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { createClient } from "@libsql/client";
+import { PGlite } from "@electric-sql/pglite";
 import { getJstYearMonthKey, parseYearMonthKey } from "@mf-dashboard/date-utils";
-import { drizzle } from "drizzle-orm/libsql";
-import { migrate } from "drizzle-orm/libsql/migrator";
+import { drizzle } from "drizzle-orm/pglite";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import * as schema from "./schema/schema";
 import {
   ALL_GROUP_IDS,
@@ -54,11 +54,11 @@ import {
 // DB 初期化
 // ---------------------------------------------------------------------------
 const dbPath =
-  process.env.DB_PATH || join(import.meta.dirname, "..", "..", "..", "data", "demo.db");
+  process.env.DB_PATH || join(import.meta.dirname, "..", "..", "..", "data", "demo-db");
 
-if (existsSync(dbPath)) unlinkSync(dbPath);
+if (existsSync(dbPath)) rmSync(dbPath, { recursive: true });
 
-const client = createClient({ url: `file:${dbPath}` });
+const client = new PGlite(dbPath);
 const db = drizzle(client, { schema });
 await migrate(db, { migrationsFolder: join(import.meta.dirname, "../drizzle") });
 
@@ -107,41 +107,32 @@ console.log(
 // ---------------------------------------------------------------------------
 // 1. グループ
 // ---------------------------------------------------------------------------
-await db
-  .insert(schema.groups)
-  .values({
-    id: GROUP_ID,
-    name: "グループ選択なし",
-    isCurrent: true,
-    lastScrapedAt: now(),
-    createdAt: now(),
-    updatedAt: now(),
-  })
-  .run();
+await db.insert(schema.groups).values({
+  id: GROUP_ID,
+  name: "グループ選択なし",
+  isCurrent: true,
+  lastScrapedAt: now(),
+  createdAt: now(),
+  updatedAt: now(),
+});
 
-await db
-  .insert(schema.groups)
-  .values({
-    id: GROUP_ID_INVESTMENT,
-    name: "投資",
-    isCurrent: false,
-    lastScrapedAt: now(),
-    createdAt: now(),
-    updatedAt: now(),
-  })
-  .run();
+await db.insert(schema.groups).values({
+  id: GROUP_ID_INVESTMENT,
+  name: "投資",
+  isCurrent: false,
+  lastScrapedAt: now(),
+  createdAt: now(),
+  updatedAt: now(),
+});
 
-await db
-  .insert(schema.groups)
-  .values({
-    id: GROUP_ID_LIVING,
-    name: "生活",
-    isCurrent: false,
-    lastScrapedAt: now(),
-    createdAt: now(),
-    updatedAt: now(),
-  })
-  .run();
+await db.insert(schema.groups).values({
+  id: GROUP_ID_LIVING,
+  name: "生活",
+  isCurrent: false,
+  lastScrapedAt: now(),
+  createdAt: now(),
+  updatedAt: now(),
+});
 
 // ---------------------------------------------------------------------------
 // 2. 機関カテゴリ
@@ -158,7 +149,7 @@ for (const category of institutionCategoryDefs) {
       updatedAt: ts,
     })
     .returning({ id: schema.institutionCategories.id })
-    .get();
+    .then((rows) => rows.at(0));
   instCatIds[category.name] = result!.id;
 }
 
@@ -176,7 +167,7 @@ for (const name of assetCategoryNames) {
       updatedAt: ts,
     })
     .returning({ id: schema.assetCategories.id })
-    .get();
+    .then((rows) => rows.at(0));
   assetCatIds[name] = result!.id;
 }
 
@@ -199,19 +190,16 @@ for (const account of accountDefs) {
       updatedAt: ts,
     })
     .returning({ id: schema.accounts.id })
-    .get();
+    .then((rows) => rows.at(0));
   accountIds[account.name] = result!.id;
 
   for (const groupId of getGroupsForCategory(account.categoryName)) {
-    await db
-      .insert(schema.groupAccounts)
-      .values({
-        groupId,
-        accountId: result!.id,
-        createdAt: ts,
-        updatedAt: ts,
-      })
-      .run();
+    await db.insert(schema.groupAccounts).values({
+      groupId,
+      accountId: result!.id,
+      createdAt: ts,
+      updatedAt: ts,
+    });
   }
 }
 
@@ -237,7 +225,7 @@ const snapshotResult = await db
     updatedAt: now(),
   })
   .returning({ id: schema.dailySnapshots.id })
-  .get();
+  .then((rows) => rows.at(0));
 const snapshotId = snapshotResult!.id;
 
 const accountTotalAssets: Record<number, number> = {};
@@ -261,24 +249,21 @@ for (const holding of holdingDefs) {
       updatedAt: ts,
     })
     .returning({ id: schema.holdings.id })
-    .get();
+    .then((rows) => rows.at(0));
 
-  await db
-    .insert(schema.holdingValues)
-    .values({
-      holdingId: holdingResult!.id,
-      snapshotId,
-      amount: holding.amount,
-      quantity: holding.quantity ?? null,
-      unitPrice: holding.unitPrice ?? null,
-      avgCostPrice: holding.avgCostPrice ?? null,
-      dailyChange: holding.dailyChange ?? null,
-      unrealizedGain: holding.unrealizedGain ?? null,
-      unrealizedGainPct: holding.unrealizedGainPct ?? null,
-      createdAt: ts,
-      updatedAt: ts,
-    })
-    .run();
+  await db.insert(schema.holdingValues).values({
+    holdingId: holdingResult!.id,
+    snapshotId,
+    amount: holding.amount,
+    quantity: holding.quantity ?? null,
+    unitPrice: holding.unitPrice ?? null,
+    avgCostPrice: holding.avgCostPrice ?? null,
+    dailyChange: holding.dailyChange ?? null,
+    unrealizedGain: holding.unrealizedGain ?? null,
+    unrealizedGainPct: holding.unrealizedGainPct ?? null,
+    createdAt: ts,
+    updatedAt: ts,
+  });
 
   if (holding.type === "asset") {
     accountTotalAssets[accId] = (accountTotalAssets[accId] || 0) + holding.amount;
@@ -298,18 +283,15 @@ for (const account of accountDefs) {
     status = "updating";
   }
 
-  await db
-    .insert(schema.accountStatuses)
-    .values({
-      accountId: accId,
-      status,
-      lastUpdated: ts,
-      totalAssets: accountTotalAssets[accId] || 0,
-      errorMessage,
-      createdAt: ts,
-      updatedAt: ts,
-    })
-    .run();
+  await db.insert(schema.accountStatuses).values({
+    accountId: accId,
+    status,
+    lastUpdated: ts,
+    totalAssets: accountTotalAssets[accId] || 0,
+    errorMessage,
+    createdAt: ts,
+    updatedAt: ts,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -426,25 +408,22 @@ forEachMonth(range, (y, m) => {
 await db.transaction(async (tx) => {
   for (const txRecord of allTransactions) {
     const ts = now();
-    await tx
-      .insert(schema.transactions)
-      .values({
-        mfId: txRecord.mfId,
-        date: txRecord.date,
-        accountId: txRecord.accountId,
-        category: txRecord.category,
-        subCategory: txRecord.subCategory,
-        description: txRecord.description,
-        amount: txRecord.amount,
-        type: txRecord.type,
-        isTransfer: txRecord.isTransfer,
-        isExcludedFromCalculation: txRecord.isExcludedFromCalculation,
-        transferTarget: txRecord.transferTarget,
-        transferTargetAccountId: txRecord.transferTargetAccountId,
-        createdAt: ts,
-        updatedAt: ts,
-      })
-      .run();
+    await tx.insert(schema.transactions).values({
+      mfId: txRecord.mfId,
+      date: txRecord.date,
+      accountId: txRecord.accountId,
+      category: txRecord.category,
+      subCategory: txRecord.subCategory,
+      description: txRecord.description,
+      amount: txRecord.amount,
+      type: txRecord.type,
+      isTransfer: txRecord.isTransfer,
+      isExcludedFromCalculation: txRecord.isExcludedFromCalculation,
+      transferTarget: txRecord.transferTarget,
+      transferTargetAccountId: txRecord.transferTargetAccountId,
+      createdAt: ts,
+      updatedAt: ts,
+    });
   }
 });
 
@@ -488,7 +467,7 @@ if (insightCount > 0) {
 // ---------------------------------------------------------------------------
 // 完了
 // ---------------------------------------------------------------------------
-client.close();
+await client.close();
 
 const yearTotalIncome = Object.values(groupMonthlyData[GROUP_ID].income).reduce((s, v) => s + v, 0);
 const yearTotalExpense = Object.values(groupMonthlyData[GROUP_ID].expense).reduce(

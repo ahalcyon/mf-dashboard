@@ -9,12 +9,12 @@ export async function getCurrentGroupId(db: Db): Promise<string | null> {
     .select({ id: schema.groups.id })
     .from(schema.groups)
     .where(eq(schema.groups.isCurrent, true))
-    .get();
+    .then((rows) => rows.at(0));
   return group?.id ?? null;
 }
 
 export async function clearGroupAccountLinks(db: DbExecutor, groupId: string): Promise<void> {
-  await db.delete(schema.groupAccounts).where(eq(schema.groupAccounts.groupId, groupId)).run();
+  await db.delete(schema.groupAccounts).where(eq(schema.groupAccounts.groupId, groupId));
 }
 
 export async function linkAccountToGroup(
@@ -30,14 +30,13 @@ export async function linkAccountToGroup(
       createdAt: now(),
       updatedAt: now(),
     })
-    .onConflictDoNothing()
-    .run();
+    .onConflictDoNothing();
 }
 
 export async function upsertGroup(db: DbExecutor, group: Group): Promise<void> {
   // isCurrent=trueの場合のみ、他のグループをfalseにする
   if (group.isCurrent) {
-    await db.update(schema.groups).set({ isCurrent: false, updatedAt: now() }).run();
+    await db.update(schema.groups).set({ isCurrent: false, updatedAt: now() });
   }
 
   // グループをupsert
@@ -65,13 +64,12 @@ export async function updateGroupLastScrapedAt(
   await db
     .update(schema.groups)
     .set({ lastScrapedAt: timestamp, updatedAt: now() })
-    .where(eq(schema.groups.id, groupId))
-    .run();
+    .where(eq(schema.groups.id, groupId));
 }
 
 export async function deleteGroupsNotIn(db: DbExecutor, groupIds: string[]): Promise<void> {
   if (groupIds.length === 0) return;
-  await db.delete(schema.groups).where(notInArray(schema.groups.id, groupIds)).run();
+  await db.delete(schema.groups).where(notInArray(schema.groups.id, groupIds));
 }
 
 /**
@@ -92,5 +90,5 @@ export async function linkAccountsToGroup(
     updatedAt: timestamp,
   }));
 
-  await db.insert(schema.groupAccounts).values(records).onConflictDoNothing().run();
+  await db.insert(schema.groupAccounts).values(records).onConflictDoNothing();
 }

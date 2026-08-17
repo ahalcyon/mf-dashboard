@@ -24,8 +24,7 @@ export async function getBankForecastDismissals(groupIdParam?: string, db: Db = 
       dismissedThroughDate: schema.bankForecastDismissals.dismissedThroughDate,
     })
     .from(schema.bankForecastDismissals)
-    .where(inArray(schema.bankForecastDismissals.accountId, accountIds))
-    .all();
+    .where(inArray(schema.bankForecastDismissals.accountId, accountIds));
 }
 
 export async function dismissBankForecastCandidate(
@@ -50,7 +49,7 @@ export async function dismissBankForecastCandidate(
         schema.bankForecastDismissals.recurringIdentity,
       ],
       set: {
-        dismissedThroughDate: sql`max(${schema.bankForecastDismissals.dismissedThroughDate}, excluded.dismissed_through_date)`,
+        dismissedThroughDate: sql`GREATEST(${schema.bankForecastDismissals.dismissedThroughDate}, excluded.dismissed_through_date)`,
         updatedAt: now,
       },
     });

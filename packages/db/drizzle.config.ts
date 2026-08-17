@@ -1,10 +1,10 @@
 import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({
-  dialect: "sqlite",
+  dialect: "postgresql",
   schema: "./src/schema/schema.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: process.env.DB_PATH || "../../data/moneyforward.db",
+    url: process.env.DATABASE_URL || "postgres://localhost:5432/moneyforward",
   },
 });

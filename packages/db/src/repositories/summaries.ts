@@ -47,14 +47,12 @@ async function saveAssetHistoryCategories(
           eq(schema.assetHistoryCategories.assetHistoryId, historyId),
           notInArray(schema.assetHistoryCategories.categoryName, categoryNames),
         ),
-      )
-      .run();
+      );
   } else {
     // カテゴリが空の場合は全削除
     await db
       .delete(schema.assetHistoryCategories)
-      .where(eq(schema.assetHistoryCategories.assetHistoryId, historyId))
-      .run();
+      .where(eq(schema.assetHistoryCategories.assetHistoryId, historyId));
     return;
   }
 
@@ -82,8 +80,7 @@ async function saveAssetHistoryCategories(
         amount: sql`excluded.amount`,
         updatedAt: timestamp,
       },
-    })
-    .run();
+    });
 }
 
 // ============================================================================

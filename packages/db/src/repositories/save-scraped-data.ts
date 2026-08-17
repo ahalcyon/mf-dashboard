@@ -249,14 +249,15 @@ async function saveScrapedDataAtomically(db: DbExecutor, data: ScrapedData): Pro
   log(`  - Snapshot ID: ${snapshotId}`);
 
   // 7. Unknown account for unmatched items
-  let unknownAccount = await db
+  const existingUnknownAccount = await db
     .select()
     .from(schema.accounts)
     .where(eq(schema.accounts.mfId, "unknown"))
-    .get();
+    .then((rows) => rows.at(0));
 
+  let unknownAccount = existingUnknownAccount;
   if (!unknownAccount) {
-    unknownAccount = await db
+    const inserted = await db
       .insert(schema.accounts)
       .values({
         mfId: "unknown",
@@ -265,8 +266,8 @@ async function saveScrapedDataAtomically(db: DbExecutor, data: ScrapedData): Pro
         createdAt: now(),
         updatedAt: now(),
       })
-      .returning()
-      .get();
+      .returning();
+    unknownAccount = inserted[0]!;
   }
   const unknownAccountId = unknownAccount.id;
 

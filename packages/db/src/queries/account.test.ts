@@ -55,17 +55,14 @@ async function createTestAccount(data: {
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
 
-  await db
-    .insert(schema.groupAccounts)
-    .values({
-      groupId: TEST_GROUP_ID,
-      accountId: account.id,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.groupAccounts).values({
+    groupId: TEST_GROUP_ID,
+    accountId: account.id,
+    createdAt: now,
+    updatedAt: now,
+  });
 
   return account.id;
 }
@@ -80,18 +77,15 @@ async function createAccountStatus(
   },
 ) {
   const now = new Date().toISOString();
-  await db
-    .insert(schema.accountStatuses)
-    .values({
-      accountId,
-      status: data.status ?? "ok",
-      lastUpdated: data.lastUpdated ?? now,
-      totalAssets: data.totalAssets ?? 0,
-      errorMessage: data.errorMessage ?? null,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.accountStatuses).values({
+    accountId,
+    status: data.status ?? "ok",
+    lastUpdated: data.lastUpdated ?? now,
+    totalAssets: data.totalAssets ?? 0,
+    errorMessage: data.errorMessage ?? null,
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
 async function createCategory(name: string, displayOrder: number): Promise<number> {
@@ -105,7 +99,7 @@ async function createCategory(name: string, displayOrder: number): Promise<numbe
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
   return category.id;
 }
 
@@ -164,12 +158,12 @@ describe("buildActiveAccountCondition", () => {
     await createTestAccount({ mfId: "mf1", name: "Active Account", isActive: true });
     await createTestAccount({ mfId: "mf2", name: "Inactive Account", isActive: false });
 
-    const accountIds = (
-      await db.select({ id: schema.accounts.id }).from(schema.accounts).all()
-    ).map((a) => a.id);
+    const accountIds = (await db.select({ id: schema.accounts.id }).from(schema.accounts)).map(
+      (a) => a.id,
+    );
 
     const condition = buildActiveAccountCondition(accountIds);
-    const results = await db.select().from(schema.accounts).where(condition).all();
+    const results = await db.select().from(schema.accounts).where(condition);
 
     expect(results).toHaveLength(1);
     expect(results[0].name).toBe("Active Account");
@@ -190,23 +184,20 @@ describe("buildActiveAccountCondition", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
-    await db
-      .insert(schema.groupAccounts)
-      .values({
-        groupId: TEST_GROUP_ID,
-        accountId: unknownAccount.id,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+      .then((rows) => rows.at(0)!);
+    await db.insert(schema.groupAccounts).values({
+      groupId: TEST_GROUP_ID,
+      accountId: unknownAccount.id,
+      createdAt: now,
+      updatedAt: now,
+    });
 
-    const accountIds = (
-      await db.select({ id: schema.accounts.id }).from(schema.accounts).all()
-    ).map((a) => a.id);
+    const accountIds = (await db.select({ id: schema.accounts.id }).from(schema.accounts)).map(
+      (a) => a.id,
+    );
 
     const condition = buildActiveAccountCondition(accountIds);
-    const results = await db.select().from(schema.accounts).where(condition).all();
+    const results = await db.select().from(schema.accounts).where(condition);
 
     expect(results).toHaveLength(1);
     expect(results[0].name).toBe("Normal Account");
@@ -217,7 +208,7 @@ describe("buildActiveAccountCondition", () => {
     await createTestAccount({ mfId: "mf2", name: "Account 2" });
 
     const condition = buildActiveAccountCondition([accountId1]);
-    const results = await db.select().from(schema.accounts).where(condition).all();
+    const results = await db.select().from(schema.accounts).where(condition);
 
     expect(results).toHaveLength(1);
     expect(results[0].name).toBe("Account 1");
@@ -370,8 +361,7 @@ describe("getLatestUpdateDate", () => {
     await db
       .update(schema.groups)
       .set({ lastScrapedAt: "2025-04-15T10:00:00Z" })
-      .where(eq(schema.groups.id, TEST_GROUP_ID))
-      .run();
+      .where(eq(schema.groups.id, TEST_GROUP_ID));
 
     const result = await getLatestUpdateDate(undefined, db);
 
@@ -500,17 +490,14 @@ describe("getAccountByMfId", () => {
   it("グループ外のアカウントはnullを返す", async () => {
     // グループに所属しないアカウントを作成
     const now = new Date().toISOString();
-    await db
-      .insert(schema.accounts)
-      .values({
-        mfId: "mf_outside",
-        name: "Outside Account",
-        type: "bank",
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.accounts).values({
+      mfId: "mf_outside",
+      name: "Outside Account",
+      type: "bank",
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const result = await getAccountByMfId("mf_outside", undefined, db);
 

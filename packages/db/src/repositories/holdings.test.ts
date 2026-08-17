@@ -49,7 +49,7 @@ describe("createHolding + saveHoldingValue", () => {
       unitPrice: 10000,
     });
 
-    const values = await db.select().from(schema.holdingValues).all();
+    const values = await db.select().from(schema.holdingValues);
     expect(values).toHaveLength(1);
     expect(values[0].amount).toBe(1000000);
   });

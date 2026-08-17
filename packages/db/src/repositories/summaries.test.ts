@@ -46,11 +46,11 @@ describe("saveAssetHistory", () => {
 
   test("資産履歴を保存できる", async () => {
     await saveAssetHistory(db, TEST_GROUP_ID, points);
-    const result = await db.select().from(schema.assetHistory).all();
+    const result = await db.select().from(schema.assetHistory);
     expect(result).toHaveLength(1);
     expect(result[0].totalAssets).toBe(10000000);
 
-    const categories = await db.select().from(schema.assetHistoryCategories).all();
+    const categories = await db.select().from(schema.assetHistoryCategories);
     expect(categories).toHaveLength(6);
     const deposit = categories.find((c) => c.categoryName === "預金・現金");
     expect(deposit?.amount).toBe(3000000);
@@ -72,11 +72,11 @@ describe("saveAssetHistory", () => {
         },
       },
     ]);
-    const result = await db.select().from(schema.assetHistory).all();
+    const result = await db.select().from(schema.assetHistory);
     expect(result).toHaveLength(1);
     expect(result[0].totalAssets).toBe(11000000);
 
-    const categories = await db.select().from(schema.assetHistoryCategories).all();
+    const categories = await db.select().from(schema.assetHistoryCategories);
     const deposit = categories.find((c) => c.categoryName === "預金・現金");
     expect(deposit?.amount).toBe(4000000);
   });
@@ -84,7 +84,7 @@ describe("saveAssetHistory", () => {
   test("スクレイピング結果にないカテゴリは削除される", async () => {
     // 最初に保険カテゴリを含むデータを保存
     await saveAssetHistory(db, TEST_GROUP_ID, points);
-    const categoriesBefore = await db.select().from(schema.assetHistoryCategories).all();
+    const categoriesBefore = await db.select().from(schema.assetHistoryCategories);
     expect(categoriesBefore).toHaveLength(6);
     expect(categoriesBefore.find((c) => c.categoryName === "保険")).toBeDefined();
 
@@ -103,14 +103,14 @@ describe("saveAssetHistory", () => {
       },
     ]);
 
-    const categoriesAfter = await db.select().from(schema.assetHistoryCategories).all();
+    const categoriesAfter = await db.select().from(schema.assetHistoryCategories);
     expect(categoriesAfter).toHaveLength(5);
     expect(categoriesAfter.find((c) => c.categoryName === "保険")).toBeUndefined();
   });
 
   test("カテゴリが空の場合は全削除される", async () => {
     await saveAssetHistory(db, TEST_GROUP_ID, points);
-    const categoriesBefore = await db.select().from(schema.assetHistoryCategories).all();
+    const categoriesBefore = await db.select().from(schema.assetHistoryCategories);
     expect(categoriesBefore).toHaveLength(6);
 
     // 空のカテゴリで更新
@@ -121,7 +121,7 @@ describe("saveAssetHistory", () => {
       },
     ]);
 
-    const categoriesAfter = await db.select().from(schema.assetHistoryCategories).all();
+    const categoriesAfter = await db.select().from(schema.assetHistoryCategories);
     expect(categoriesAfter).toHaveLength(0);
   });
 });
@@ -134,12 +134,10 @@ describe("グループ分離", () => {
     const ts = new Date().toISOString();
     await db
       .insert(schema.groups)
-      .values({ id: GROUP_A, name: "グループA", isCurrent: false, createdAt: ts, updatedAt: ts })
-      .run();
+      .values({ id: GROUP_A, name: "グループA", isCurrent: false, createdAt: ts, updatedAt: ts });
     await db
       .insert(schema.groups)
-      .values({ id: GROUP_B, name: "グループB", isCurrent: false, createdAt: ts, updatedAt: ts })
-      .run();
+      .values({ id: GROUP_B, name: "グループB", isCurrent: false, createdAt: ts, updatedAt: ts });
   });
 
   test("異なるグループで独立した資産履歴を保存できる", async () => {
@@ -163,7 +161,7 @@ describe("グループ分離", () => {
     await saveAssetHistory(db, GROUP_A, pointsA);
     await saveAssetHistory(db, GROUP_B, pointsB);
 
-    const all = await db.select().from(schema.assetHistory).all();
+    const all = await db.select().from(schema.assetHistory);
     expect(all).toHaveLength(2);
 
     const historyA = all.find((h) => h.groupId === GROUP_A);

@@ -34,7 +34,7 @@ describe("upsertGroup", () => {
 
   test("新規グループを作成できる", async () => {
     await upsertGroup(db, group);
-    const result = await db.select().from(schema.groups).all();
+    const result = await db.select().from(schema.groups);
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("テストグループ");
     expect(result[0].isCurrent).toBe(true);
@@ -43,7 +43,7 @@ describe("upsertGroup", () => {
   test("既存グループを更新できる", async () => {
     await upsertGroup(db, group);
     await upsertGroup(db, { ...group, name: "更新後" });
-    const result = await db.select().from(schema.groups).all();
+    const result = await db.select().from(schema.groups);
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("更新後");
   });
@@ -51,7 +51,11 @@ describe("upsertGroup", () => {
   test("新しいグループをupsertすると古いグループのisCurrentがfalseになる", async () => {
     await upsertGroup(db, group);
     await upsertGroup(db, { id: "g2", name: "別のグループ", isCurrent: true });
-    const g1 = await db.select().from(schema.groups).where(eq(schema.groups.id, "g1")).get();
+    const g1 = await db
+      .select()
+      .from(schema.groups)
+      .where(eq(schema.groups.id, "g1"))
+      .then((rows) => rows.at(0)!);
     expect(g1?.isCurrent).toBe(false);
   });
 
@@ -59,8 +63,16 @@ describe("upsertGroup", () => {
     await upsertGroup(db, { id: "g1", name: "グループ1", isCurrent: true });
     await upsertGroup(db, { id: "g2", name: "グループ2", isCurrent: false });
 
-    const g1 = await db.select().from(schema.groups).where(eq(schema.groups.id, "g1")).get();
-    const g2 = await db.select().from(schema.groups).where(eq(schema.groups.id, "g2")).get();
+    const g1 = await db
+      .select()
+      .from(schema.groups)
+      .where(eq(schema.groups.id, "g1"))
+      .then((rows) => rows.at(0)!);
+    const g2 = await db
+      .select()
+      .from(schema.groups)
+      .where(eq(schema.groups.id, "g2"))
+      .then((rows) => rows.at(0)!);
 
     expect(g1?.isCurrent).toBe(true);
     expect(g2?.isCurrent).toBe(false);
@@ -72,7 +84,7 @@ describe("upsertGroup", () => {
     await upsertGroup(db, { id: "g3", name: "グループ3", isCurrent: false });
     await upsertGroup(db, { id: "g4", name: "グループ4", isCurrent: false });
 
-    const groups = await db.select().from(schema.groups).all();
+    const groups = await db.select().from(schema.groups);
     const currentGroups = groups.filter((g) => g.isCurrent);
 
     expect(currentGroups).toHaveLength(1);
@@ -96,20 +108,32 @@ describe("updateGroupLastScrapedAt", () => {
 
     await updateGroupLastScrapedAt(db, "g1", timestamp);
 
-    const result = await db.select().from(schema.groups).where(eq(schema.groups.id, "g1")).get();
+    const result = await db
+      .select()
+      .from(schema.groups)
+      .where(eq(schema.groups.id, "g1"))
+      .then((rows) => rows.at(0)!);
     expect(result?.lastScrapedAt).toBe(timestamp);
   });
 
   test("updatedAt も更新される", async () => {
     await upsertGroup(db, { id: "g1", name: "テストグループ", isCurrent: true });
-    const before = await db.select().from(schema.groups).where(eq(schema.groups.id, "g1")).get();
+    const before = await db
+      .select()
+      .from(schema.groups)
+      .where(eq(schema.groups.id, "g1"))
+      .then((rows) => rows.at(0)!);
 
     // 時間を1秒進める
     vi.advanceTimersByTime(1000);
 
     await updateGroupLastScrapedAt(db, "g1", "2025-04-29T14:00:00.000Z");
 
-    const after = await db.select().from(schema.groups).where(eq(schema.groups.id, "g1")).get();
+    const after = await db
+      .select()
+      .from(schema.groups)
+      .where(eq(schema.groups.id, "g1"))
+      .then((rows) => rows.at(0)!);
     expect(after?.updatedAt).not.toBe(before?.updatedAt);
     expect(after?.updatedAt).toBe("2025-04-29T12:00:01.000Z");
   });
@@ -127,7 +151,7 @@ describe("getCurrentGroupId", () => {
   test("現在のグループがない場合はnullを返す", async () => {
     // グループを作成してからisCurrent=falseに更新
     await upsertGroup(db, { id: "g1", name: "テストグループ", isCurrent: true });
-    await db.update(schema.groups).set({ isCurrent: false }).run();
+    await db.update(schema.groups).set({ isCurrent: false });
 
     const result = await getCurrentGroupId(db);
 
@@ -172,11 +196,11 @@ describe("clearGroupAccountLinks", () => {
     await linkAccountToGroup(db, "g1", account1);
     await linkAccountToGroup(db, "g1", account2);
 
-    expect(await db.select().from(schema.groupAccounts).all()).toHaveLength(2);
+    expect(await db.select().from(schema.groupAccounts)).toHaveLength(2);
 
     await clearGroupAccountLinks(db, "g1");
 
-    expect(await db.select().from(schema.groupAccounts).all()).toHaveLength(0);
+    expect(await db.select().from(schema.groupAccounts)).toHaveLength(0);
   });
 
   test("他のグループのリンクには影響しない", async () => {
@@ -190,7 +214,7 @@ describe("clearGroupAccountLinks", () => {
 
     await clearGroupAccountLinks(db, "g1");
 
-    const remaining = await db.select().from(schema.groupAccounts).all();
+    const remaining = await db.select().from(schema.groupAccounts);
     expect(remaining).toHaveLength(1);
     expect(remaining[0].groupId).toBe("g2");
   });
@@ -213,7 +237,7 @@ describe("deleteGroupsNotIn", () => {
 
     await deleteGroupsNotIn(db, ["g1", "g2"]);
 
-    const result = await db.select().from(schema.groups).all();
+    const result = await db.select().from(schema.groups);
     expect(result).toHaveLength(2);
     expect(result.map((g) => g.id).sort()).toEqual(["g1", "g2"]);
   });
@@ -224,7 +248,7 @@ describe("deleteGroupsNotIn", () => {
 
     await deleteGroupsNotIn(db, ["g1", "g2"]);
 
-    const result = await db.select().from(schema.groups).all();
+    const result = await db.select().from(schema.groups);
     expect(result).toHaveLength(2);
   });
 
@@ -233,7 +257,7 @@ describe("deleteGroupsNotIn", () => {
 
     await deleteGroupsNotIn(db, []);
 
-    const result = await db.select().from(schema.groups).all();
+    const result = await db.select().from(schema.groups);
     expect(result).toHaveLength(1);
   });
 
@@ -245,7 +269,7 @@ describe("deleteGroupsNotIn", () => {
 
     await deleteGroupsNotIn(db, ["g1", NO_GROUP_ID]);
 
-    const result = await db.select().from(schema.groups).all();
+    const result = await db.select().from(schema.groups);
     expect(result).toHaveLength(2);
     expect(result.map((g) => g.id).sort()).toEqual(["0", "g1"]);
   });
@@ -258,7 +282,7 @@ describe("linkAccountToGroup", () => {
 
     await linkAccountToGroup(db, "g1", accountId);
 
-    const result = await db.select().from(schema.groupAccounts).all();
+    const result = await db.select().from(schema.groupAccounts);
     expect(result).toHaveLength(1);
     expect(result[0].groupId).toBe("g1");
     expect(result[0].accountId).toBe(accountId);
@@ -272,7 +296,7 @@ describe("linkAccountToGroup", () => {
     await linkAccountToGroup(db, "g1", accountId);
     await linkAccountToGroup(db, "g1", accountId);
 
-    const result = await db.select().from(schema.groupAccounts).all();
+    const result = await db.select().from(schema.groupAccounts);
     expect(result).toHaveLength(1);
   });
 
@@ -284,7 +308,7 @@ describe("linkAccountToGroup", () => {
     await linkAccountToGroup(db, "g1", accountId);
     await linkAccountToGroup(db, "g2", accountId);
 
-    const result = await db.select().from(schema.groupAccounts).all();
+    const result = await db.select().from(schema.groupAccounts);
     expect(result).toHaveLength(2);
     expect(result.map((r) => r.groupId).sort()).toEqual(["g1", "g2"]);
   });
@@ -297,7 +321,7 @@ describe("linkAccountToGroup", () => {
     await linkAccountToGroup(db, "g1", account1);
     await linkAccountToGroup(db, "g1", account2);
 
-    const result = await db.select().from(schema.groupAccounts).all();
+    const result = await db.select().from(schema.groupAccounts);
     expect(result).toHaveLength(2);
     expect(result.map((r) => r.accountId).sort((a, b) => a - b)).toEqual(
       [account1, account2].sort((a, b) => a - b),

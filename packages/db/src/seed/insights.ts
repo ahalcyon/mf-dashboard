@@ -25,22 +25,19 @@ export async function seedInsights({
     readFileSync(insightsPath, "utf-8"),
   );
   for (const [groupId, data] of Object.entries(insights)) {
-    await db
-      .insert(schema.analyticsReports)
-      .values({
-        groupId,
-        date: dateStr(yearEnd, monthEnd, fixedDay),
-        summary: data.summary,
-        savingsInsight: data.savingsInsight,
-        investmentInsight: data.investmentInsight,
-        spendingInsight: data.spendingInsight,
-        balanceInsight: data.balanceInsight,
-        liabilityInsight: data.liabilityInsight,
-        model: "demo",
-        createdAt: now(),
-        updatedAt: now(),
-      })
-      .run();
+    await db.insert(schema.analyticsReports).values({
+      groupId,
+      date: dateStr(yearEnd, monthEnd, fixedDay),
+      summary: data.summary,
+      savingsInsight: data.savingsInsight,
+      investmentInsight: data.investmentInsight,
+      spendingInsight: data.spendingInsight,
+      balanceInsight: data.balanceInsight,
+      liabilityInsight: data.liabilityInsight,
+      model: "demo",
+      createdAt: now(),
+      updatedAt: now(),
+    });
   }
 
   return Object.keys(insights).length;

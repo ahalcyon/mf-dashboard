@@ -25,6 +25,5 @@ export async function getAllInstitutionCategories(db: Db) {
   return await db
     .select()
     .from(schema.institutionCategories)
-    .orderBy(schema.institutionCategories.displayOrder)
-    .all();
+    .orderBy(schema.institutionCategories.displayOrder);
 }

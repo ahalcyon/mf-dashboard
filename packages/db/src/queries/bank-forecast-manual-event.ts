@@ -42,8 +42,7 @@ async function resolveBankForecastScope(
     )
     .where(
       and(inArray(schema.accounts.id, accountIds), eq(schema.institutionCategories.name, "銀行")),
-    )
-    .all();
+    );
   return { groupId, accountIds: rows.map(({ id }) => id) };
 }
 
@@ -63,8 +62,7 @@ export async function getBankForecastManualEvents(
         inArray(schema.bankForecastManualEvents.accountId, scope.accountIds),
       ),
     )
-    .orderBy(asc(schema.bankForecastManualEvents.date), asc(schema.bankForecastManualEvents.id))
-    .all();
+    .orderBy(asc(schema.bankForecastManualEvents.date), asc(schema.bankForecastManualEvents.id));
 }
 
 export async function createBankForecastManualEvent(
@@ -80,7 +78,7 @@ export async function createBankForecastManualEvent(
     .insert(schema.bankForecastManualEvents)
     .values({ ...input, groupId: scope.groupId, createdAt: now, updatedAt: now })
     .returning(eventSelection)
-    .get();
+    .then((rows) => rows.at(0) ?? null);
 }
 
 export async function updateBankForecastManualEvent(
@@ -102,7 +100,7 @@ export async function updateBankForecastManualEvent(
       ),
     )
     .returning(eventSelection)
-    .get();
+    .then((rows) => rows.at(0));
   return updated ?? null;
 }
 
@@ -123,6 +121,6 @@ export async function deleteBankForecastManualEvent(
       ),
     )
     .returning({ id: schema.bankForecastManualEvents.id })
-    .get();
+    .then((rows) => rows.at(0));
   return deleted !== undefined;
 }

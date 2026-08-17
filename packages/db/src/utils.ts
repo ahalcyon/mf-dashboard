@@ -1,6 +1,6 @@
 import { formatIsoDateKey, getDaysInMonth, getJstDateParts } from "@mf-dashboard/date-utils";
 import { eq, type SQL } from "drizzle-orm";
-import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
+import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import type { Db, DbExecutor } from "./index";
 
 /** 現在時刻を ISO 8601 文字列で返す */
@@ -19,19 +19,22 @@ export function now(): string {
  */
 export async function upsertById<T extends { id: number }>(
   db: DbExecutor,
-  table: SQLiteTable,
+  table: PgTable,
   condition: SQL,
   insertValues: Record<string, unknown>,
   updateValues: Record<string, unknown>,
 ): Promise<number> {
-  const existing = (await db.select().from(table).where(condition).get()) as T | undefined;
+  const existing = (await db
+    .select()
+    .from(table)
+    .where(condition)
+    .then((rows) => rows.at(0))) as T | undefined;
 
   if (existing) {
     await db
       .update(table)
       .set({ ...updateValues, updatedAt: now() })
-      .where(condition)
-      .run();
+      .where(condition);
     return existing.id;
   }
 
@@ -39,7 +42,7 @@ export async function upsertById<T extends { id: number }>(
     .insert(table)
     .values({ ...insertValues, createdAt: now(), updatedAt: now() })
     .returning()
-    .get()) as { id: number };
+    .then((rows) => rows.at(0))) as { id: number };
 
   return result.id;
 }
@@ -49,21 +52,28 @@ export async function upsertById<T extends { id: number }>(
  */
 export async function upsertOne<T extends { id: number }>(
   db: Db,
-  table: SQLiteTable,
+  table: PgTable,
   condition: SQL,
   insertValues: Record<string, unknown>,
   updateValues: Record<string, unknown>,
 ): Promise<{ record: T; isNew: boolean }> {
-  const existing = (await db.select().from(table).where(condition).get()) as T | undefined;
+  const existing = (await db
+    .select()
+    .from(table)
+    .where(condition)
+    .then((rows) => rows.at(0))) as T | undefined;
 
   if (existing) {
     await db
       .update(table)
       .set({ ...updateValues, updatedAt: now() })
-      .where(condition)
-      .run();
+      .where(condition);
 
-    const updated = (await db.select().from(table).where(condition).get()) as T;
+    const updated = (await db
+      .select()
+      .from(table)
+      .where(condition)
+      .then((rows) => rows.at(0))) as T;
     return { record: updated, isNew: false };
   }
 
@@ -71,7 +81,7 @@ export async function upsertOne<T extends { id: number }>(
     .insert(table)
     .values({ ...insertValues, createdAt: now(), updatedAt: now() })
     .returning()
-    .get()) as T;
+    .then((rows) => rows.at(0))) as T;
 
   return { record: result, isNew: true };
 }
@@ -86,14 +96,16 @@ export async function upsertOne<T extends { id: number }>(
  */
 export async function getOrCreate(
   db: DbExecutor,
-  table: SQLiteTable,
+  table: PgTable,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  nameColumn: SQLiteColumn<any>,
+  nameColumn: PgColumn<any>,
   name: string,
 ): Promise<number> {
-  const existing = (await db.select().from(table).where(eq(nameColumn, name)).get()) as
-    | { id: number }
-    | undefined;
+  const existing = (await db
+    .select()
+    .from(table)
+    .where(eq(nameColumn, name))
+    .then((rows) => rows.at(0))) as { id: number } | undefined;
 
   if (existing) {
     return existing.id;
@@ -104,7 +116,7 @@ export async function getOrCreate(
     .insert(table)
     .values({ name, createdAt: timestamp, updatedAt: timestamp })
     .returning()
-    .get()) as { id: number };
+    .then((rows) => rows.at(0))) as { id: number };
 
   return result.id;
 }

@@ -34,7 +34,7 @@ beforeEach(async () => {
       updatedAt: now,
     })
     .returning({ id: schema.accounts.id })
-    .get();
+    .then((rows) => rows.at(0)!);
   accountId = account.id;
   await db.insert(schema.groupAccounts).values({
     groupId: TEST_GROUP_ID,
@@ -82,7 +82,7 @@ describe("bank forecast dismissals", () => {
         updatedAt: now,
       })
       .returning({ id: schema.accounts.id })
-      .get();
+      .then((rows) => rows.at(0)!);
     await db.insert(schema.groups).values({
       id: "other-group",
       name: "Other Group",

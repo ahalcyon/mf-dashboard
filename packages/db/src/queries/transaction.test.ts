@@ -20,16 +20,13 @@ beforeEach(async () => {
   await resetTestDb(db);
   // Setup test group
   const now = new Date().toISOString();
-  await db
-    .insert(schema.groups)
-    .values({
-      id: TEST_GROUP_ID,
-      name: "Test Group",
-      isCurrent: true,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.groups).values({
+    id: TEST_GROUP_ID,
+    name: "Test Group",
+    isCurrent: true,
+    createdAt: now,
+    updatedAt: now,
+  });
 });
 
 async function createTestAccount(name: string): Promise<number> {
@@ -44,17 +41,14 @@ async function createTestAccount(name: string): Promise<number> {
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
 
-  await db
-    .insert(schema.groupAccounts)
-    .values({
-      groupId: TEST_GROUP_ID,
-      accountId: account.id,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.groupAccounts).values({
+    groupId: TEST_GROUP_ID,
+    accountId: account.id,
+    createdAt: now,
+    updatedAt: now,
+  });
 
   return account.id;
 }
@@ -68,24 +62,21 @@ async function createTransaction(data: {
   transferTargetAccountId?: number;
 }) {
   const now = new Date().toISOString();
-  await db
-    .insert(schema.transactions)
-    .values({
-      mfId: `tx_${Date.now()}_${Math.random()}`,
-      date: data.date,
-      accountId: data.accountId,
-      category: data.category ?? null,
-      subCategory: null,
-      description: "Test transaction",
-      amount: data.amount,
-      type: data.type,
-      isTransfer: data.type === "transfer",
-      isExcludedFromCalculation: data.type === "transfer",
-      transferTargetAccountId: data.transferTargetAccountId ?? null,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.transactions).values({
+    mfId: `tx_${Date.now()}_${Math.random()}`,
+    date: data.date,
+    accountId: data.accountId,
+    category: data.category ?? null,
+    subCategory: null,
+    description: "Test transaction",
+    amount: data.amount,
+    type: data.type,
+    isTransfer: data.type === "transfer",
+    isExcludedFromCalculation: data.type === "transfer",
+    transferTargetAccountId: data.transferTargetAccountId ?? null,
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
 describe("getTransactions", () => {
@@ -147,7 +138,7 @@ describe("getTransactions", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     await createTransaction({
       accountId: externalAccount.id,
       transferTargetAccountId: bankAccountId,
@@ -217,7 +208,7 @@ describe("getTransactionsByMonth", () => {
           updatedAt: now,
         })
         .returning()
-        .get();
+        .then((rows) => rows.at(0)!);
 
       await createTransaction({
         accountId,

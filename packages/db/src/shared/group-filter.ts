@@ -8,7 +8,7 @@ export async function getDefaultGroupId(db: Db): Promise<string | null> {
     .select({ id: schema.groups.id })
     .from(schema.groups)
     .where(eq(schema.groups.isCurrent, true))
-    .get();
+    .then((rows) => rows.at(0));
   return currentGroup?.id ?? null;
 }
 
@@ -22,7 +22,6 @@ export async function getAccountIdsForGroup(db: Db, groupId: string): Promise<nu
   const groupAccounts = await db
     .select({ accountId: schema.groupAccounts.accountId })
     .from(schema.groupAccounts)
-    .where(eq(schema.groupAccounts.groupId, groupId))
-    .all();
+    .where(eq(schema.groupAccounts.groupId, groupId));
   return groupAccounts.map((ga) => ga.accountId);
 }

@@ -65,8 +65,7 @@ export async function updateAccountCategory(
   await db
     .update(schema.accounts)
     .set({ categoryId, updatedAt: now() })
-    .where(eq(schema.accounts.mfId, mfId))
-    .run();
+    .where(eq(schema.accounts.mfId, mfId));
 }
 
 /**
@@ -74,7 +73,7 @@ export async function updateAccountCategory(
  * トランザクション保存時のaccount_idルックアップ用
  */
 export async function buildAccountIdMap(db: DbExecutor): Promise<Map<string, number>> {
-  const accounts = await db.select().from(schema.accounts).all();
+  const accounts = await db.select().from(schema.accounts);
   const map = new Map<string, number>();
 
   for (const account of accounts) {
@@ -119,8 +118,7 @@ export async function upsertAccounts(db: DbExecutor, accounts: AccountStatus[]):
           isActive: sql`excluded.is_active`,
           updatedAt: timestamp,
         },
-      })
-      .run();
+      });
   }
 }
 
@@ -162,8 +160,7 @@ export async function saveAccountStatuses(
           errorMessage: sql`excluded.error_message`,
           updatedAt: timestamp,
         },
-      })
-      .run();
+      });
   }
 
   for (const { accountId, status } of statuses) {
@@ -175,7 +172,6 @@ export async function saveAccountStatuses(
         scheduledWithdrawalConfirmed: status.scheduledWithdrawalConfirmed ?? false,
         updatedAt: timestamp,
       })
-      .where(eq(schema.accountStatuses.accountId, accountId))
-      .run();
+      .where(eq(schema.accountStatuses.accountId, accountId));
   }
 }

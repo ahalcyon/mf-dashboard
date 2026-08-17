@@ -22,11 +22,11 @@ let temporaryDirectory: string;
 
 beforeAll(async () => {
   temporaryDirectory = mkdtempSync(join(tmpdir(), "mf-dashboard-transactions-"));
-  db = await createTestDb(`file:${join(temporaryDirectory, "test.db")}`);
+  db = await createTestDb(join(temporaryDirectory, "test-db"));
 });
 
-afterAll(() => {
-  closeTestDb(db);
+afterAll(async () => {
+  await closeTestDb(db);
   rmSync(temporaryDirectory, { recursive: true });
 });
 
@@ -48,7 +48,7 @@ describe("saveTransaction", () => {
       isExcludedFromCalculation: false,
     };
     await saveTransaction(db, item);
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result).toHaveLength(1);
     expect(result[0].amount).toBe(1000);
   });
@@ -65,7 +65,7 @@ describe("saveTransaction", () => {
         updatedAt: new Date().toISOString(),
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const accountId = accountResult.id;
 
     const accountIdMap = new Map<string, number>();
@@ -86,7 +86,7 @@ describe("saveTransaction", () => {
     };
     await saveTransaction(db, item, accountIdMap);
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result).toHaveLength(1);
     expect(result[0].accountId).toBe(accountId);
   });
@@ -103,7 +103,7 @@ describe("saveTransaction", () => {
         updatedAt: new Date().toISOString(),
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const accountId = accountResult.id;
 
     const accountIdMap = new Map<string, number>();
@@ -124,7 +124,7 @@ describe("saveTransaction", () => {
     };
     await saveTransaction(db, item, accountIdMap);
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result).toHaveLength(1);
     expect(result[0].accountId).toBe(accountId);
   });
@@ -141,7 +141,7 @@ describe("saveTransaction", () => {
         updatedAt: new Date().toISOString(),
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const sourceAccountId = sourceResult.id;
 
     // 送金先アカウントを作成
@@ -155,7 +155,7 @@ describe("saveTransaction", () => {
         updatedAt: new Date().toISOString(),
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const targetAccountId = targetResult.id;
 
     const accountIdMap = new Map<string, number>();
@@ -177,7 +177,7 @@ describe("saveTransaction", () => {
     };
     await saveTransaction(db, item, accountIdMap);
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result).toHaveLength(1);
     expect(result[0].accountId).toBe(targetAccountId);
     expect(result[0].transferTargetAccountId).toBe(sourceAccountId);
@@ -195,7 +195,7 @@ describe("saveTransaction", () => {
         updatedAt: new Date().toISOString(),
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const sourceAccountId = sourceResult.id;
 
     // 送金先アカウントを作成
@@ -209,7 +209,7 @@ describe("saveTransaction", () => {
         updatedAt: new Date().toISOString(),
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const targetAccountId = targetResult.id;
 
     const accountIdMap = new Map<string, number>();
@@ -231,7 +231,7 @@ describe("saveTransaction", () => {
     };
     await saveTransaction(db, item, accountIdMap);
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result).toHaveLength(1);
     expect(result[0].transferTargetAccountId).toBe(sourceAccountId);
   });
@@ -247,7 +247,7 @@ describe("saveTransaction", () => {
         updatedAt: new Date().toISOString(),
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const accountId = accountResult.id;
 
     const accountIdMap = new Map<string, number>();
@@ -268,7 +268,7 @@ describe("saveTransaction", () => {
     };
     await saveTransaction(db, item, accountIdMap);
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result).toHaveLength(1);
     expect(result[0].accountId).toBe(accountId);
     expect(result[0].transferTargetAccountId).toBeNull();
@@ -289,7 +289,7 @@ describe("saveTransaction", () => {
     };
     await saveTransaction(db, item);
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result).toHaveLength(1);
     expect(result[0].accountId).toBeNull();
   });
@@ -307,7 +307,7 @@ describe("saveTransaction", () => {
       isExcludedFromCalculation: false,
     };
     await saveTransaction(db, item);
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result).toHaveLength(0);
   });
 
@@ -325,7 +325,7 @@ describe("saveTransaction", () => {
     };
     await saveTransaction(db, item);
     await saveTransaction(db, { ...item, amount: 2000 });
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result).toHaveLength(1);
     expect(result[0].amount).toBe(2000);
   });
@@ -354,7 +354,7 @@ describe("saveTransaction", () => {
       isExcludedFromCalculation: true,
     });
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result).toHaveLength(1);
     expect(result[0].category).toBe("日用品");
     expect(result[0].subCategory).toBe("ドラッグストア");
@@ -481,7 +481,7 @@ describe("saveTransactionsForMonth", () => {
     });
 
     await expect(saveTransactionsForMonth(db, "", [])).rejects.toThrow("Invalid transaction month");
-    expect(await db.select().from(schema.transactions).all()).toHaveLength(1);
+    expect(await db.select().from(schema.transactions)).toHaveLength(1);
   });
 
   const items: CashFlowItem[] = [
@@ -534,7 +534,7 @@ describe("saveTransactionsForMonth", () => {
     const savedCount = await saveTransactionsForMonth(db, "2025-04", newItems);
 
     expect(savedCount).toBe(1);
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result).toHaveLength(1);
     expect(result[0].mfId).toBe("tx3");
   });
@@ -544,9 +544,9 @@ describe("saveTransactionsForMonth", () => {
 
     await saveTransactionsForMonth(db, "2025-04", items);
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result.map(({ mfId }) => mfId).sort()).toEqual(["tx1", "tx2"]);
-    await expect(db.select().from(schema.cashFlowPeriods).all()).resolves.toEqual([
+    await expect(db.select().from(schema.cashFlowPeriods)).resolves.toEqual([
       expect.objectContaining({ month: "2025-04", transactionCount: 2 }),
     ]);
   });
@@ -564,7 +564,7 @@ describe("saveTransactionsForMonth", () => {
     );
 
     expect(savedCount).toBe(0);
-    await expect(db.select().from(schema.transactions).all()).resolves.toEqual([]);
+    await expect(db.select().from(schema.transactions)).resolves.toEqual([]);
     await expect(hasCashFlowPeriod(db, "2025-04")).resolves.toBe(true);
   });
 
@@ -575,7 +575,7 @@ describe("saveTransactionsForMonth", () => {
       "incomplete cash flow period",
     );
 
-    await expect(db.select().from(schema.transactions).all()).resolves.toHaveLength(2);
+    await expect(db.select().from(schema.transactions)).resolves.toHaveLength(2);
   });
 
   test("完全性を確認できない非空入力でも既存データを削除しない", async () => {
@@ -592,7 +592,7 @@ describe("saveTransactionsForMonth", () => {
       ),
     ).rejects.toThrow("incomplete cash flow period");
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result.map(({ mfId }) => mfId).sort()).toEqual(["tx1", "tx2"]);
   });
 
@@ -603,7 +603,7 @@ describe("saveTransactionsForMonth", () => {
       saveTransactionsForMonth(db, "2025-04", [{ ...items[0]!, mfId: "" }]),
     ).rejects.toThrow("missing transaction ID");
 
-    await expect(db.select().from(schema.transactions).all()).resolves.toHaveLength(2);
+    await expect(db.select().from(schema.transactions)).resolves.toHaveLength(2);
   });
 
   test("MM/DD形式の日付は保存対象月の年で保存される", async () => {
@@ -622,7 +622,7 @@ describe("saveTransactionsForMonth", () => {
     ]);
 
     expect(savedCount).toBe(1);
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result).toHaveLength(1);
     expect(result[0].date).toBe("2025-12-31");
   });
@@ -665,7 +665,7 @@ describe("saveTransactionsForMonth", () => {
       },
     ]);
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result.map(({ mfId }) => mfId).sort()).toEqual(["period-august", "period-september"]);
   });
 
@@ -688,7 +688,7 @@ describe("saveTransactionsForMonth", () => {
       ]),
     ).rejects.toThrow("Overlapping transaction date ranges");
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result.map(({ mfId }) => mfId)).toEqual(["existing-transaction"]);
   });
 
@@ -704,7 +704,7 @@ describe("saveTransactionsForMonth", () => {
       }),
     ).rejects.toThrow("Invalid transaction date range");
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result.map(({ mfId }) => mfId)).toEqual(["existing-transaction"]);
   });
 
@@ -745,7 +745,7 @@ describe("saveTransactionsForMonth", () => {
       ),
     ).rejects.toThrow("Invalid transactions: item falls outside replacement date range");
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result.map(({ mfId }) => mfId)).toEqual(["existing-transaction"]);
   });
 
@@ -782,7 +782,7 @@ describe("saveTransactionsForMonth", () => {
       { from: "2026-07-26", to: "2026-08-25" },
     );
 
-    const result = await db.select().from(schema.transactions).all();
+    const result = await db.select().from(schema.transactions);
     expect(result.map(({ mfId }) => mfId)).toEqual(["current-end-day-transaction"]);
   });
 });

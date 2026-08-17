@@ -20,7 +20,7 @@ export async function createSnapshot(
       updatedAt: now(),
     })
     .returning({ id: schema.dailySnapshots.id })
-    .get();
+    .then((rows) => rows.at(0)!);
 
   const snapshotId = result.id;
 

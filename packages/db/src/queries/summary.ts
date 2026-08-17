@@ -37,7 +37,7 @@ export function buildIncludedTransactionCondition(accountIds: number[]) {
     // 通常の収入/支出（振替以外で計算対象）
     and(
       sql`${schema.transactions.type} != 'transfer'`,
-      sql`${schema.transactions.isExcludedFromCalculation} = 0`,
+      sql`${schema.transactions.isExcludedFromCalculation} IS FALSE`,
     ),
     // グループ内→グループ外への振替（カテゴリ別表示用）
     and(
@@ -127,8 +127,8 @@ export async function hasCommonGroup(
       .select({ groupId: schema.groupAccounts.groupId })
       .from(schema.groupAccounts)
       .where(eq(schema.groupAccounts.accountId, accountId1))
-      .all()
   )
+
     .map((g) => g.groupId)
     .filter((id) => id !== GROUP_NONE_ID);
 
@@ -138,8 +138,8 @@ export async function hasCommonGroup(
         .select({ groupId: schema.groupAccounts.groupId })
         .from(schema.groupAccounts)
         .where(eq(schema.groupAccounts.accountId, accountId2))
-        .all()
     )
+
       .map((g) => g.groupId)
       .filter((id) => id !== GROUP_NONE_ID),
   );
@@ -184,7 +184,7 @@ export async function getDeduplicatedTransferIncome(
       ),
     );
 
-  const transfers = await query.all();
+  const transfers = await query;
 
   // 重複除外: (date, amount, accountId, transferTargetAccountId) でユニーク化
   const seen = new Set<string>();
@@ -267,7 +267,7 @@ export async function getDeduplicatedTransferExpense(
       ),
     );
 
-  const transfers = await query.all();
+  const transfers = await query;
   const normalTransactions = await db
     .select({
       accountId: schema.transactions.accountId,
@@ -283,8 +283,7 @@ export async function getDeduplicatedTransferExpense(
         sql`${schema.transactions.type} IN ('income', 'expense')`,
         dateCondition ? like(schema.transactions.date, `${dateCondition}%`) : sql`1=1`,
       ),
-    )
-    .all();
+    );
   const normalTransactionKeys = createNormalTransactionMirrorKeys(normalTransactions);
 
   // 重複除外: (date, amount, accountId, transferTargetAccountId) でユニーク化
@@ -338,7 +337,7 @@ export async function getMonthlySummaries(
     })
     .from(schema.transactions)
     .where(inArray(schema.transactions.accountId, accountIds))
-    .get();
+    .then((rows) => rows.at(0));
 
   if (!oldestResult?.month) return [];
 
@@ -355,8 +354,7 @@ export async function getMonthlySummaries(
     })
     .from(schema.transactions)
     .where(buildGroupTransactionCondition(accountIds))
-    .groupBy(sql`substr(${schema.transactions.date}, 1, 7)`)
-    .all();
+    .groupBy(sql`substr(${schema.transactions.date}, 1, 7)`);
 
   // DB結果をMapに変換
   const resultMap = new Map<string, { regularIncome: number; totalExpense: number }>();
@@ -410,7 +408,7 @@ export async function getAvailableMonths(groupIdParam?: string, db: Db = getDb()
     })
     .from(schema.transactions)
     .where(inArray(schema.transactions.accountId, accountIds))
-    .get();
+    .then((rows) => rows.at(0));
 
   if (!oldestResult?.month) return [];
 
@@ -445,7 +443,7 @@ export async function getMonthlySummaryByMonth(
     .where(
       and(like(schema.transactions.date, `${month}%`), buildGroupTransactionCondition(accountIds)),
     )
-    .get();
+    .then((rows) => rows.at(0));
 
   if (!result) return undefined;
 
@@ -511,8 +509,7 @@ export async function getMonthlyCategoryTotals(
       schema.transactions.type,
       schema.transactions.transferTargetAccountId,
       schema.transactions.accountId,
-    )
-    .all();
+    );
 
   // Transform results: transfers should be treated as income/expense based on classifyTransfer
   // This matches the logic in getMonthlySummaryByMonth / getDeduplicatedTransferIncome
@@ -613,7 +610,7 @@ export async function getYearToDateSummary(
         buildGroupTransactionCondition(accountIds),
       ),
     )
-    .get();
+    .then((rows) => rows.at(0));
 
   // 重複除外した振替収入を取得（年全体）
   const transferIncomeMap = await getDeduplicatedTransferIncome(db, accountIds, yearPrefix);
@@ -660,8 +657,7 @@ export async function getExpenseByFixedVariable(
   const targets = await db
     .select()
     .from(schema.spendingTargets)
-    .where(eq(schema.spendingTargets.groupId, groupId))
-    .all();
+    .where(eq(schema.spendingTargets.groupId, groupId));
 
   const fixedCategoryNames = new Set(
     targets.filter((t) => t.type === "fixed").map((t) => t.categoryName),

@@ -1,6 +1,3 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { schema } from "../index";
@@ -9,18 +6,13 @@ import { executeReadOnlyQuery, normalizeReadOnlySql } from "./read-only-query";
 
 type Db = Awaited<ReturnType<typeof createTestDb>>;
 let db: Db;
-let databasePath: string;
-let temporaryDirectory: string;
 
 beforeAll(async () => {
-  temporaryDirectory = mkdtempSync(join(tmpdir(), "mf-dashboard-read-only-query-"));
-  databasePath = join(temporaryDirectory, "test.db");
-  db = await createTestDb(`file:${databasePath}`);
+  db = await createTestDb();
 });
 
-afterAll(() => {
-  closeTestDb(db);
-  rmSync(temporaryDirectory, { recursive: true });
+afterAll(async () => {
+  await closeTestDb(db);
 });
 
 beforeEach(async () => {
@@ -50,7 +42,7 @@ beforeEach(async () => {
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
   await db.insert(schema.groupAccounts).values({
     groupId: "group-a",
     accountId: account.id,
@@ -87,7 +79,7 @@ beforeEach(async () => {
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
   await db.insert(schema.groupAccounts).values({
     groupId: "group-b",
     accountId: otherAccount.id,
@@ -118,7 +110,6 @@ describe("executeReadOnlyQuery", () => {
        WHERE ga.group_id = :groupId AND t.category = '食費'
       ORDER BY t.amount DESC`,
       "group-a",
-      databasePath,
     );
 
     expect(result).toEqual({
@@ -135,7 +126,6 @@ describe("executeReadOnlyQuery", () => {
         db,
         "SELECT description, amount FROM transactions ORDER BY amount DESC",
         "group-a",
-        databasePath,
       ),
     ).resolves.toMatchObject({
       rows: [{ description: "店舗 A", amount: 3_000 }],
@@ -171,7 +161,6 @@ describe("executeReadOnlyQuery", () => {
         db,
         "SELECT description FROM transactions WHERE mf_id IS NULL AND description = 'External expense'",
         "group-a",
-        databasePath,
       ),
     ).resolves.toMatchObject({ rows: [], rowCount: 0 });
   });
@@ -182,7 +171,6 @@ describe("executeReadOnlyQuery", () => {
         db,
         "WITH value AS (SELECT 'delete' AS text) SELECT text FROM value",
         "",
-        databasePath,
       ),
     ).resolves.toEqual({
       columns: ["text"],
@@ -198,7 +186,6 @@ describe("executeReadOnlyQuery", () => {
         db,
         "WITH totals(month, amount) AS (SELECT '2026-07', 100) SELECT * FROM totals",
         "",
-        databasePath,
       ),
     ).resolves.toMatchObject({
       rows: [{ month: "2026-07", amount: 100 }],
@@ -211,7 +198,6 @@ describe("executeReadOnlyQuery", () => {
         db,
         "SELECT * FROM (WITH totals AS (SELECT 100 AS amount) SELECT * FROM totals)",
         "",
-        databasePath,
       ),
     ).resolves.toMatchObject({ rows: [{ amount: 100 }] });
 
@@ -220,7 +206,6 @@ describe("executeReadOnlyQuery", () => {
         db,
         "SELECT * FROM (WITH totals AS (SELECT 100 AS amount) SELECT * FROM totals) nested JOIN totals",
         "",
-        databasePath,
       ),
     ).rejects.toThrow("許可されていないテーブル totals は参照できません。");
   });
@@ -231,7 +216,6 @@ describe("executeReadOnlyQuery", () => {
         db,
         "WITH value AS (SELECT * FROM (WITH value AS (SELECT 1 AS amount) SELECT * FROM value)) SELECT * FROM value",
         "",
-        databasePath,
       ),
     ).resolves.toMatchObject({ rows: [{ amount: 1 }] });
   });
@@ -241,7 +225,7 @@ describe("executeReadOnlyQuery", () => {
     'WITH value AS (SELECT 1 AS amount) SELECT amount FROM "value"',
     'WITH "value" AS (SELECT 1 AS amount) SELECT amount FROM "value"',
   ])("allowlist内のquoted tableまたはCTEを実行できる: %s", async (sql) => {
-    await expect(executeReadOnlyQuery(db, sql, "group-a", databasePath)).resolves.toMatchObject({
+    await expect(executeReadOnlyQuery(db, sql, "group-a")).resolves.toMatchObject({
       rowCount: 1,
     });
   });
@@ -251,27 +235,23 @@ describe("executeReadOnlyQuery", () => {
       "WITH cnt(x) AS (VALUES(1) UNION ALL SELECT x + 1 FROM cnt) SELECT max(x) FROM cnt",
       'WITH "cnt"(x) AS (VALUES(1) UNION ALL SELECT x + 1 FROM "cnt") SELECT max(x) FROM "cnt"',
     ]) {
-      await expect(executeReadOnlyQuery(db, sql, "", databasePath)).rejects.toThrow(
-        "再帰CTEは使用できません。",
-      );
+      await expect(executeReadOnlyQuery(db, sql, "")).rejects.toThrow("再帰CTEは使用できません。");
     }
   });
 
   it("末尾の行コメントを外側のLIMITで壊さない", async () => {
-    await expect(
-      executeReadOnlyQuery(db, "SELECT 1 AS value -- explanation", "", databasePath),
-    ).resolves.toEqual({
-      columns: ["value"],
-      rows: [{ value: 1 }],
-      rowCount: 1,
-      truncated: false,
-    });
+    await expect(executeReadOnlyQuery(db, "SELECT 1 AS value -- explanation", "")).resolves.toEqual(
+      {
+        columns: ["value"],
+        rows: [{ value: 1 }],
+        rowCount: 1,
+        truncated: false,
+      },
+    );
   });
 
   it("重複した結果列名を保持できるよう自動で区別する", async () => {
-    await expect(
-      executeReadOnlyQuery(db, "SELECT 1 AS id, 2 AS id", "", databasePath),
-    ).resolves.toEqual({
+    await expect(executeReadOnlyQuery(db, "SELECT 1 AS id, 2 AS id", "")).resolves.toEqual({
       columns: ["id", "id:1"],
       rows: [{ id: 1, "id:1": 2 }],
       rowCount: 1,
@@ -281,29 +261,19 @@ describe("executeReadOnlyQuery", () => {
 
   it("main schemaを指定したgroup viewの迂回を拒否する", async () => {
     await expect(
-      executeReadOnlyQuery(db, "SELECT * FROM main.transactions", "group-a", databasePath),
+      executeReadOnlyQuery(db, "SELECT * FROM main.transactions", "group-a"),
     ).rejects.toThrow("データベースschemaを直接指定するSQLは実行できません。");
   });
 
   it("parenthesized source list内の未許可tableを拒否する", async () => {
     await expect(
-      executeReadOnlyQuery(
-        db,
-        "SELECT 1 FROM (transactions AS window, sqlite_master)",
-        "group-a",
-        databasePath,
-      ),
+      executeReadOnlyQuery(db, "SELECT 1 FROM (transactions AS window, sqlite_master)", "group-a"),
     ).rejects.toThrow("許可されていないテーブル sqlite_master は参照できません。");
   });
 
   it("schema名と同じtable aliasを許可する", async () => {
     await expect(
-      executeReadOnlyQuery(
-        db,
-        "SELECT source.description FROM transactions AS source",
-        "group-a",
-        databasePath,
-      ),
+      executeReadOnlyQuery(db, "SELECT source.description FROM transactions AS source", "group-a"),
     ).resolves.toMatchObject({
       rows: [{ description: "店舗 A" }],
     });
@@ -337,7 +307,6 @@ describe("executeReadOnlyQuery", () => {
          FROM transactions
          WHERE description = 'Boundary transfer'`,
         "group-a",
-        databasePath,
       ),
     ).resolves.toMatchObject({
       rows: [
@@ -401,7 +370,6 @@ describe("executeReadOnlyQuery", () => {
          FROM transactions
          WHERE description = 'Internal boundary transfer'`,
         "group-a",
-        databasePath,
       ),
     ).resolves.toMatchObject({
       rows: [{ is_internal_transfer: 1 }],
@@ -425,7 +393,7 @@ describe("executeReadOnlyQuery", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     await db.insert(schema.transactions).values([
       {
         mfId: "outbound-transfer-a",
@@ -514,7 +482,6 @@ describe("executeReadOnlyQuery", () => {
        WHERE description LIKE 'Outbound transfer%'
        ORDER BY description`,
       "group-a",
-      databasePath,
     );
     const keys = result.rows.map(({ transfer_counterparty_key }) => transfer_counterparty_key);
 
@@ -533,7 +500,6 @@ describe("executeReadOnlyQuery", () => {
        WHERE description LIKE 'Inbound transfer%'
        ORDER BY description`,
       "group-a",
-      databasePath,
     );
     const inboundKeys = inboundResult.rows.map(
       ({ transfer_counterparty_key }) => transfer_counterparty_key,
@@ -587,7 +553,6 @@ describe("executeReadOnlyQuery", () => {
          FROM transactions
          WHERE description LIKE 'Unresolved % transfer'`,
         "group-a",
-        databasePath,
       ),
     ).resolves.toMatchObject({ rows: [], rowCount: 0 });
   });
@@ -604,7 +569,7 @@ describe("executeReadOnlyQuery", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const holding = await db
       .insert(schema.holdings)
       .values({
@@ -616,7 +581,7 @@ describe("executeReadOnlyQuery", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const snapshot = await db
       .insert(schema.dailySnapshots)
       .values({
@@ -626,7 +591,7 @@ describe("executeReadOnlyQuery", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     await db.insert(schema.holdingValues).values({
       holdingId: holding.id,
       snapshotId: snapshot.id,
@@ -644,7 +609,6 @@ describe("executeReadOnlyQuery", () => {
          JOIN group_accounts ga ON ga.account_id = h.account_id
          WHERE ga.group_id = :groupId`,
         "0",
-        databasePath,
       ),
     ).resolves.toMatchObject({
       rows: [{ name: "Unmatched Asset", amount: 12_345 }],
@@ -663,7 +627,7 @@ describe("executeReadOnlyQuery", () => {
     });
 
     await expect(
-      executeReadOnlyQuery(db, "SELECT summary FROM analytics_reports", "group-a", databasePath),
+      executeReadOnlyQuery(db, "SELECT summary FROM analytics_reports", "group-a"),
     ).resolves.toMatchObject({ rows: [], rowCount: 0 });
   });
 
@@ -685,7 +649,7 @@ describe("executeReadOnlyQuery", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const currentHolding = await db
       .insert(schema.holdings)
       .values({
@@ -697,7 +661,7 @@ describe("executeReadOnlyQuery", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const incompleteHolding = await db
       .insert(schema.holdings)
       .values({
@@ -709,7 +673,7 @@ describe("executeReadOnlyQuery", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const selectedSnapshot = await db
       .insert(schema.dailySnapshots)
       .values({
@@ -719,7 +683,7 @@ describe("executeReadOnlyQuery", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const externalSnapshot = await db
       .insert(schema.dailySnapshots)
       .values({
@@ -729,7 +693,7 @@ describe("executeReadOnlyQuery", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const incompleteSnapshot = await db
       .insert(schema.dailySnapshots)
       .values({
@@ -740,7 +704,7 @@ describe("executeReadOnlyQuery", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     await db.insert(schema.holdingValues).values([
       {
         holdingId: oldHolding.id,
@@ -773,7 +737,6 @@ describe("executeReadOnlyQuery", () => {
          JOIN holding_values hv ON hv.snapshot_id = ds.id
          ORDER BY hv.amount`,
         "group-a",
-        databasePath,
       ),
     ).resolves.toMatchObject({
       rows: [{ group_id: "group-a", amount: 10_000 }],
@@ -799,7 +762,7 @@ describe("executeReadOnlyQuery", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const oldSnapshot = await db
       .insert(schema.dailySnapshots)
       .values({
@@ -809,7 +772,7 @@ describe("executeReadOnlyQuery", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     await db.insert(schema.dailySnapshots).values({
       groupId: "0",
       date: "2026-07-12",
@@ -831,7 +794,6 @@ describe("executeReadOnlyQuery", () => {
            (SELECT COUNT(*) FROM holdings) AS holding_count,
            (SELECT date FROM daily_snapshots) AS snapshot_date`,
         "group-a",
-        databasePath,
       ),
     ).resolves.toMatchObject({
       rows: [{ holding_count: 0, snapshot_date: "2026-07-12" }],
@@ -841,7 +803,7 @@ describe("executeReadOnlyQuery", () => {
 
   it("schema外のtableを拒否する", async () => {
     await expect(
-      executeReadOnlyQuery(db, "SELECT name FROM sqlite_master", "group-a", databasePath),
+      executeReadOnlyQuery(db, "SELECT name FROM sqlite_master", "group-a"),
     ).rejects.toThrow("許可されていないテーブル sqlite_master は参照できません。");
   });
 
@@ -852,7 +814,7 @@ describe("executeReadOnlyQuery", () => {
     "SELECT transactions.description, sqlite_schema.name FROM transactions, sqlite_schema",
     'SELECT transactions.description, sqlite_schema.name FROM transactions, "sqlite_schema"',
   ])("allowlistを迂回するtable参照を拒否する: %s", async (sql) => {
-    await expect(executeReadOnlyQuery(db, sql, "group-a", databasePath)).rejects.toThrow(
+    await expect(executeReadOnlyQuery(db, sql, "group-a")).rejects.toThrow(
       /(?:テーブル名はschemaに記載された形式|許可されていないテーブル sqlite_schema)/,
     );
   });
@@ -861,15 +823,13 @@ describe("executeReadOnlyQuery", () => {
     await db
       .update(schema.transactions)
       .set({ description: "x".repeat(40_000) })
-      .where(eq(schema.transactions.mfId, "transaction-a"))
-      .run();
+      .where(eq(schema.transactions.mfId, "transaction-a"));
 
     await expect(
       executeReadOnlyQuery(
         db,
         "SELECT description || description AS value FROM transactions",
         "group-a",
-        databasePath,
       ),
     ).resolves.toEqual({
       columns: ["value"],
@@ -881,12 +841,7 @@ describe("executeReadOnlyQuery", () => {
 
   it("同名結果列をlibsqlの一意な列名で値を失わず返す", async () => {
     await expect(
-      executeReadOnlyQuery(
-        db,
-        "SELECT 1 AS duplicate_name, 2 AS duplicate_name",
-        "group-a",
-        databasePath,
-      ),
+      executeReadOnlyQuery(db, "SELECT 1 AS duplicate_name, 2 AS duplicate_name", "group-a"),
     ).resolves.toMatchObject({
       columns: ["duplicate_name", "duplicate_name:1"],
       rows: [{ duplicate_name: 1, "duplicate_name:1": 2 }],
@@ -899,7 +854,6 @@ describe("executeReadOnlyQuery", () => {
         db,
         "SELECT datetime('2026-07-24 15:30:00', 'localtime') AS local_datetime",
         "group-a",
-        databasePath,
       ),
     ).resolves.toMatchObject({
       rows: [{ local_datetime: "2026-07-25 00:30:00" }],
@@ -935,7 +889,6 @@ describe("executeReadOnlyQuery", () => {
          JOIN transactions c ON 1 = 1
          JOIN transactions d ON 1 = 1`,
         "group-a",
-        databasePath,
       ),
     ).rejects.toThrow("SQLの実行時間が上限を超えました。");
   });
@@ -970,7 +923,6 @@ describe("executeReadOnlyQuery", () => {
        JOIN transactions c ON 1 = 1
        JOIN transactions d ON 1 = 1`,
       "group-a",
-      databasePath,
       abortController.signal,
     );
     setTimeout(() => abortController.abort(abortReason), 20);
@@ -994,7 +946,6 @@ describe("executeReadOnlyQuery", () => {
         `WITH ${commonTableExpressions.join(",")}
          SELECT value FROM value_27`,
         "group-a",
-        databasePath,
       ),
     ).rejects.toThrow(/memory|上限/);
   });

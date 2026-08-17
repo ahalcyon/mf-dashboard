@@ -53,17 +53,14 @@ async function createTestAccount(name: string): Promise<number> {
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
 
-  await db
-    .insert(schema.groupAccounts)
-    .values({
-      groupId: TEST_GROUP_ID,
-      accountId: account.id,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.groupAccounts).values({
+    groupId: TEST_GROUP_ID,
+    accountId: account.id,
+    createdAt: now,
+    updatedAt: now,
+  });
 
   return account.id;
 }
@@ -82,7 +79,7 @@ async function createExternalAccount(name: string): Promise<number> {
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
 
   // External accounts belong ONLY to "グループ選択なし" (GROUP_NONE_ID = "0")
   // This makes them external entities for getExternalEntityAccountIds
@@ -95,18 +92,14 @@ async function createExternalAccount(name: string): Promise<number> {
       createdAt: now,
       updatedAt: now,
     })
-    .onConflictDoNothing()
-    .run();
+    .onConflictDoNothing();
 
-  await db
-    .insert(schema.groupAccounts)
-    .values({
-      groupId: GROUP_NONE_ID,
-      accountId: account.id,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.groupAccounts).values({
+    groupId: GROUP_NONE_ID,
+    accountId: account.id,
+    createdAt: now,
+    updatedAt: now,
+  });
 
   return account.id;
 }
@@ -123,24 +116,21 @@ async function createTransaction(data: {
   isTransfer?: boolean;
 }) {
   const now = new Date().toISOString();
-  await db
-    .insert(schema.transactions)
-    .values({
-      mfId: `tx_${Date.now()}_${Math.random()}`,
-      date: data.date,
-      accountId: data.accountId,
-      category: data.category ?? null,
-      subCategory: data.subCategory ?? null,
-      description: "Test transaction",
-      amount: data.amount,
-      type: data.type,
-      isTransfer: data.isTransfer ?? data.type === "transfer",
-      isExcludedFromCalculation: data.isExcludedFromCalculation ?? data.type === "transfer",
-      transferTargetAccountId: data.transferTargetAccountId ?? null,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.transactions).values({
+    mfId: `tx_${Date.now()}_${Math.random()}`,
+    date: data.date,
+    accountId: data.accountId,
+    category: data.category ?? null,
+    subCategory: data.subCategory ?? null,
+    description: "Test transaction",
+    amount: data.amount,
+    type: data.type,
+    isTransfer: data.isTransfer ?? data.type === "transfer",
+    isExcludedFromCalculation: data.isExcludedFromCalculation ?? data.type === "transfer",
+    transferTargetAccountId: data.transferTargetAccountId ?? null,
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
 async function createSpendingTarget(
@@ -149,17 +139,14 @@ async function createSpendingTarget(
   largeCategoryId: number,
 ) {
   const now = new Date().toISOString();
-  await db
-    .insert(schema.spendingTargets)
-    .values({
-      groupId: TEST_GROUP_ID,
-      categoryName,
-      type,
-      largeCategoryId,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.spendingTargets).values({
+    groupId: TEST_GROUP_ID,
+    categoryName,
+    type,
+    largeCategoryId,
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
 describe("getMonthlySummaryByMonth", () => {
@@ -215,22 +202,19 @@ describe("getMonthlySummaryByMonth", () => {
     // Transfer from internal to external (counted as income when no common group)
     // グループ内(accountId)→グループ外(externalAccountId)への振替
     const now = new Date().toISOString();
-    await db
-      .insert(schema.transactions)
-      .values({
-        mfId: `mf-transfer-${Date.now()}`,
-        accountId: accountId,
-        date: "2025-04-15",
-        amount: 100000,
-        type: "transfer",
-        description: "Group to External",
-        isTransfer: true,
-        isExcludedFromCalculation: true,
-        transferTargetAccountId: externalAccountId,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.transactions).values({
+      mfId: `mf-transfer-${Date.now()}`,
+      accountId: accountId,
+      date: "2025-04-15",
+      amount: 100000,
+      type: "transfer",
+      description: "Group to External",
+      isTransfer: true,
+      isExcludedFromCalculation: true,
+      transferTargetAccountId: externalAccountId,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const result = await getMonthlySummaryByMonth("2025-04", undefined, db);
 
@@ -413,22 +397,19 @@ describe("getMonthlyCategoryTotals", () => {
 
     // グループ外（external）→グループ内（account）への振替
     const now = new Date().toISOString();
-    await db
-      .insert(schema.transactions)
-      .values({
-        mfId: `mf-transfer-${Date.now()}`,
-        accountId: externalAccountId,
-        date: "2025-04-15",
-        amount: 80000,
-        type: "transfer",
-        description: "External to Group",
-        isTransfer: true,
-        isExcludedFromCalculation: true,
-        transferTargetAccountId: accountId,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.transactions).values({
+      mfId: `mf-transfer-${Date.now()}`,
+      accountId: externalAccountId,
+      date: "2025-04-15",
+      amount: 80000,
+      type: "transfer",
+      description: "External to Group",
+      isTransfer: true,
+      isExcludedFromCalculation: true,
+      transferTargetAccountId: accountId,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const result = await getMonthlyCategoryTotals("2025-04", undefined, db);
 
@@ -556,40 +537,34 @@ describe("getYearToDateSummary", () => {
 
     // グループ内→グループ外への振替（収入として扱われる）
     const now = new Date().toISOString();
-    await db
-      .insert(schema.transactions)
-      .values({
-        mfId: `mf-transfer-income-${Date.now()}`,
-        accountId: accountId,
-        date: "2025-04-20",
-        amount: 100000,
-        type: "transfer",
-        description: "Group to External",
-        isTransfer: true,
-        isExcludedFromCalculation: true,
-        transferTargetAccountId: externalAccountId,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.transactions).values({
+      mfId: `mf-transfer-income-${Date.now()}`,
+      accountId: accountId,
+      date: "2025-04-20",
+      amount: 100000,
+      type: "transfer",
+      description: "Group to External",
+      isTransfer: true,
+      isExcludedFromCalculation: true,
+      transferTargetAccountId: externalAccountId,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     // 同じ振替の重複レコード（重複除去される）
-    await db
-      .insert(schema.transactions)
-      .values({
-        mfId: `mf-transfer-income-dup-${Date.now()}`,
-        accountId: accountId,
-        date: "2025-04-20",
-        amount: 100000,
-        type: "transfer",
-        description: "Group to External (dup)",
-        isTransfer: true,
-        isExcludedFromCalculation: true,
-        transferTargetAccountId: externalAccountId,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.transactions).values({
+      mfId: `mf-transfer-income-dup-${Date.now()}`,
+      accountId: accountId,
+      date: "2025-04-20",
+      amount: 100000,
+      type: "transfer",
+      description: "Group to External (dup)",
+      isTransfer: true,
+      isExcludedFromCalculation: true,
+      transferTargetAccountId: externalAccountId,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const result = await getYearToDateSummary({ year: 2025 }, db);
 
@@ -884,22 +859,19 @@ describe("getDeduplicatedTransferIncome", () => {
     amount: number,
   ) {
     const now = new Date().toISOString();
-    await db
-      .insert(schema.transactions)
-      .values({
-        mfId: `mf-transfer-${Date.now()}-${Math.random()}`,
-        accountId: groupAccountId,
-        date,
-        amount,
-        type: "transfer",
-        description: "Group to External",
-        isTransfer: true,
-        isExcludedFromCalculation: true,
-        transferTargetAccountId: externalAccountId,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.transactions).values({
+      mfId: `mf-transfer-${Date.now()}-${Math.random()}`,
+      accountId: groupAccountId,
+      date,
+      amount,
+      type: "transfer",
+      description: "Group to External",
+      isTransfer: true,
+      isExcludedFromCalculation: true,
+      transferTargetAccountId: externalAccountId,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 
   it("グループ内→グループ外への振替収入を月別に集計する", async () => {
@@ -921,38 +893,32 @@ describe("getDeduplicatedTransferIncome", () => {
 
     // 全く同じ条件の振替を2回登録（重複）
     const now = new Date().toISOString();
-    await db
-      .insert(schema.transactions)
-      .values({
-        mfId: "mf-transfer-dup-1",
-        accountId: accountId,
-        date: "2025-04-15",
-        amount: 100000,
-        type: "transfer",
-        description: "Group to External",
-        isTransfer: true,
-        isExcludedFromCalculation: true,
-        transferTargetAccountId: externalAccountId,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-    await db
-      .insert(schema.transactions)
-      .values({
-        mfId: "mf-transfer-dup-2",
-        accountId: accountId,
-        date: "2025-04-15",
-        amount: 100000,
-        type: "transfer",
-        description: "Group to External (dup)",
-        isTransfer: true,
-        isExcludedFromCalculation: true,
-        transferTargetAccountId: externalAccountId,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.transactions).values({
+      mfId: "mf-transfer-dup-1",
+      accountId: accountId,
+      date: "2025-04-15",
+      amount: 100000,
+      type: "transfer",
+      description: "Group to External",
+      isTransfer: true,
+      isExcludedFromCalculation: true,
+      transferTargetAccountId: externalAccountId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(schema.transactions).values({
+      mfId: "mf-transfer-dup-2",
+      accountId: accountId,
+      date: "2025-04-15",
+      amount: 100000,
+      type: "transfer",
+      description: "Group to External (dup)",
+      isTransfer: true,
+      isExcludedFromCalculation: true,
+      transferTargetAccountId: externalAccountId,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const result = await getDeduplicatedTransferIncome(db, [accountId]);
 
@@ -1013,35 +979,29 @@ describe("getDeduplicatedTransferIncome", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     // TEST_GROUP_IDに登録（accountIdと同じグループ）
-    await db
-      .insert(schema.groupAccounts)
-      .values({
-        groupId: TEST_GROUP_ID,
-        accountId: commonGroupAccount.id,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.groupAccounts).values({
+      groupId: TEST_GROUP_ID,
+      accountId: commonGroupAccount.id,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     // グループ内→共通グループアカウントへの振替（共通グループあり）
-    await db
-      .insert(schema.transactions)
-      .values({
-        mfId: "mf-transfer-common",
-        accountId: accountId,
-        date: "2025-04-15",
-        amount: 100000,
-        type: "transfer",
-        description: "Group to Common Group",
-        isTransfer: true,
-        isExcludedFromCalculation: true,
-        transferTargetAccountId: commonGroupAccount.id,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.transactions).values({
+      mfId: "mf-transfer-common",
+      accountId: accountId,
+      date: "2025-04-15",
+      amount: 100000,
+      type: "transfer",
+      description: "Group to Common Group",
+      isTransfer: true,
+      isExcludedFromCalculation: true,
+      transferTargetAccountId: commonGroupAccount.id,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const result = await getDeduplicatedTransferIncome(db, [accountId]);
 
@@ -1091,7 +1051,7 @@ describe("buildIncludedTransactionCondition", () => {
     });
 
     const condition = buildIncludedTransactionCondition([accountId]);
-    const results = await db.select().from(schema.transactions).where(condition).all();
+    const results = await db.select().from(schema.transactions).where(condition);
 
     expect(results).toHaveLength(3);
   });
@@ -1109,7 +1069,7 @@ describe("buildIncludedTransactionCondition", () => {
     });
 
     const condition = buildIncludedTransactionCondition([accountId]);
-    const results = await db.select().from(schema.transactions).where(condition).all();
+    const results = await db.select().from(schema.transactions).where(condition);
 
     expect(results).toHaveLength(0);
   });
@@ -1131,48 +1091,39 @@ describe("buildOutsideTransferCondition", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const outsideGroupId = "outside_group";
-    await db
-      .insert(schema.groups)
-      .values({
-        id: outsideGroupId,
-        name: "Outside Group",
-        isCurrent: false,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-    await db
-      .insert(schema.groupAccounts)
-      .values({
-        groupId: outsideGroupId,
-        accountId: outsideAccount.id,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.groups).values({
+      id: outsideGroupId,
+      name: "Outside Group",
+      isCurrent: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(schema.groupAccounts).values({
+      groupId: outsideGroupId,
+      accountId: outsideAccount.id,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     // グループ外からグループ内への振替
-    await db
-      .insert(schema.transactions)
-      .values({
-        mfId: `tx_${Date.now()}`,
-        date: "2025-04-15",
-        accountId: outsideAccount.id,
-        transferTargetAccountId: groupAccountId,
-        amount: 50000,
-        type: "transfer",
-        description: "Outside to group transfer",
-        isTransfer: true,
-        isExcludedFromCalculation: true,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.transactions).values({
+      mfId: `tx_${Date.now()}`,
+      date: "2025-04-15",
+      accountId: outsideAccount.id,
+      transferTargetAccountId: groupAccountId,
+      amount: 50000,
+      type: "transfer",
+      description: "Outside to group transfer",
+      isTransfer: true,
+      isExcludedFromCalculation: true,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const condition = buildOutsideTransferCondition([groupAccountId]);
-    const results = await db.select().from(schema.transactions).where(condition).all();
+    const results = await db.select().from(schema.transactions).where(condition);
 
     expect(results).toHaveLength(1);
     expect(results[0].amount).toBe(50000);
@@ -1204,48 +1155,39 @@ describe("buildGroupTransactionCondition", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const outsideGroupId = "outside_group2";
-    await db
-      .insert(schema.groups)
-      .values({
-        id: outsideGroupId,
-        name: "Outside Group",
-        isCurrent: false,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-    await db
-      .insert(schema.groupAccounts)
-      .values({
-        groupId: outsideGroupId,
-        accountId: outsideAccount.id,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.groups).values({
+      id: outsideGroupId,
+      name: "Outside Group",
+      isCurrent: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(schema.groupAccounts).values({
+      groupId: outsideGroupId,
+      accountId: outsideAccount.id,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     // グループ外からグループ内への振替
-    await db
-      .insert(schema.transactions)
-      .values({
-        mfId: `tx_outside_${Date.now()}`,
-        date: "2025-04-16",
-        accountId: outsideAccount.id,
-        transferTargetAccountId: groupAccountId,
-        amount: 50000,
-        type: "transfer",
-        description: "Outside to group",
-        isTransfer: true,
-        isExcludedFromCalculation: true,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.transactions).values({
+      mfId: `tx_outside_${Date.now()}`,
+      date: "2025-04-16",
+      accountId: outsideAccount.id,
+      transferTargetAccountId: groupAccountId,
+      amount: 50000,
+      type: "transfer",
+      description: "Outside to group",
+      isTransfer: true,
+      isExcludedFromCalculation: true,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const condition = buildGroupTransactionCondition([groupAccountId]);
-    const results = await db.select().from(schema.transactions).where(condition).all();
+    const results = await db.select().from(schema.transactions).where(condition);
 
     expect(results).toHaveLength(2);
   });
@@ -1278,7 +1220,10 @@ describe("buildRegularIncomeSum", () => {
     });
 
     const incomeSum = buildRegularIncomeSum();
-    const result = await db.select({ total: incomeSum }).from(schema.transactions).get();
+    const result = await db
+      .select({ total: incomeSum })
+      .from(schema.transactions)
+      .then((rows) => rows.at(0)!);
 
     expect(result?.total).toBe(150000);
   });
@@ -1295,7 +1240,10 @@ describe("buildRegularIncomeSum", () => {
     });
 
     const incomeSum = buildRegularIncomeSum();
-    const result = await db.select({ total: incomeSum }).from(schema.transactions).get();
+    const result = await db
+      .select({ total: incomeSum })
+      .from(schema.transactions)
+      .then((rows) => rows.at(0)!);
 
     expect(result?.total).toBe(0);
   });
@@ -1317,27 +1265,21 @@ describe("buildExpenseSum", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const outsideGroupId = "outside_group3";
-    await db
-      .insert(schema.groups)
-      .values({
-        id: outsideGroupId,
-        name: "Outside Group",
-        isCurrent: false,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-    await db
-      .insert(schema.groupAccounts)
-      .values({
-        groupId: outsideGroupId,
-        accountId: outsideAccount.id,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.groups).values({
+      id: outsideGroupId,
+      name: "Outside Group",
+      isCurrent: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(schema.groupAccounts).values({
+      groupId: outsideGroupId,
+      accountId: outsideAccount.id,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     // 通常の支出
     await createTransaction({
@@ -1367,7 +1309,10 @@ describe("buildExpenseSum", () => {
     });
 
     const expenseSum = buildExpenseSum([groupAccountId]);
-    const result = await db.select({ total: expenseSum }).from(schema.transactions).get();
+    const result = await db
+      .select({ total: expenseSum })
+      .from(schema.transactions)
+      .then((rows) => rows.at(0)!);
 
     // 通常支出30000のみ（振替は含まない）
     expect(result?.total).toBe(30000);
@@ -1385,7 +1330,10 @@ describe("buildExpenseSum", () => {
     });
 
     const expenseSum = buildExpenseSum([accountId]);
-    const result = await db.select({ total: expenseSum }).from(schema.transactions).get();
+    const result = await db
+      .select({ total: expenseSum })
+      .from(schema.transactions)
+      .then((rows) => rows.at(0)!);
 
     expect(result?.total).toBe(0);
   });

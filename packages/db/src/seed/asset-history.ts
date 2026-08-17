@@ -216,20 +216,17 @@ export async function seedAssetHistory({
             updatedAt: ts,
           })
           .returning({ id: schema.assetHistory.id })
-          .get();
+          .then((rows) => rows.at(0));
         const ahId = ahResult!.id;
 
         const insertCategory = async (categoryName: string, amount: number) => {
-          await tx
-            .insert(schema.assetHistoryCategories)
-            .values({
-              assetHistoryId: ahId,
-              categoryName,
-              amount,
-              createdAt: ts,
-              updatedAt: ts,
-            })
-            .run();
+          await tx.insert(schema.assetHistoryCategories).values({
+            assetHistoryId: ahId,
+            categoryName,
+            amount,
+            createdAt: ts,
+            updatedAt: ts,
+          });
         };
 
         if (groupId === GROUP_ID) {

@@ -50,10 +50,10 @@ export async function getTransactions(
     .orderBy(desc(schema.transactions.date));
 
   if (options?.limit) {
-    const results = await query.limit(options.limit).all();
+    const results = await query.limit(options.limit);
     return results.map((t) => transformTransferToIncome(t, accountIds));
   }
-  const results = await query.all();
+  const results = await query;
   return results.map((t) => transformTransferToIncome(t, accountIds));
 }
 
@@ -96,8 +96,7 @@ export async function getTransactionsByMonth(
         inArray(schema.transactions.accountId, accountIds),
       ),
     )
-    .orderBy(desc(schema.transactions.date))
-    .all();
+    .orderBy(desc(schema.transactions.date));
 
   return results.map((t) => transformTransferToIncome(t, accountIds));
 }
@@ -131,6 +130,5 @@ export async function getTransactionsByAccountId(
     .from(schema.transactions)
     .leftJoin(schema.accounts, eq(schema.accounts.id, schema.transactions.accountId))
     .where(eq(schema.transactions.accountId, accountId))
-    .orderBy(desc(schema.transactions.date))
-    .all();
+    .orderBy(desc(schema.transactions.date));
 }

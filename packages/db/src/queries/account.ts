@@ -14,7 +14,7 @@ export async function getLatestUpdateDate(groupIdParam?: string, db: Db = getDb(
     .select({ lastScrapedAt: schema.groups.lastScrapedAt })
     .from(schema.groups)
     .where(eq(schema.groups.id, groupId))
-    .get();
+    .then((rows) => rows.at(0));
   return group?.lastScrapedAt ?? null;
 }
 
@@ -90,8 +90,7 @@ export async function getAccountsWithAssets(groupIdParam?: string, db: Db = getD
       schema.institutionCategories,
       eq(schema.institutionCategories.id, schema.accounts.categoryId),
     )
-    .where(buildActiveAccountCondition(accountIds))
-    .all();
+    .where(buildActiveAccountCondition(accountIds));
 
   return results.map((account) => normalizeAccount(account));
 }
@@ -109,8 +108,7 @@ export async function getAllAccountMfIds(groupIdParam?: string, db: Db = getDb()
   const results = await db
     .select({ mfId: schema.accounts.mfId })
     .from(schema.accounts)
-    .where(buildActiveAccountCondition(accountIds))
-    .all();
+    .where(buildActiveAccountCondition(accountIds));
 
   return results.map((a) => a.mfId);
 }
@@ -145,7 +143,7 @@ export async function getAccountByMfId(mfId: string, groupIdParam?: string, db: 
       eq(schema.institutionCategories.id, schema.accounts.categoryId),
     )
     .where(and(eq(schema.accounts.mfId, mfId), inArray(schema.accounts.id, accountIds)))
-    .get();
+    .then((rows) => rows.at(0));
 
   if (!account) return null;
 

@@ -52,7 +52,7 @@ export async function getAssetBreakdownByCategory(groupIdParam?: string, db: Db 
     .where(eq(schema.assetHistory.groupId, groupId))
     .orderBy(desc(schema.assetHistory.date))
     .limit(1)
-    .get();
+    .then((rows) => rows.at(0));
 
   if (!latestHistory) {
     return [];
@@ -61,8 +61,7 @@ export async function getAssetBreakdownByCategory(groupIdParam?: string, db: Db 
   const categories = await db
     .select()
     .from(schema.assetHistoryCategories)
-    .where(eq(schema.assetHistoryCategories.assetHistoryId, latestHistory.id))
-    .all();
+    .where(eq(schema.assetHistoryCategories.assetHistoryId, latestHistory.id));
 
   return categories
     .filter((c) => c.amount > 0)
@@ -119,9 +118,9 @@ export async function getAssetHistory(
     .orderBy(desc(schema.assetHistory.date));
 
   if (options?.limit) {
-    return query.limit(options.limit).all();
+    return query.limit(options.limit);
   }
-  return query.all();
+  return query;
 }
 
 /**
@@ -139,17 +138,14 @@ export async function getAssetHistoryWithCategories(
     .from(schema.assetHistory)
     .where(eq(schema.assetHistory.groupId, groupId))
     .orderBy(desc(schema.assetHistory.date));
-  const historyEntries = options?.limit
-    ? await query.limit(options.limit).all()
-    : await query.all();
+  const historyEntries = options?.limit ? await query.limit(options.limit) : await query;
 
   const results = [];
   for (const entry of historyEntries) {
     const cats = await db
       .select()
       .from(schema.assetHistoryCategories)
-      .where(eq(schema.assetHistoryCategories.assetHistoryId, entry.id))
-      .all();
+      .where(eq(schema.assetHistoryCategories.assetHistoryId, entry.id));
 
     const categories: Record<string, number> = {};
     for (const cat of cats) {
@@ -182,7 +178,7 @@ export async function getLatestTotalAssets(
     .where(eq(schema.assetHistory.groupId, groupId))
     .orderBy(desc(schema.assetHistory.date))
     .limit(1)
-    .get();
+    .then((rows) => rows.at(0));
 
   return latest?.totalAssets ?? null;
 }
@@ -199,8 +195,7 @@ export async function getDailyAssetChange(groupIdParam?: string, db: Db = getDb(
     .from(schema.assetHistory)
     .where(eq(schema.assetHistory.groupId, groupId))
     .orderBy(desc(schema.assetHistory.date))
-    .limit(2)
-    .all();
+    .limit(2);
 
   if (latest.length < 2) {
     return null;
@@ -251,7 +246,7 @@ export async function getCategoryChangesForPeriod(
     .where(eq(schema.assetHistory.groupId, groupId))
     .orderBy(desc(schema.assetHistory.date))
     .limit(1)
-    .get();
+    .then((rows) => rows.at(0));
 
   if (!latest) {
     return null;
@@ -270,7 +265,7 @@ export async function getCategoryChangesForPeriod(
     )
     .orderBy(desc(schema.assetHistory.date))
     .limit(1)
-    .get();
+    .then((rows) => rows.at(0));
 
   if (!previous || previous.date === latest.date) {
     return null;
@@ -279,14 +274,12 @@ export async function getCategoryChangesForPeriod(
   const latestCategories = await db
     .select()
     .from(schema.assetHistoryCategories)
-    .where(eq(schema.assetHistoryCategories.assetHistoryId, latest.id))
-    .all();
+    .where(eq(schema.assetHistoryCategories.assetHistoryId, latest.id));
 
   const previousCategories = await db
     .select()
     .from(schema.assetHistoryCategories)
-    .where(eq(schema.assetHistoryCategories.assetHistoryId, previous.id))
-    .all();
+    .where(eq(schema.assetHistoryCategories.assetHistoryId, previous.id));
 
   const categoryChanges = calculateCategoryChanges(latestCategories, previousCategories);
 

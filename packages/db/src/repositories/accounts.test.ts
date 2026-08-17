@@ -40,7 +40,7 @@ describe("upsertAccount", () => {
   test("新規アカウントを作成して ID を返す", async () => {
     const id = await upsertAccount(db, account);
     expect(id).toBeGreaterThan(0);
-    const result = await db.select().from(schema.accounts).all();
+    const result = await db.select().from(schema.accounts);
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("テスト銀行");
   });
@@ -49,7 +49,7 @@ describe("upsertAccount", () => {
     const id1 = await upsertAccount(db, account);
     const id2 = await upsertAccount(db, { ...account, name: "更新銀行" });
     expect(id1).toBe(id2);
-    const result = await db.select().from(schema.accounts).all();
+    const result = await db.select().from(schema.accounts);
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("更新銀行");
   });
@@ -75,7 +75,7 @@ describe("saveAccountStatus", () => {
       url: "",
       totalAssets: 1000000,
     });
-    const result = await db.select().from(schema.accountStatuses).all();
+    const result = await db.select().from(schema.accountStatuses);
     expect(result).toHaveLength(1);
     expect(result[0].status).toBe("ok");
     expect(result[0].totalAssets).toBe(1000000);
@@ -109,7 +109,10 @@ describe("saveAccountStatus", () => {
       },
     ]);
 
-    const result = await db.select().from(schema.accountStatuses).get();
+    const result = await db
+      .select()
+      .from(schema.accountStatuses)
+      .then((rows) => rows.at(0)!);
     expect(result?.scheduledWithdrawalAmount).toBe(42_000);
     expect(result?.scheduledWithdrawalConfirmed).toBe(true);
   });
@@ -133,7 +136,7 @@ describe("updateAccountCategory", () => {
       .select()
       .from(schema.accounts)
       .where(eq(schema.accounts.mfId, "acc1"))
-      .get();
+      .then((rows) => rows.at(0)!);
 
     expect(account).toBeDefined();
     expect(account!.categoryId).toBeGreaterThan(0);
@@ -143,7 +146,7 @@ describe("updateAccountCategory", () => {
       .select()
       .from(schema.institutionCategories)
       .where(eq(schema.institutionCategories.id, account!.categoryId!))
-      .get();
+      .then((rows) => rows.at(0)!);
 
     expect(category).toBeDefined();
     expect(category!.name).toBe("銀行");
@@ -173,13 +176,13 @@ describe("updateAccountCategory", () => {
     await updateAccountCategory(db, "acc1", "銀行");
     await updateAccountCategory(db, "acc2", "銀行");
 
-    const accounts = await db.select().from(schema.accounts).all();
+    const accounts = await db.select().from(schema.accounts);
     expect(accounts).toHaveLength(2);
     // 両方とも同じcategoryIdを持つ
     expect(accounts[0].categoryId).toBe(accounts[1].categoryId);
 
     // カテゴリーは1つだけ作成される
-    const categories = await db.select().from(schema.institutionCategories).all();
+    const categories = await db.select().from(schema.institutionCategories);
     expect(categories).toHaveLength(1);
     expect(categories[0].name).toBe("銀行");
   });
@@ -208,13 +211,13 @@ describe("updateAccountCategory", () => {
     await updateAccountCategory(db, "acc1", "銀行");
     await updateAccountCategory(db, "acc2", "証券");
 
-    const accounts = await db.select().from(schema.accounts).all();
+    const accounts = await db.select().from(schema.accounts);
     expect(accounts).toHaveLength(2);
     // 異なるcategoryIdを持つ
     expect(accounts[0].categoryId).not.toBe(accounts[1].categoryId);
 
     // カテゴリーは2つ作成される
-    const categories = await db.select().from(schema.institutionCategories).all();
+    const categories = await db.select().from(schema.institutionCategories);
     expect(categories).toHaveLength(2);
     expect(categories.map((c) => c.name)).toEqual(expect.arrayContaining(["銀行", "証券"]));
   });

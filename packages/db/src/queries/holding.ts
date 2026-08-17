@@ -14,7 +14,7 @@ async function getHoldingAccountIdsForGroup(db: Db, groupId: string): Promise<nu
     .select({ id: schema.accounts.id })
     .from(schema.accounts)
     .where(eq(schema.accounts.mfId, FALLBACK_ACCOUNT_MF_ID))
-    .get();
+    .then((rows) => rows.at(0));
 
   if (!fallbackAccount || accountIds.includes(fallbackAccount.id)) return accountIds;
   return [...accountIds, fallbackAccount.id];
@@ -30,7 +30,7 @@ export async function getLatestSnapshot(db: Db = getDb()) {
     .from(schema.dailySnapshots)
     .orderBy(desc(schema.dailySnapshots.id))
     .limit(1)
-    .get();
+    .then((rows) => rows.at(0));
 }
 
 /**
@@ -87,8 +87,7 @@ export async function getHoldingsWithLatestValues(groupIdParam?: string, db: Db 
     .innerJoin(schema.holdings, eq(schema.holdings.id, schema.holdingValues.holdingId))
     .leftJoin(schema.assetCategories, eq(schema.assetCategories.id, schema.holdings.categoryId))
     .leftJoin(schema.accounts, eq(schema.accounts.id, schema.holdings.accountId))
-    .where(whereCondition)
-    .all();
+    .where(whereCondition);
 }
 
 /**
@@ -138,8 +137,7 @@ export async function getHoldingsByAccountId(
         eq(schema.holdingValues.snapshotId, latestSnapshot.id),
         eq(schema.holdings.accountId, accountId),
       ),
-    )
-    .all();
+    );
 }
 
 export interface HoldingWithDailyChange {
@@ -187,8 +185,7 @@ export async function getHoldingsWithDailyChange(
     .innerJoin(schema.holdings, eq(schema.holdings.id, schema.holdingValues.holdingId))
     .leftJoin(schema.assetCategories, eq(schema.assetCategories.id, schema.holdings.categoryId))
     .leftJoin(schema.accounts, eq(schema.accounts.id, schema.holdings.accountId))
-    .where(whereCondition)
-    .all()) as HoldingWithDailyChange[];
+    .where(whereCondition)) as HoldingWithDailyChange[];
 }
 
 /**

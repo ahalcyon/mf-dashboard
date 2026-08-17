@@ -28,17 +28,14 @@ export async function seedSpendingTargets(db: SeedDb, now: Now): Promise<void> {
 
     for (const target of spendingTargetDefs) {
       const ts = now();
-      await db
-        .insert(schema.spendingTargets)
-        .values({
-          groupId,
-          largeCategoryId: target.largeCategoryId,
-          categoryName: target.categoryName,
-          type: target.type,
-          createdAt: ts,
-          updatedAt: ts,
-        })
-        .run();
+      await db.insert(schema.spendingTargets).values({
+        groupId,
+        largeCategoryId: target.largeCategoryId,
+        categoryName: target.categoryName,
+        type: target.type,
+        createdAt: ts,
+        updatedAt: ts,
+      });
     }
   }
 }

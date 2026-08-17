@@ -35,6 +35,5 @@ export async function getSpendingTargets(db: Db, groupId: string) {
   return await db
     .select()
     .from(schema.spendingTargets)
-    .where(eq(schema.spendingTargets.groupId, groupId))
-    .all();
+    .where(eq(schema.spendingTargets.groupId, groupId));
 }

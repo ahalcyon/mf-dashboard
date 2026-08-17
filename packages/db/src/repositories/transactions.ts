@@ -41,7 +41,7 @@ export async function hasTransactionsForMonth(db: Db, month: string): Promise<bo
     .select({ count: sql<number>`count(*)` })
     .from(schema.transactions)
     .where(like(schema.transactions.date, `${month}%`))
-    .get();
+    .then((rows) => rows.at(0));
   return (result?.count ?? 0) > 0;
 }
 
@@ -50,7 +50,7 @@ export async function hasCashFlowPeriod(db: Db, month: string): Promise<boolean>
     .select({ id: schema.cashFlowPeriods.id })
     .from(schema.cashFlowPeriods)
     .where(eq(schema.cashFlowPeriods.month, month))
-    .get();
+    .then((rows) => rows.at(0));
   return result !== undefined;
 }
 
@@ -63,8 +63,7 @@ export async function findExistingTransactionMfIds(db: Db, mfIds: string[]): Pro
     const rows = await db
       .select({ mfId: schema.transactions.mfId })
       .from(schema.transactions)
-      .where(inArray(schema.transactions.mfId, batch))
-      .all();
+      .where(inArray(schema.transactions.mfId, batch));
 
     for (const row of rows) {
       existingMfIds.add(row.mfId);
@@ -79,18 +78,18 @@ export async function findExistingTransactionMfIds(db: Db, mfIds: string[]): Pro
  * @param month "2026-01" 形式
  */
 export async function deleteTransactionsForMonth(db: DbExecutor, month: string): Promise<number> {
-  const result = await db
+  const deleted = await db
     .delete(schema.transactions)
     .where(like(schema.transactions.date, `${month}%`))
-    .run();
-  return result.rowsAffected;
+    .returning({ id: schema.transactions.id });
+  return deleted.length;
 }
 
 async function deleteTransactionsForDateRange(
   db: DbExecutor,
   range: TransactionDateRange & { toExclusive: string },
 ): Promise<number> {
-  const result = await db
+  const deleted = await db
     .delete(schema.transactions)
     .where(
       and(
@@ -98,8 +97,8 @@ async function deleteTransactionsForDateRange(
         lt(schema.transactions.date, range.toExclusive),
       ),
     )
-    .run();
-  return result.rowsAffected;
+    .returning({ id: schema.transactions.id });
+  return deleted.length;
 }
 
 function resolveTransactionDateRange(
@@ -278,8 +277,7 @@ export async function replaceTransactionsForMonth(
           transferTargetAccountId: sql`excluded.transfer_target_account_id`,
           updatedAt: timestamp,
         },
-      })
-      .run();
+      });
   }
 
   await db
@@ -300,8 +298,7 @@ export async function replaceTransactionsForMonth(
         transactionCount: records.length,
         updatedAt: timestamp,
       },
-    })
-    .run();
+    });
 
   return items.length;
 }

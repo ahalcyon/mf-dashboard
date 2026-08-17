@@ -45,17 +45,14 @@ async function createTestAccount(name: string): Promise<number> {
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
 
-  await db
-    .insert(schema.groupAccounts)
-    .values({
-      groupId: TEST_GROUP_ID,
-      accountId: account.id,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.groupAccounts).values({
+    groupId: TEST_GROUP_ID,
+    accountId: account.id,
+    createdAt: now,
+    updatedAt: now,
+  });
 
   return account.id;
 }
@@ -71,7 +68,7 @@ async function createSnapshot(): Promise<number> {
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
   return snapshot.id;
 }
 
@@ -85,7 +82,7 @@ async function createAssetCategory(name: string): Promise<number> {
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
   return category.id;
 }
 
@@ -111,7 +108,7 @@ async function createHolding(data: {
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
   return holding.id;
 }
 
@@ -127,22 +124,19 @@ async function createHoldingValue(data: {
   unrealizedGainPct?: number | null;
 }) {
   const now = new Date().toISOString();
-  await db
-    .insert(schema.holdingValues)
-    .values({
-      holdingId: data.holdingId,
-      snapshotId: data.snapshotId,
-      amount: data.amount ?? 100000,
-      quantity: data.quantity ?? null,
-      unitPrice: data.unitPrice ?? null,
-      avgCostPrice: data.avgCostPrice ?? null,
-      dailyChange: data.dailyChange ?? null,
-      unrealizedGain: data.unrealizedGain ?? null,
-      unrealizedGainPct: data.unrealizedGainPct ?? null,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.holdingValues).values({
+    holdingId: data.holdingId,
+    snapshotId: data.snapshotId,
+    amount: data.amount ?? 100000,
+    quantity: data.quantity ?? null,
+    unitPrice: data.unitPrice ?? null,
+    avgCostPrice: data.avgCostPrice ?? null,
+    dailyChange: data.dailyChange ?? null,
+    unrealizedGain: data.unrealizedGain ?? null,
+    unrealizedGainPct: data.unrealizedGainPct ?? null,
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
 // ============================================================
@@ -189,24 +183,18 @@ describe("getLatestSnapshot", () => {
 
   it("複数のスナップショットがある場合は最新を返す", async () => {
     const now = new Date().toISOString();
-    await db
-      .insert(schema.dailySnapshots)
-      .values({
-        groupId: TEST_GROUP_ID,
-        date: "2025-04-14",
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-    await db
-      .insert(schema.dailySnapshots)
-      .values({
-        groupId: TEST_GROUP_ID,
-        date: "2025-04-15",
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.dailySnapshots).values({
+      groupId: TEST_GROUP_ID,
+      date: "2025-04-14",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(schema.dailySnapshots).values({
+      groupId: TEST_GROUP_ID,
+      date: "2025-04-15",
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const result = await getLatestSnapshot(db);
 
@@ -269,7 +257,7 @@ describe("getHoldingsWithLatestValues", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const holdingId2 = await createHolding({ accountId: outsideAccount.id, name: "Holding B" });
     await createHoldingValue({ holdingId: holdingId2, snapshotId, amount: 200000 });
 
@@ -318,7 +306,7 @@ describe("getHoldingsWithLatestValues", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const snapshotId = await createSnapshot();
     const holdingId = await createHolding({
       accountId: fallbackAccount.id,
@@ -359,7 +347,7 @@ describe("getHoldingsByAccountId", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
 
     const result = await getHoldingsByAccountId(outsideAccount.id, undefined, db);
 
@@ -428,7 +416,7 @@ describe("getHoldingsWithDailyChange", () => {
         updatedAt: now,
       })
       .returning()
-      .get();
+      .then((rows) => rows.at(0)!);
     const outsideHoldingId = await createHolding({
       accountId: outsideAccount.id,
       name: "Stock B",

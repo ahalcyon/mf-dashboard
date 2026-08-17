@@ -21,16 +21,13 @@ beforeEach(async () => {
 describe("getCurrentGroup", () => {
   it("isCurrent=trueのグループを返す", async () => {
     const now = new Date().toISOString();
-    await db
-      .insert(schema.groups)
-      .values({
-        id: "group_001",
-        name: "Current Group",
-        isCurrent: true,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(schema.groups).values({
+      id: "group_001",
+      name: "Current Group",
+      isCurrent: true,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const result = await getCurrentGroup(db);
 
@@ -48,35 +45,32 @@ describe("getAllGroups", () => {
     const now = new Date().toISOString();
     const yesterday = new Date(Date.now() - 86400000).toISOString();
 
-    await db
-      .insert(schema.groups)
-      .values([
-        {
-          id: "g1",
-          name: "Group 1",
-          isCurrent: false,
-          lastScrapedAt: yesterday,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          id: "g2",
-          name: "Group 2",
-          isCurrent: true,
-          lastScrapedAt: yesterday,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          id: "g3",
-          name: "Group 3",
-          isCurrent: false,
-          lastScrapedAt: now,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ])
-      .run();
+    await db.insert(schema.groups).values([
+      {
+        id: "g1",
+        name: "Group 1",
+        isCurrent: false,
+        lastScrapedAt: yesterday,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: "g2",
+        name: "Group 2",
+        isCurrent: true,
+        lastScrapedAt: yesterday,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: "g3",
+        name: "Group 3",
+        isCurrent: false,
+        lastScrapedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
 
     const result = await getAllGroups(db);
 

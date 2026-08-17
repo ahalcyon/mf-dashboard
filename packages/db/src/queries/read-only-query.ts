@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
-import { getTableColumns, getTableName, isTable } from "drizzle-orm";
-import { getDbPath } from "../db-path";
+import { getTableColumns, getTableName, isTable, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../index";
 import * as schema from "../schema/schema";
 
@@ -70,13 +69,32 @@ const QUERY_PROCESS_SOURCE = String.raw`
     return value instanceof Uint8Array ? Array.from(value) : value;
   }
 
+  function quoteIdentifier(name) {
+    return '"' + String(name).replaceAll('"', '""') + '"';
+  }
+
   function run(processData) {
     const { DatabaseSync } = require("node:sqlite");
     const database = new DatabaseSync(":memory:");
 
     try {
       database.exec("PRAGMA hard_heap_limit = " + processData.maxSqliteHeapBytes);
-      database.exec(processData.scopedDatabaseSql);
+      for (const table of processData.tables) {
+        const columnList = table.columns.map(quoteIdentifier).join(", ");
+        database.exec("CREATE TABLE " + quoteIdentifier(table.name) + " (" + columnList + ")");
+        if (table.rows.length === 0) continue;
+        const placeholders = table.columns.map(() => "?").join(", ");
+        const insert = database.prepare(
+          "INSERT INTO " + quoteIdentifier(table.name) + " VALUES (" + placeholders + ")",
+        );
+        for (const row of table.rows) {
+          insert.run(...row);
+        }
+      }
+      for (const indexSql of processData.indexes) {
+        database.exec(indexSql);
+      }
+      database.exec("PRAGMA query_only = ON");
       send({ ready: true });
       const statement = database.prepare(
         "SELECT * FROM (\n" + processData.query + "\n) AS query_result LIMIT " +
@@ -388,190 +406,282 @@ export function normalizeReadOnlySql(sql: string): string {
   return normalized;
 }
 
-function quoteSqlText(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
+interface SandboxTable {
+  name: string;
+  columns: string[];
+  rows: unknown[][];
 }
 
-function createScopedDatabaseSql(databasePath: string, groupId: string): string {
-  const sourceDatabase = quoteSqlText(databasePath);
-  const selectedGroup = quoteSqlText(groupId);
-  const globalSnapshotGroup = quoteSqlText(GLOBAL_SNAPSHOT_GROUP_ID);
-  const accountIds = `
-    SELECT account_id FROM source.group_accounts WHERE group_id = ${selectedGroup}
+const SANDBOX_INDEXES = [
+  "CREATE INDEX group_accounts_group_id_idx ON group_accounts(group_id)",
+  "CREATE INDEX group_accounts_account_id_idx ON group_accounts(account_id)",
+  "CREATE INDEX holdings_account_id_idx ON holdings(account_id)",
+  "CREATE INDEX holding_values_holding_id_idx ON holding_values(holding_id)",
+  "CREATE INDEX transactions_account_id_idx ON transactions(account_id)",
+  "CREATE INDEX transactions_date_idx ON transactions(date)",
+  "CREATE INDEX asset_history_group_id_idx ON asset_history(group_id)",
+];
+
+/**
+ * PostgreSQL側で現在グループへのスコープと匿名化を行い、
+ * sandboxへ渡すテーブルデータを構築するクエリ群を返す。
+ */
+function createScopedTableQueries(groupId: string): Array<{ name: string; query: SQL }> {
+  const selectedGroup = sql`${groupId}`;
+  const globalSnapshotGroup = sql`${GLOBAL_SNAPSHOT_GROUP_ID}`;
+  const accountIds = sql`
+    SELECT account_id AS id FROM group_accounts WHERE group_id = ${selectedGroup}
     UNION
-    SELECT id FROM source.accounts
+    SELECT id FROM accounts
     WHERE mf_id = 'unknown' AND ${selectedGroup} = ${globalSnapshotGroup}
   `;
-  const groupHoldingIds = `SELECT id FROM source.holdings WHERE account_id IN (${accountIds})`;
-  const latestHoldingSnapshotId = `
+  const groupHoldingIds = sql`SELECT id FROM holdings WHERE account_id IN (${accountIds})`;
+  const latestHoldingSnapshotId = sql`
     SELECT id
-    FROM source.daily_snapshots
+    FROM daily_snapshots
     WHERE group_id = ${globalSnapshotGroup}
-      AND refresh_completed = 1
+      AND refresh_completed IS TRUE
     ORDER BY date DESC, id DESC
     LIMIT 1
   `;
-  const assetHistoryIds = `SELECT id FROM source.asset_history WHERE group_id = ${selectedGroup}`;
+  const assetHistoryIds = sql`SELECT id FROM asset_history WHERE group_id = ${selectedGroup}`;
 
-  return `
-    ATTACH DATABASE ${sourceDatabase} AS source;
-    BEGIN;
-    CREATE TABLE groups AS
-      SELECT * FROM source.groups WHERE id = ${selectedGroup};
-    CREATE TABLE group_accounts AS
-      SELECT * FROM source.group_accounts WHERE group_id = ${selectedGroup}
-      UNION ALL
-      SELECT
-        -1 AS id,
-        ${globalSnapshotGroup} AS group_id,
-        id AS account_id,
-        created_at,
-        updated_at
-      FROM source.accounts
-      WHERE mf_id = 'unknown'
-        AND ${selectedGroup} = ${globalSnapshotGroup}
-        AND id NOT IN (
-          SELECT account_id FROM source.group_accounts WHERE group_id = ${globalSnapshotGroup}
-        );
-    CREATE TABLE institution_categories AS
-      SELECT * FROM source.institution_categories;
-    CREATE TABLE accounts AS
-      SELECT id, NULL AS mf_id, name, type, institution, category_id, created_at, updated_at, is_active
-      FROM source.accounts
-      WHERE id IN (${accountIds});
-    CREATE TABLE asset_categories AS
-      SELECT * FROM source.asset_categories;
-    CREATE TABLE account_statuses AS
-      SELECT * FROM source.account_statuses WHERE account_id IN (${accountIds});
-    CREATE TABLE daily_snapshots AS
-      SELECT
-        id,
-        ${selectedGroup} AS group_id,
-        date,
-        refresh_completed,
-        created_at,
-        updated_at
-      FROM source.daily_snapshots
-      WHERE id IN (${latestHoldingSnapshotId});
-    CREATE TABLE holding_values AS
-      SELECT *
-      FROM source.holding_values
-      WHERE snapshot_id IN (${latestHoldingSnapshotId})
-        AND holding_id IN (${groupHoldingIds});
-    CREATE TABLE holdings AS
-      SELECT
-        id,
-        NULL AS mf_id,
-        account_id,
-        category_id,
-        name,
-        code,
-        type,
-        liability_category,
-        created_at,
-        updated_at,
-        is_active
-      FROM source.holdings
-      WHERE id IN (SELECT holding_id FROM holding_values);
-    CREATE TABLE transactions AS
-      WITH external_transfer_candidates AS (
+  return [
+    {
+      name: "groups",
+      query: sql`SELECT * FROM groups WHERE id = ${selectedGroup}`,
+    },
+    {
+      name: "group_accounts",
+      query: sql`
+        SELECT * FROM group_accounts WHERE group_id = ${selectedGroup}
+        UNION ALL
         SELECT
-          transfer_target_account_id AS external_account_id
-        FROM source.transactions
-        WHERE type = 'transfer'
-          AND account_id IN (${accountIds})
-          AND transfer_target_account_id IS NOT NULL
-          AND transfer_target_account_id NOT IN (${accountIds})
-        UNION
-        SELECT
-          account_id AS external_account_id
-        FROM source.transactions
-        WHERE type = 'transfer'
-          AND account_id NOT IN (${accountIds})
-          AND transfer_target_account_id IN (${accountIds})
-      ),
-      external_transfer_accounts AS (
-        SELECT
-          external_account_id,
-          ROW_NUMBER() OVER (ORDER BY external_account_id) AS anonymized_id
-        FROM external_transfer_candidates
-      )
-      SELECT
-        id,
-        NULL AS mf_id,
-        date,
-        CASE WHEN account_id IN (${accountIds}) THEN account_id END AS account_id,
-        category,
-        sub_category,
-        description,
-        amount,
-        type,
-        is_transfer,
-        is_excluded_from_calculation,
-        CASE WHEN transfer_target_account_id IN (${accountIds}) THEN transfer_target END
-          AS transfer_target,
-        CASE WHEN transfer_target_account_id IN (${accountIds}) THEN transfer_target_account_id END
-          AS transfer_target_account_id,
-        CASE
-          WHEN type <> 'transfer' THEN NULL
-          WHEN account_id IN (${accountIds}) AND transfer_target_account_id IN (${accountIds})
-            THEN 'account:' || transfer_target_account_id
-          WHEN external_transfer_accounts.anonymized_id IS NOT NULL
-            THEN 'external:' || external_transfer_accounts.anonymized_id
-          ELSE 'external:unknown'
-        END AS transfer_counterparty_key,
-        CASE
-          WHEN type = 'transfer' AND EXISTS (
-            SELECT 1
-            FROM source.group_accounts source_group
-            JOIN source.group_accounts target_group
-              ON target_group.group_id = source_group.group_id
-            WHERE source_group.account_id = source.transactions.account_id
-              AND target_group.account_id = source.transactions.transfer_target_account_id
-              AND source_group.group_id <> '0'
+          -1 AS id,
+          ${globalSnapshotGroup} AS group_id,
+          id AS account_id,
+          created_at,
+          updated_at
+        FROM accounts
+        WHERE mf_id = 'unknown'
+          AND ${selectedGroup} = ${globalSnapshotGroup}
+          AND id NOT IN (
+            SELECT account_id FROM group_accounts WHERE group_id = ${globalSnapshotGroup}
           )
-          THEN 1
-          ELSE 0
-        END AS is_internal_transfer,
-        created_at,
-        updated_at
-      FROM source.transactions
-      LEFT JOIN external_transfer_accounts
-        ON external_transfer_accounts.external_account_id =
+      `,
+    },
+    {
+      name: "institution_categories",
+      query: sql`SELECT * FROM institution_categories`,
+    },
+    {
+      name: "accounts",
+      query: sql`
+        SELECT id, NULL AS mf_id, name, type, institution, category_id, created_at, updated_at, is_active
+        FROM accounts
+        WHERE id IN (${accountIds})
+      `,
+    },
+    {
+      name: "asset_categories",
+      query: sql`SELECT * FROM asset_categories`,
+    },
+    {
+      name: "account_statuses",
+      query: sql`SELECT * FROM account_statuses WHERE account_id IN (${accountIds})`,
+    },
+    {
+      name: "daily_snapshots",
+      query: sql`
+        SELECT
+          id,
+          ${selectedGroup} AS group_id,
+          date,
+          refresh_completed,
+          created_at,
+          updated_at
+        FROM daily_snapshots
+        WHERE id IN (${latestHoldingSnapshotId})
+      `,
+    },
+    {
+      name: "holding_values",
+      query: sql`
+        SELECT *
+        FROM holding_values
+        WHERE snapshot_id IN (${latestHoldingSnapshotId})
+          AND holding_id IN (${groupHoldingIds})
+      `,
+    },
+    {
+      name: "holdings",
+      query: sql`
+        SELECT
+          id,
+          NULL AS mf_id,
+          account_id,
+          category_id,
+          name,
+          code,
+          type,
+          liability_category,
+          created_at,
+          updated_at,
+          is_active
+        FROM holdings
+        WHERE id IN (
+          SELECT holding_id
+          FROM holding_values
+          WHERE snapshot_id IN (${latestHoldingSnapshotId})
+            AND holding_id IN (${groupHoldingIds})
+        )
+      `,
+    },
+    {
+      name: "transactions",
+      query: sql`
+        WITH external_transfer_candidates AS (
+          SELECT
+            transfer_target_account_id AS external_account_id
+          FROM transactions
+          WHERE type = 'transfer'
+            AND account_id IN (${accountIds})
+            AND transfer_target_account_id IS NOT NULL
+            AND transfer_target_account_id NOT IN (${accountIds})
+          UNION
+          SELECT
+            account_id AS external_account_id
+          FROM transactions
+          WHERE type = 'transfer'
+            AND account_id NOT IN (${accountIds})
+            AND transfer_target_account_id IN (${accountIds})
+        ),
+        external_transfer_accounts AS (
+          SELECT
+            external_account_id,
+            ROW_NUMBER() OVER (ORDER BY external_account_id) AS anonymized_id
+          FROM external_transfer_candidates
+        )
+        SELECT
+          transactions.id,
+          NULL AS mf_id,
+          transactions.date,
+          CASE WHEN transactions.account_id IN (${accountIds}) THEN transactions.account_id END
+            AS account_id,
+          transactions.category,
+          transactions.sub_category,
+          transactions.description,
+          transactions.amount,
+          transactions.type,
+          transactions.is_transfer,
+          transactions.is_excluded_from_calculation,
+          CASE WHEN transactions.transfer_target_account_id IN (${accountIds})
+            THEN transactions.transfer_target END AS transfer_target,
+          CASE WHEN transactions.transfer_target_account_id IN (${accountIds})
+            THEN transactions.transfer_target_account_id END AS transfer_target_account_id,
           CASE
-            WHEN source.transactions.account_id IN (${accountIds})
-              THEN source.transactions.transfer_target_account_id
-            ELSE source.transactions.account_id
-          END
-      WHERE (
-        (type = 'transfer' AND (
-          account_id IN (${accountIds}) OR transfer_target_account_id IN (${accountIds})
-        ))
-        OR (type <> 'transfer' AND account_id IN (${accountIds}))
-      )
-        AND (
-          type <> 'transfer'
-          OR (account_id IS NOT NULL AND transfer_target_account_id IS NOT NULL)
-        );
-    CREATE TABLE asset_history AS
-      SELECT * FROM source.asset_history WHERE id IN (${assetHistoryIds});
-    CREATE TABLE asset_history_categories AS
-      SELECT * FROM source.asset_history_categories WHERE asset_history_id IN (${assetHistoryIds});
-    CREATE TABLE spending_targets AS
-      SELECT * FROM source.spending_targets WHERE group_id = ${selectedGroup};
-    CREATE TABLE analytics_reports AS
-      SELECT * FROM source.analytics_reports WHERE 0;
-    CREATE INDEX group_accounts_group_id_idx ON group_accounts(group_id);
-    CREATE INDEX group_accounts_account_id_idx ON group_accounts(account_id);
-    CREATE INDEX holdings_account_id_idx ON holdings(account_id);
-    CREATE INDEX holding_values_holding_id_idx ON holding_values(holding_id);
-    CREATE INDEX transactions_account_id_idx ON transactions(account_id);
-    CREATE INDEX transactions_date_idx ON transactions(date);
-    CREATE INDEX asset_history_group_id_idx ON asset_history(group_id);
-    COMMIT;
-    DETACH DATABASE source;
-    PRAGMA query_only = ON;
-  `;
+            WHEN transactions.type <> 'transfer' THEN NULL
+            WHEN transactions.account_id IN (${accountIds})
+              AND transactions.transfer_target_account_id IN (${accountIds})
+              THEN 'account:' || transactions.transfer_target_account_id::text
+            WHEN external_transfer_accounts.anonymized_id IS NOT NULL
+              THEN 'external:' || external_transfer_accounts.anonymized_id::text
+            ELSE 'external:unknown'
+          END AS transfer_counterparty_key,
+          CASE
+            WHEN transactions.type = 'transfer' AND EXISTS (
+              SELECT 1
+              FROM group_accounts source_group
+              JOIN group_accounts target_group
+                ON target_group.group_id = source_group.group_id
+              WHERE source_group.account_id = transactions.account_id
+                AND target_group.account_id = transactions.transfer_target_account_id
+                AND source_group.group_id <> ${globalSnapshotGroup}
+            )
+            THEN 1
+            ELSE 0
+          END AS is_internal_transfer,
+          transactions.created_at,
+          transactions.updated_at
+        FROM transactions
+        LEFT JOIN external_transfer_accounts
+          ON external_transfer_accounts.external_account_id =
+            CASE
+              WHEN transactions.account_id IN (${accountIds})
+                THEN transactions.transfer_target_account_id
+              ELSE transactions.account_id
+            END
+        WHERE (
+          (transactions.type = 'transfer' AND (
+            transactions.account_id IN (${accountIds})
+            OR transactions.transfer_target_account_id IN (${accountIds})
+          ))
+          OR (transactions.type <> 'transfer' AND transactions.account_id IN (${accountIds}))
+        )
+          AND (
+            transactions.type <> 'transfer'
+            OR (
+              transactions.account_id IS NOT NULL
+              AND transactions.transfer_target_account_id IS NOT NULL
+            )
+          )
+      `,
+    },
+    {
+      name: "asset_history",
+      query: sql`SELECT * FROM asset_history WHERE id IN (${assetHistoryIds})`,
+    },
+    {
+      name: "asset_history_categories",
+      query: sql`
+        SELECT * FROM asset_history_categories WHERE asset_history_id IN (${assetHistoryIds})
+      `,
+    },
+    {
+      name: "spending_targets",
+      query: sql`SELECT * FROM spending_targets WHERE group_id = ${selectedGroup}`,
+    },
+    {
+      name: "analytics_reports",
+      query: sql`SELECT * FROM analytics_reports WHERE FALSE`,
+    },
+  ];
+}
+
+/** sandbox（SQLite）が扱える値へ変換する。booleanは0/1の整数として格納する。 */
+function serializeSandboxValue(value: unknown): unknown {
+  if (value === true) return 1;
+  if (value === false) return 0;
+  if (value === undefined) return null;
+  return value;
+}
+
+interface ExecutedQueryResult {
+  rows: Record<string, unknown>[];
+  fields: Array<{ name: string }>;
+}
+
+/**
+ * PostgreSQLから現在グループへスコープ済みの匿名化テーブルを取得する。
+ */
+async function loadScopedTables(
+  db: Db,
+  groupId: string,
+  abortSignal?: AbortSignal,
+): Promise<SandboxTable[]> {
+  const tables: SandboxTable[] = [];
+
+  for (const { name, query } of createScopedTableQueries(groupId)) {
+    abortSignal?.throwIfAborted();
+    const result = (await db.execute(query)) as unknown as ExecutedQueryResult;
+    const columns = result.fields.map((field) => field.name);
+    const rows = result.rows.map((row) =>
+      columns.map((column) => serializeSandboxValue(row[column])),
+    );
+    tables.push({ name, columns, rows });
+  }
+
+  return tables;
 }
 
 interface CommonTableExpression {
@@ -785,7 +895,7 @@ interface QueryProcessMessage {
 }
 
 function runSandboxedQuery(
-  databasePath: string,
+  tables: SandboxTable[],
   query: string,
   groupId: string,
   abortSignal?: AbortSignal,
@@ -799,12 +909,13 @@ function runSandboxedQuery(
   });
   const processData = JSON.stringify({
     groupId,
+    indexes: SANDBOX_INDEXES,
     maxBytes: READ_ONLY_QUERY_MAX_BYTES,
     maxColumns: MAX_RESULT_COLUMNS,
     maxRows: READ_ONLY_QUERY_MAX_ROWS,
     maxSqliteHeapBytes: READ_ONLY_QUERY_MAX_SQLITE_HEAP_BYTES,
     query,
-    scopedDatabaseSql: createScopedDatabaseSql(databasePath, groupId),
+    tables,
   });
 
   return new Promise((resolve, reject) => {
@@ -892,14 +1003,14 @@ function runSandboxedQuery(
 }
 
 export async function executeReadOnlyQuery(
-  _db: Db,
+  db: Db,
   sql: string,
   groupId: string,
-  databasePath = getDbPath(),
   abortSignal?: AbortSignal,
 ) {
   abortSignal?.throwIfAborted();
   const query = normalizeReadOnlySql(sql);
   validateReferencedTables(query);
-  return runSandboxedQuery(databasePath, query, groupId, abortSignal);
+  const tables = await loadScopedTables(db, groupId, abortSignal);
+  return runSandboxedQuery(tables, query, groupId, abortSignal);
 }

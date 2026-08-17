@@ -31,7 +31,7 @@ export async function createHolding(
       isActive: true,
     })
     .returning({ id: schema.holdings.id })
-    .get();
+    .then((rows) => rows.at(0)!);
 
   return result.id;
 }

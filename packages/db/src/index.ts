@@ -1,44 +1,94 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { createClient, type Client } from "@libsql/client";
-import type { LibSQLDatabase } from "drizzle-orm/libsql";
-import { drizzle } from "drizzle-orm/libsql";
-import { migrate } from "drizzle-orm/libsql/migrator";
-import { getDbPath } from "./db-path";
+import { PGlite } from "@electric-sql/pglite";
+import type { ExtractTablesWithRelations } from "drizzle-orm";
+import { drizzle as drizzleNodePg, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { migrate as migrateNodePg } from "drizzle-orm/node-postgres/migrator";
+import type { PgDatabase, PgQueryResultHKT, PgTransaction } from "drizzle-orm/pg-core";
+import { drizzle as drizzlePglite, type PgliteDatabase } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
+import pg from "pg";
+import { getDatabaseUrl, getDbPath } from "./db-path";
+
+// node-postgresはint8(SUM/COUNTなど)とnumericをstringで返すため、
+// PGliteと同じくnumberへ揃える（本アプリの金額は2^53未満）
+pg.types.setTypeParser(pg.types.builtins.INT8, (value) => Number(value));
+pg.types.setTypeParser(pg.types.builtins.NUMERIC, (value) => Number(value));
+
+const { Pool } = pg;
 import * as schema from "./schema/schema";
 
-let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
-let _client: Client | null = null;
+/**
+ * 接続先はどちらもPostgreSQL:
+ * - DATABASE_URL が設定されていればnode-postgres（AWS RDSなどのリモートPostgreSQL）
+ * - 未設定ならPGlite（data/ 以下のローカル組込みPostgres。デモ・ローカル開発用）
+ */
+export type Db = PgDatabase<
+  PgQueryResultHKT,
+  typeof schema,
+  ExtractTablesWithRelations<typeof schema>
+>;
+export type DbTransaction = PgTransaction<
+  PgQueryResultHKT,
+  typeof schema,
+  ExtractTablesWithRelations<typeof schema>
+>;
+export type DbExecutor = Db | DbTransaction;
+
+let _db: Db | null = null;
+let _nodePgDb: NodePgDatabase<typeof schema> | null = null;
+let _pgliteDb: PgliteDatabase<typeof schema> | null = null;
+let _pool: pg.Pool | null = null;
+let _pglite: PGlite | null = null;
 
 export function isDatabaseAvailable(): boolean {
+  if (getDatabaseUrl()) {
+    return true;
+  }
   return existsSync(getDbPath());
 }
 
-export function getDb() {
+export function getDb(): Db {
   if (!_db) {
-    _client = createClient({ url: `file:${getDbPath()}` });
-    _db = drizzle(_client, { schema });
+    const databaseUrl = getDatabaseUrl();
+    if (databaseUrl) {
+      _pool = new Pool({ connectionString: databaseUrl });
+      _nodePgDb = drizzleNodePg(_pool, { schema });
+      _db = _nodePgDb as Db;
+    } else {
+      _pglite = new PGlite(getDbPath());
+      _pgliteDb = drizzlePglite(_pglite, { schema });
+      _db = _pgliteDb as Db;
+    }
   }
   return _db;
 }
 
-export function closeDb() {
-  if (_client) {
-    _client.close();
-    _client = null;
-    _db = null;
+export async function closeDb(): Promise<void> {
+  if (_pool) {
+    await _pool.end();
   }
+  if (_pglite) {
+    await _pglite.close();
+  }
+  _pool = null;
+  _pglite = null;
+  _nodePgDb = null;
+  _pgliteDb = null;
+  _db = null;
 }
 
-export type Db = LibSQLDatabase<typeof schema>;
-export type DbTransaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
-export type DbExecutor = Db | DbTransaction;
+const MIGRATIONS_FOLDER = join(import.meta.dirname, "../drizzle");
 
-export async function initDb() {
+export async function initDb(): Promise<Db> {
   const db = getDb();
 
   // Apply migrations
-  await migrate(db, { migrationsFolder: join(import.meta.dirname, "../drizzle") });
+  if (_nodePgDb) {
+    await migrateNodePg(_nodePgDb, { migrationsFolder: MIGRATIONS_FOLDER });
+  } else if (_pgliteDb) {
+    await migratePglite(_pgliteDb, { migrationsFolder: MIGRATIONS_FOLDER });
+  }
 
   return db;
 }

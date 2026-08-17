@@ -111,7 +111,7 @@ describe("upsertById", () => {
     );
     expect(id).toBeGreaterThan(0);
 
-    const result = await db.select().from(schema.assetCategories).all();
+    const result = await db.select().from(schema.assetCategories);
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("テストカテゴリ");
   });
@@ -134,7 +134,7 @@ describe("upsertById", () => {
     );
 
     expect(id1).toBe(id2);
-    const result = await db.select().from(schema.assetCategories).all();
+    const result = await db.select().from(schema.assetCategories);
     expect(result).toHaveLength(1);
   });
 });
@@ -185,7 +185,7 @@ describe("getOrCreate", () => {
     );
     expect(id).toBeGreaterThan(0);
 
-    const result = await db.select().from(schema.assetCategories).all();
+    const result = await db.select().from(schema.assetCategories);
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("新規カテゴリ");
   });
@@ -205,7 +205,7 @@ describe("getOrCreate", () => {
     );
 
     expect(id1).toBe(id2);
-    const result = await db.select().from(schema.assetCategories).all();
+    const result = await db.select().from(schema.assetCategories);
     expect(result).toHaveLength(1);
   });
 });

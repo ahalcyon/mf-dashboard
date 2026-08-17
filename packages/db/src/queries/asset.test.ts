@@ -50,7 +50,7 @@ async function createAssetHistory(data: { date: string; totalAssets: number }): 
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
   return history.id;
 }
 
@@ -60,16 +60,13 @@ async function createAssetHistoryCategory(data: {
   amount: number;
 }) {
   const now = new Date().toISOString();
-  await db
-    .insert(schema.assetHistoryCategories)
-    .values({
-      assetHistoryId: data.assetHistoryId,
-      categoryName: data.categoryName,
-      amount: data.amount,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.assetHistoryCategories).values({
+    assetHistoryId: data.assetHistoryId,
+    categoryName: data.categoryName,
+    amount: data.amount,
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
 async function createTestAccount(name: string): Promise<number> {
@@ -84,17 +81,14 @@ async function createTestAccount(name: string): Promise<number> {
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
 
-  await db
-    .insert(schema.groupAccounts)
-    .values({
-      groupId: TEST_GROUP_ID,
-      accountId: account.id,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.groupAccounts).values({
+    groupId: TEST_GROUP_ID,
+    accountId: account.id,
+    createdAt: now,
+    updatedAt: now,
+  });
 
   return account.id;
 }
@@ -110,7 +104,7 @@ async function createSnapshot(): Promise<number> {
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
   return snapshot.id;
 }
 
@@ -132,22 +126,19 @@ async function createHolding(data: {
       updatedAt: now,
     })
     .returning()
-    .get();
+    .then((rows) => rows.at(0)!);
   return holding.id;
 }
 
 async function createHoldingValue(data: { holdingId: number; snapshotId: number; amount: number }) {
   const now = new Date().toISOString();
-  await db
-    .insert(schema.holdingValues)
-    .values({
-      holdingId: data.holdingId,
-      snapshotId: data.snapshotId,
-      amount: data.amount,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(schema.holdingValues).values({
+    holdingId: data.holdingId,
+    snapshotId: data.snapshotId,
+    amount: data.amount,
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
 // ============================================================

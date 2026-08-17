@@ -20,11 +20,11 @@ let temporaryDirectory: string;
 
 beforeAll(async () => {
   temporaryDirectory = mkdtempSync(join(tmpdir(), "mf-dashboard-save-scraped-data-"));
-  db = await createTestDb(`file:${join(temporaryDirectory, "test.db")}`);
+  db = await createTestDb(join(temporaryDirectory, "test-db"));
 });
 
-afterAll(() => {
-  closeTestDb(db);
+afterAll(async () => {
+  await closeTestDb(db);
   rmSync(temporaryDirectory, { recursive: true });
 });
 
@@ -248,12 +248,12 @@ describe("saveScrapedData", () => {
       },
     ];
     await saveScrapedData(db, populatedData);
-    expect(await db.select().from(schema.transactions).all()).toHaveLength(1);
+    expect(await db.select().from(schema.transactions)).toHaveLength(1);
 
     const emptyData = createScrapedData();
     await saveScrapedData(db, emptyData);
 
-    await expect(db.select().from(schema.transactions).all()).resolves.toEqual([]);
+    await expect(db.select().from(schema.transactions)).resolves.toEqual([]);
   });
 
   test("ポートフォリオの全詳細フィールドを保持して保存する", async () => {
@@ -261,8 +261,8 @@ describe("saveScrapedData", () => {
 
     await saveScrapedData(db, data);
 
-    const holdings = await db.select().from(schema.holdings).all();
-    const values = await db.select().from(schema.holdingValues).all();
+    const holdings = await db.select().from(schema.holdings);
+    const values = await db.select().from(schema.holdingValues);
 
     expect(holdings).toHaveLength(1);
     expect(holdings[0]).toMatchObject({ name: "Fund A", type: "asset" });
@@ -283,7 +283,7 @@ describe("saveScrapedData", () => {
     data.portfolio.items[0]!.type = "預金・現金";
 
     await expect(saveScrapedData(db, data)).rejects.toThrow("Cannot classify a deposit");
-    await expect(db.select().from(schema.holdings).all()).resolves.toEqual([]);
+    await expect(db.select().from(schema.holdings)).resolves.toEqual([]);
   });
 
   test("公式口座カテゴリで正規化した暗号資産カテゴリを保存する", async () => {
@@ -303,7 +303,7 @@ describe("saveScrapedData", () => {
       })
       .from(schema.holdings)
       .innerJoin(schema.assetCategories, eq(schema.assetCategories.id, schema.holdings.categoryId))
-      .get();
+      .then((rows) => rows.at(0)!);
 
     expect(savedHolding).toEqual({
       holdingName: "Fund A",
@@ -336,12 +336,12 @@ describe("saveScrapedData", () => {
       .select()
       .from(schema.accounts)
       .where(eq(schema.accounts.mfId, "manual-account-a"))
-      .get();
+      .then((rows) => rows.at(0)!);
     const manualHolding = await db
       .select()
       .from(schema.holdings)
       .where(eq(schema.holdings.name, "Manual Asset A"))
-      .get();
+      .then((rows) => rows.at(0)!);
 
     expect(manualHolding?.accountId).toBe(manualAccount?.id);
     await expect(
@@ -349,7 +349,7 @@ describe("saveScrapedData", () => {
         .select()
         .from(schema.groupAccounts)
         .where(eq(schema.groupAccounts.accountId, manualAccount!.id))
-        .get(),
+        .then((rows) => rows.at(0)!),
     ).resolves.toMatchObject({ groupId: "group-a" });
   });
 
@@ -369,12 +369,12 @@ describe("saveScrapedData", () => {
       .select()
       .from(schema.accounts)
       .where(eq(schema.accounts.mfId, "account-a"))
-      .get();
+      .then((rows) => rows.at(0)!);
     const pensionHolding = await db
       .select()
       .from(schema.holdings)
       .where(eq(schema.holdings.name, "Pension A"))
-      .get();
+      .then((rows) => rows.at(0)!);
 
     expect(pensionHolding?.accountId).toBe(linkedAccount?.id);
   });
@@ -404,12 +404,12 @@ describe("saveScrapedData", () => {
       .select()
       .from(schema.accounts)
       .where(eq(schema.accounts.mfId, "manual-account-a"))
-      .get();
+      .then((rows) => rows.at(0)!);
     const manualHolding = await db
       .select()
       .from(schema.holdings)
       .where(eq(schema.holdings.name, "Manual Asset A"))
-      .get();
+      .then((rows) => rows.at(0)!);
 
     expect(manualHolding?.accountId).toBe(manualAccount?.id);
   });
@@ -438,12 +438,12 @@ describe("saveScrapedData", () => {
       .select()
       .from(schema.accounts)
       .where(eq(schema.accounts.mfId, "unknown"))
-      .get();
+      .then((rows) => rows.at(0)!);
     const unmatchedHolding = await db
       .select()
       .from(schema.holdings)
       .where(eq(schema.holdings.name, "Manual Asset A"))
-      .get();
+      .then((rows) => rows.at(0)!);
 
     expect(unmatchedHolding?.accountId).toBe(fallbackAccount?.id);
   });
@@ -472,12 +472,12 @@ describe("saveScrapedData", () => {
       .select()
       .from(schema.accounts)
       .where(eq(schema.accounts.mfId, "unknown"))
-      .get();
+      .then((rows) => rows.at(0)!);
     const unmatchedHolding = await db
       .select()
       .from(schema.holdings)
       .where(eq(schema.holdings.name, "Manual Account A"))
-      .get();
+      .then((rows) => rows.at(0)!);
 
     expect(unmatchedHolding?.accountId).toBe(fallbackAccount?.id);
   });
@@ -506,12 +506,12 @@ describe("saveScrapedData", () => {
       .select()
       .from(schema.accounts)
       .where(eq(schema.accounts.mfId, "unknown"))
-      .get();
+      .then((rows) => rows.at(0)!);
     const unmatchedHolding = await db
       .select()
       .from(schema.holdings)
       .where(eq(schema.holdings.name, "Manual Asset A"))
-      .get();
+      .then((rows) => rows.at(0)!);
 
     expect(unmatchedHolding?.accountId).toBe(fallbackAccount?.id);
   });
@@ -551,12 +551,12 @@ describe("saveScrapedData", () => {
       .select()
       .from(schema.accounts)
       .where(eq(schema.accounts.mfId, "unknown"))
-      .get();
+      .then((rows) => rows.at(0)!);
     const unmatchedHolding = await db
       .select()
       .from(schema.holdings)
       .where(eq(schema.holdings.name, "Shared Account"))
-      .get();
+      .then((rows) => rows.at(0)!);
 
     expect(unmatchedHolding?.accountId).toBe(fallbackAccount?.id);
   });
@@ -585,18 +585,18 @@ describe("saveScrapedData", () => {
       .select()
       .from(schema.accounts)
       .where(eq(schema.accounts.mfId, "manual-liability-a"))
-      .get();
+      .then((rows) => rows.at(0)!);
     const manualHolding = await db
       .select()
       .from(schema.holdings)
       .where(eq(schema.holdings.name, "Manual Liability A"))
-      .get();
+      .then((rows) => rows.at(0)!);
 
     const fallbackAccount = await db
       .select()
       .from(schema.accounts)
       .where(eq(schema.accounts.mfId, "unknown"))
-      .get();
+      .then((rows) => rows.at(0)!);
 
     expect(manualHolding?.accountId).not.toBe(manualAccount?.id);
     expect(manualHolding?.accountId).toBe(fallbackAccount?.id);
@@ -616,10 +616,10 @@ describe("saveScrapedData", () => {
 
     await expect(saveScrapedData(db, data)).rejects.toThrow(/spending_targets/);
 
-    await expect(db.select().from(schema.groups).all()).resolves.toEqual([]);
-    await expect(db.select().from(schema.groupAccounts).all()).resolves.toEqual([]);
-    await expect(db.select().from(schema.dailySnapshots).all()).resolves.toEqual([]);
-    await expect(db.select().from(schema.holdingValues).all()).resolves.toEqual([]);
+    await expect(db.select().from(schema.groups)).resolves.toEqual([]);
+    await expect(db.select().from(schema.groupAccounts)).resolves.toEqual([]);
+    await expect(db.select().from(schema.dailySnapshots)).resolves.toEqual([]);
+    await expect(db.select().from(schema.holdingValues)).resolves.toEqual([]);
   });
 
   test("group-only保存も途中に失敗した場合はすべてrollbackする", async () => {
@@ -636,8 +636,8 @@ describe("saveScrapedData", () => {
 
     await expect(saveGroupOnlyData(db, data)).rejects.toThrow(/spending_targets/);
 
-    await expect(db.select().from(schema.groups).all()).resolves.toEqual([]);
-    await expect(db.select().from(schema.groupAccounts).all()).resolves.toEqual([]);
+    await expect(db.select().from(schema.groups)).resolves.toEqual([]);
+    await expect(db.select().from(schema.groupAccounts)).resolves.toEqual([]);
   });
 
   test("full保存後のgroup-only保存失敗時もcrawl全体をrollbackする", async () => {
@@ -658,10 +658,10 @@ describe("saveScrapedData", () => {
       saveScrapedDataBatch(db, { fullData, groupOnlyData: [groupData] }),
     ).rejects.toThrow(/spending_targets/);
 
-    await expect(db.select().from(schema.groups).all()).resolves.toEqual([]);
-    await expect(db.select().from(schema.groupAccounts).all()).resolves.toEqual([]);
-    await expect(db.select().from(schema.dailySnapshots).all()).resolves.toEqual([]);
-    await expect(db.select().from(schema.holdingValues).all()).resolves.toEqual([]);
+    await expect(db.select().from(schema.groups)).resolves.toEqual([]);
+    await expect(db.select().from(schema.groupAccounts)).resolves.toEqual([]);
+    await expect(db.select().from(schema.dailySnapshots)).resolves.toEqual([]);
+    await expect(db.select().from(schema.holdingValues)).resolves.toEqual([]);
   });
 
   test("stale group cleanupをcurrent dataと同じtransactionで公開する", async () => {
@@ -679,7 +679,7 @@ describe("saveScrapedData", () => {
       groupOnlyData: [],
     });
 
-    await expect(db.select().from(schema.groups).all()).resolves.toEqual([
+    await expect(db.select().from(schema.groups)).resolves.toEqual([
       expect.objectContaining({ id: "group-a" }),
     ]);
   });
@@ -692,7 +692,7 @@ describe("saveScrapedData", () => {
       groupOnlyData: [],
       institutionCategories: new Map([["account-a", "銀行"]]),
     });
-    const [bankCategory] = await db.select().from(schema.institutionCategories).all();
+    const [bankCategory] = await db.select().from(schema.institutionCategories);
     expect(bankCategory).toEqual(expect.objectContaining({ name: "銀行" }));
 
     await expect(
@@ -721,12 +721,10 @@ describe("saveScrapedData", () => {
       }),
     ).rejects.toThrow(/transactions/);
 
-    await expect(db.select().from(schema.accounts).all()).resolves.toContainEqual(
+    await expect(db.select().from(schema.accounts)).resolves.toContainEqual(
       expect.objectContaining({ mfId: "account-a", categoryId: bankCategory?.id }),
     );
-    await expect(db.select().from(schema.institutionCategories).all()).resolves.toEqual([
-      bankCategory,
-    ]);
+    await expect(db.select().from(schema.institutionCategories)).resolves.toEqual([bankCategory]);
   });
 
   test("後続の履歴月保存失敗時もcurrent dataと先行月をrollbackする", async () => {
@@ -765,10 +763,10 @@ describe("saveScrapedData", () => {
       }),
     ).rejects.toThrow(/transactions/);
 
-    await expect(db.select().from(schema.groups).all()).resolves.toEqual([
+    await expect(db.select().from(schema.groups)).resolves.toEqual([
       expect.objectContaining({ id: "stale-group" }),
     ]);
-    await expect(db.select().from(schema.transactions).all()).resolves.toEqual([]);
-    await expect(db.select().from(schema.dailySnapshots).all()).resolves.toEqual([]);
+    await expect(db.select().from(schema.transactions)).resolves.toEqual([]);
+    await expect(db.select().from(schema.dailySnapshots)).resolves.toEqual([]);
   });
 });

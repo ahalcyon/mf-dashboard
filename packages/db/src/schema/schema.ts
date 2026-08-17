@@ -1,24 +1,32 @@
 import { relations } from "drizzle-orm";
-import { sqliteTable, text, integer, real, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import {
+  pgTable,
+  text,
+  integer,
+  boolean,
+  doublePrecision,
+  uniqueIndex,
+  index,
+} from "drizzle-orm/pg-core";
 
 // ============================================================================
 // マスタ系
 // ============================================================================
 
-export const groups = sqliteTable("groups", {
+export const groups = pgTable("groups", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  isCurrent: integer("is_current", { mode: "boolean" }).default(false),
+  isCurrent: boolean("is_current").default(false),
   lastScrapedAt: text("last_scraped_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
 
 // グループとアカウントの多対多関係を管理する中間テーブル
-export const groupAccounts = sqliteTable(
+export const groupAccounts = pgTable(
   "group_accounts",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     groupId: text("group_id")
       .notNull()
       .references(() => groups.id, { onDelete: "cascade" }),
@@ -35,18 +43,18 @@ export const groupAccounts = sqliteTable(
   ],
 );
 
-export const institutionCategories = sqliteTable("institution_categories", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const institutionCategories = pgTable("institution_categories", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   name: text("name").notNull().unique(),
   displayOrder: integer("display_order"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
 
-export const accounts = sqliteTable(
+export const accounts = pgTable(
   "accounts",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     mfId: text("mf_id").notNull().unique(),
     name: text("name").notNull(),
     type: text("type").notNull(), // "自動連携" / "手動"
@@ -56,13 +64,13 @@ export const accounts = sqliteTable(
     }),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
-    isActive: integer("is_active", { mode: "boolean" }).default(true),
+    isActive: boolean("is_active").default(true),
   },
   (table) => [index("accounts_category_id_idx").on(table.categoryId)],
 );
 
-export const assetCategories = sqliteTable("asset_categories", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const assetCategories = pgTable("asset_categories", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   name: text("name").notNull().unique(),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
@@ -73,8 +81,8 @@ export const assetCategories = sqliteTable("asset_categories", {
 // ============================================================================
 
 // アカウントステータス（常に最新状態をupsert）
-export const accountStatuses = sqliteTable("account_statuses", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const accountStatuses = pgTable("account_statuses", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   accountId: integer("account_id")
     .notNull()
     .unique()
@@ -83,9 +91,7 @@ export const accountStatuses = sqliteTable("account_statuses", {
   lastUpdated: text("last_updated"), // ISO 8601形式
   totalAssets: integer("total_assets").default(0), // /accountsページから取得した資産額
   scheduledWithdrawalAmount: integer("scheduled_withdrawal_amount"),
-  scheduledWithdrawalConfirmed: integer("scheduled_withdrawal_confirmed", { mode: "boolean" })
-    .notNull()
-    .default(false),
+  scheduledWithdrawalConfirmed: boolean("scheduled_withdrawal_confirmed").notNull().default(false),
   errorMessage: text("error_message"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
@@ -98,10 +104,10 @@ export const accountStatuses = sqliteTable("account_statuses", {
 // 銘柄マスタ（資産と負債を統一管理）
 // Note: No unique constraint on (accountId, name, type) to allow duplicates
 // (e.g., same fund in NISA/特定/一般 accounts)
-export const holdings = sqliteTable(
+export const holdings = pgTable(
   "holdings",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     mfId: text("mf_id").unique(), // MFの識別子（ない場合もある）
     accountId: integer("account_id")
       .notNull()
@@ -115,7 +121,7 @@ export const holdings = sqliteTable(
     liabilityCategory: text("liability_category"), // 負債の場合のカテゴリ（カード、ローン等）
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
-    isActive: integer("is_active", { mode: "boolean" }).default(true),
+    isActive: boolean("is_active").default(true),
   },
   (table) => [index("holdings_account_id_idx").on(table.accountId)],
 );
@@ -124,15 +130,15 @@ export const holdings = sqliteTable(
 // スナップショット系
 // ============================================================================
 
-export const dailySnapshots = sqliteTable(
+export const dailySnapshots = pgTable(
   "daily_snapshots",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     groupId: text("group_id")
       .notNull()
       .references(() => groups.id, { onDelete: "cascade" }),
     date: text("date").notNull(),
-    refreshCompleted: integer("refresh_completed", { mode: "boolean" }).default(true),
+    refreshCompleted: boolean("refresh_completed").default(true),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -140,10 +146,10 @@ export const dailySnapshots = sqliteTable(
 );
 
 // 銘柄の日次評価額
-export const holdingValues = sqliteTable(
+export const holdingValues = pgTable(
   "holding_values",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     holdingId: integer("holding_id")
       .notNull()
       .references(() => holdings.id, { onDelete: "cascade" }),
@@ -151,12 +157,12 @@ export const holdingValues = sqliteTable(
       .notNull()
       .references(() => dailySnapshots.id, { onDelete: "cascade" }),
     amount: integer("amount").notNull(), // 評価額
-    quantity: real("quantity"), // 数量（株式・投信）
-    unitPrice: real("unit_price"), // 単価
-    avgCostPrice: real("avg_cost_price"), // 平均取得単価
+    quantity: doublePrecision("quantity"), // 数量（株式・投信）
+    unitPrice: doublePrecision("unit_price"), // 単価
+    avgCostPrice: doublePrecision("avg_cost_price"), // 平均取得単価
     dailyChange: integer("daily_change"), // 前日比（円）
     unrealizedGain: integer("unrealized_gain"), // 含み損益
-    unrealizedGainPct: real("unrealized_gain_pct"), // 含み損益率
+    unrealizedGainPct: doublePrecision("unrealized_gain_pct"), // 含み損益率
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -169,10 +175,10 @@ export const holdingValues = sqliteTable(
 // 収支系
 // ============================================================================
 
-export const transactions = sqliteTable(
+export const transactions = pgTable(
   "transactions",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     mfId: text("mf_id").notNull().unique(),
     date: text("date").notNull(),
     accountId: integer("account_id").references(() => accounts.id, {
@@ -183,12 +189,8 @@ export const transactions = sqliteTable(
     description: text("description"),
     amount: integer("amount").notNull(),
     type: text("type").notNull(), // "income" / "expense" / "transfer"
-    isTransfer: integer("is_transfer", { mode: "boolean" }).notNull().default(false),
-    isExcludedFromCalculation: integer("is_excluded_from_calculation", {
-      mode: "boolean",
-    })
-      .notNull()
-      .default(false), // mf-grayout class
+    isTransfer: boolean("is_transfer").notNull().default(false),
+    isExcludedFromCalculation: boolean("is_excluded_from_calculation").notNull().default(false), // mf-grayout class
     transferTarget: text("transfer_target"),
     transferTargetAccountId: integer("transfer_target_account_id").references(() => accounts.id, {
       onDelete: "set null",
@@ -202,10 +204,10 @@ export const transactions = sqliteTable(
   ],
 );
 
-export const cashFlowPeriods = sqliteTable(
+export const cashFlowPeriods = pgTable(
   "cash_flow_periods",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     month: text("month").notNull(),
     periodStart: text("period_start").notNull(),
     periodEnd: text("period_end").notNull(),
@@ -216,10 +218,10 @@ export const cashFlowPeriods = sqliteTable(
   (table) => [uniqueIndex("cash_flow_periods_month_idx").on(table.month)],
 );
 
-export const bankForecastDismissals = sqliteTable(
+export const bankForecastDismissals = pgTable(
   "bank_forecast_dismissals",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     accountId: integer("account_id")
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
@@ -239,10 +241,10 @@ export const bankForecastDismissals = sqliteTable(
   ],
 );
 
-export const bankForecastManualEvents = sqliteTable(
+export const bankForecastManualEvents = pgTable(
   "bank_forecast_manual_events",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     groupId: text("group_id")
       .notNull()
       .references(() => groups.id, { onDelete: "cascade" }),
@@ -269,10 +271,10 @@ export const bankForecastManualEvents = sqliteTable(
 // 資産履歴系
 // ============================================================================
 
-export const assetHistory = sqliteTable(
+export const assetHistory = pgTable(
   "asset_history",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     groupId: text("group_id")
       .notNull()
       .references(() => groups.id, { onDelete: "cascade" }),
@@ -288,10 +290,10 @@ export const assetHistory = sqliteTable(
   ],
 );
 
-export const assetHistoryCategories = sqliteTable(
+export const assetHistoryCategories = pgTable(
   "asset_history_categories",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     assetHistoryId: integer("asset_history_id")
       .notNull()
       .references(() => assetHistory.id, { onDelete: "cascade" }),
@@ -312,10 +314,10 @@ export const assetHistoryCategories = sqliteTable(
 // 予算系
 // ============================================================================
 
-export const spendingTargets = sqliteTable(
+export const spendingTargets = pgTable(
   "spending_targets",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     groupId: text("group_id")
       .notNull()
       .references(() => groups.id, { onDelete: "cascade" }),
@@ -454,10 +456,10 @@ export const spendingTargetsRelations = relations(spendingTargets, ({ one }) => 
 // 分析系
 // ============================================================================
 
-export const analyticsReports = sqliteTable(
+export const analyticsReports = pgTable(
   "analytics_reports",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     groupId: text("group_id")
       .notNull()
       .references(() => groups.id, { onDelete: "cascade" }),

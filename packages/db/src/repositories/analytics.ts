@@ -42,7 +42,7 @@ export async function getLatestAnalyticsReport(
     .where(eq(schema.analyticsReports.groupId, groupId))
     .orderBy(desc(schema.analyticsReports.date))
     .limit(1)
-    .get();
+    .then((rows) => rows.at(0));
 
   return result ?? null;
 }
@@ -58,7 +58,7 @@ export async function getAnalyticsReportByDate(
     .where(
       and(eq(schema.analyticsReports.groupId, groupId), eq(schema.analyticsReports.date, date)),
     )
-    .get();
+    .then((rows) => rows.at(0));
 
   return result ?? null;
 }
@@ -84,16 +84,12 @@ export async function saveAnalyticsReport(db: Db, report: AnalyticsReportInput):
     await db
       .update(schema.analyticsReports)
       .set(values)
-      .where(eq(schema.analyticsReports.id, existing.id))
-      .run();
+      .where(eq(schema.analyticsReports.id, existing.id));
   } else {
-    await db
-      .insert(schema.analyticsReports)
-      .values({
-        ...values,
-        createdAt: timestamp,
-      })
-      .run();
+    await db.insert(schema.analyticsReports).values({
+      ...values,
+      createdAt: timestamp,
+    });
   }
 }
 
@@ -107,6 +103,5 @@ export async function getAnalyticsReports(
     .from(schema.analyticsReports)
     .where(eq(schema.analyticsReports.groupId, groupId))
     .orderBy(desc(schema.analyticsReports.date))
-    .limit(limit)
-    .all();
+    .limit(limit);
 }

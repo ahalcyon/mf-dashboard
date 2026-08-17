@@ -51,7 +51,7 @@ describe("saveSpendingTargets", () => {
   test("カテゴリ別の固定費/変動費を保存できる", async () => {
     await saveSpendingTargets(db, TEST_GROUP_ID, sampleData);
 
-    const targets = await db.select().from(schema.spendingTargets).all();
+    const targets = await db.select().from(schema.spendingTargets);
     expect(targets).toHaveLength(3);
 
     const food = targets.find((t) => t.largeCategoryId === 11);
@@ -78,7 +78,7 @@ describe("saveSpendingTargets", () => {
 
     await saveSpendingTargets(db, TEST_GROUP_ID, updatedData);
 
-    const targets = await db.select().from(schema.spendingTargets).all();
+    const targets = await db.select().from(schema.spendingTargets);
     const food = targets.find((t) => t.largeCategoryId === 11);
     expect(food?.type).toBe("fixed");
   });
@@ -135,12 +135,10 @@ describe("グループ分離", () => {
     const ts = new Date().toISOString();
     await db
       .insert(schema.groups)
-      .values({ id: GROUP_A, name: "グループA", isCurrent: false, createdAt: ts, updatedAt: ts })
-      .run();
+      .values({ id: GROUP_A, name: "グループA", isCurrent: false, createdAt: ts, updatedAt: ts });
     await db
       .insert(schema.groups)
-      .values({ id: GROUP_B, name: "グループB", isCurrent: false, createdAt: ts, updatedAt: ts })
-      .run();
+      .values({ id: GROUP_B, name: "グループB", isCurrent: false, createdAt: ts, updatedAt: ts });
   });
 
   test("異なるグループで同じカテゴリIDでも独立した設定を保存できる", async () => {
@@ -194,7 +192,7 @@ describe("グループ分離", () => {
     await saveSpendingTargets(db, GROUP_A, dataA);
     await saveSpendingTargets(db, GROUP_B, dataB);
 
-    const allTargets = await db.select().from(schema.spendingTargets).all();
+    const allTargets = await db.select().from(schema.spendingTargets);
 
     // グループA: 1ターゲット
     // グループB: 2ターゲット

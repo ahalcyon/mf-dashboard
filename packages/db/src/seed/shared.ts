@@ -1,7 +1,7 @@
-import type { LibSQLDatabase } from "drizzle-orm/libsql";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
 import type * as schema from "../schema/schema";
 
-export type SeedDb = LibSQLDatabase<typeof schema>;
+export type SeedDb = PgliteDatabase<typeof schema>;
 export type Now = () => string;
 export type RandInt = (min: number, max: number) => number;
 export type Pick = <T>(arr: readonly T[]) => T;

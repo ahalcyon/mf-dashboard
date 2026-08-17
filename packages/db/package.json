@@ -29,19 +29,22 @@
     "./test-helpers": "./src/test-helpers.ts"
   },
   "scripts": {
-    "build:demo": "DB_PATH=../../data/demo.db tsx src/seed.ts",
+    "build:demo": "DB_PATH=../../data/demo-db tsx src/seed.ts",
     "test": "vitest run",
     "test:demo": "REQUIRE_DEMO_DB=true vitest run src/demo-data.test.ts",
     "typecheck": "tsc --noEmit",
     "studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@libsql/client": "catalog:",
+    "@electric-sql/pglite": "catalog:",
     "@mf-dashboard/date-utils": "workspace:*",
-    "drizzle-orm": "catalog:"
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:"
   },
   "devDependencies": {
+    "@libsql/client": "catalog:",
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
     "drizzle-kit": "0.31.10",
     "typescript": "catalog:",
     "vitest": "catalog:"

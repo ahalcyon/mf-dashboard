@@ -34,7 +34,7 @@ beforeEach(async () => {
     .insert(schema.institutionCategories)
     .values({ name: "銀行", createdAt: now, updatedAt: now })
     .returning({ id: schema.institutionCategories.id })
-    .get();
+    .then((rows) => rows.at(0)!);
   const accounts = await db
     .insert(schema.accounts)
     .values([
@@ -55,8 +55,7 @@ beforeEach(async () => {
         updatedAt: now,
       },
     ])
-    .returning({ id: schema.accounts.id })
-    .all();
+    .returning({ id: schema.accounts.id });
   accountId = accounts[0]!.id;
   externalAccountId = accounts[1]!.id;
   await db.insert(schema.groupAccounts).values({
@@ -120,7 +119,7 @@ describe("bank forecast manual events", () => {
         updatedAt: now,
       })
       .returning({ id: schema.bankForecastManualEvents.id })
-      .get();
+      .then((rows) => rows.at(0)!);
     await expect(getBankForecastManualEvents(TEST_GROUP_ID, db)).resolves.toEqual([]);
     await expect(
       updateBankForecastManualEvent(external.id, input(), TEST_GROUP_ID, db),
@@ -164,7 +163,7 @@ describe("bank forecast manual events", () => {
       .insert(schema.institutionCategories)
       .values({ name: "証券", createdAt: now, updatedAt: now })
       .returning({ id: schema.institutionCategories.id })
-      .get();
+      .then((rows) => rows.at(0)!);
     const account = await db
       .insert(schema.accounts)
       .values({
@@ -176,7 +175,7 @@ describe("bank forecast manual events", () => {
         updatedAt: now,
       })
       .returning({ id: schema.accounts.id })
-      .get();
+      .then((rows) => rows.at(0)!);
     await db.insert(schema.groupAccounts).values({
       groupId: TEST_GROUP_ID,
       accountId: account.id,
