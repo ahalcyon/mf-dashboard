@@ -15,6 +15,19 @@
 - AWS認証情報（`AWS_PROFILE` など）が設定済み
 - 自宅ネットワークの固定グローバルIP（またはVPNの出口IP）を把握していること
 
+## stateの扱い
+
+backendを設定していないため、stateは実行したマシンのローカルファイル（`terraform/aws/terraform.tfstate`）に置かれる。
+このため以下を守ること。
+
+- **applyは常に同じマシンから実行する。** stateを失うと、RDSがAWS上に残ったままTerraformから管理できなくなる。
+  `deletion_protection = true` のため、その場合の後始末はコンソールでの手作業になる。
+- **stateをコミットしない。** `random_password.db` が生成するマスターパスワードがstateに平文で記録される。
+  `.gitignore` で `*.tfstate` / `*.tfvars` / `.terraform/` を除外済み。
+- 使い捨て環境やCIからは applyしない。複数マシンから運用したくなった時点で、S3 backend（バージョニング + 暗号化 + ロック）へ移行する。
+
+`.terraform.lock.hcl` はプロバイダのchecksumを固定するものなので、これはコミットする。
+
 ## 適用
 
 ```sh
@@ -81,5 +94,3 @@ pnpm --filter @mf-dashboard/web dev:prod
 ```sh
 terraform -chdir=terraform/aws destroy
 ```
-
-`terraform.tfvars` とTerraform stateは秘密情報として扱い、Git管理対象外とする。

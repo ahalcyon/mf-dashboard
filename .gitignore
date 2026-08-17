@@ -22,6 +22,15 @@ data/*
 *.db-wal
 secrets/
 
+# Terraform: stateにはRDSマスターパスワードが平文で入る。tfvarsには自宅IPが入る。
+# .terraform.lock.hcl はプロバイダのchecksumを固定するため意図的にコミットする。
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+crash.*.log
+
 playwright-report
 test-results
 storybook-static/
