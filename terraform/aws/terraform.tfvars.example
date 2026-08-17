@@ -1,0 +1,5 @@
+# 自宅など、RDSへ接続を許可するCIDR（必ず絞ること）
+allowed_cidr_blocks = ["203.0.113.10/32"]
+
+# aws_region        = "ap-northeast-1"
+# db_instance_class = "db.t4g.micro"

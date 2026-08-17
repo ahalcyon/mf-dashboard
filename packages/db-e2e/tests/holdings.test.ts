@@ -42,7 +42,7 @@ describe.skipIf(!hasAuthState())("Holdings比較: スクレイピング vs DB", 
     await page?.close();
     await context?.close();
     await browser?.close();
-    closeDb();
+    await closeDb();
   });
 
   it("全グループの保有資産がDBと一致すること", async () => {

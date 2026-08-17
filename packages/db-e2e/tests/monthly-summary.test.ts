@@ -40,7 +40,7 @@ describe("Monthly Summary比較: スクレイピング vs DB", () => {
     await page?.close();
     await context?.close();
     await browser?.close();
-    closeDb();
+    await closeDb();
   });
 
   it("全グループの月次サマリーがDBと一致すること", async () => {

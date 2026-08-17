@@ -58,8 +58,8 @@ Webアプリ右下の家計AIチャットでは、「先月の食費はいくら
 
 Docker Composeで次の3サービスを動かす。
 
-- **web**: SQLiteのデータを表示するNext.jsアプリ
-- **crawler**: Money Forward MEからデータを取得し、SQLiteへ保存するPlaywrightアプリ
+- **web**: PostgreSQLのデータを表示するNext.jsアプリ
+- **crawler**: Money Forward MEからデータを取得し、PostgreSQLへ保存するPlaywrightアプリ
 - **cloudflare**: Cloudflare Tunnelへ接続し、認証済みユーザーへWebアプリを公開
 
 ```mermaid
@@ -71,9 +71,9 @@ flowchart TD
     O[1Password<br/>認証情報とOTP] --> C
     C --> M[Money Forward ME]
     M --> C
-    C -->|保存| D[(SQLite)]
+    C -->|保存| D[(PostgreSQL)]
     D -->|読み取り| W
     C -->|表示を更新| W
 ```
 
-SQLiteはwebとcrawlerで共有する。外部アクセスはCloudflare TunnelとAccessで保護し、Googleログインとメールアドレスの許可リストを通過したユーザーだけに限定する。詳しい構築手順は[セットアップガイド](docs/setup.md)を参照。
+データベースはPostgreSQLで、`DATABASE_URL`を設定するとAWS RDSなどのリモートPostgreSQLへ、未設定なら`data/`以下のローカルPGliteへ接続する。webとcrawlerは同じデータベースを共有する。外部アクセスはCloudflare TunnelとAccessで保護し、Googleログインとメールアドレスの許可リストを通過したユーザーだけに限定する。詳しい構築手順は[セットアップガイド](docs/setup.md)を参照。

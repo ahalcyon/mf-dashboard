@@ -11,6 +11,8 @@ services:
     working_dir: /app/apps/crawler
     entrypoint: ["/usr/bin/tini", "--"]
     command: ["node", "--import", "tsx", "../../packages/db/src/migrate.ts"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-}
     volumes:
       - ./data:/app/data
     restart: "no"
@@ -45,6 +47,7 @@ services:
       AI_MODEL: ${AI_MODEL:-}
       AI_PROVIDER: ${AI_PROVIDER:-}
       CRAWLER_URL: http://crawler:8766
+      DATABASE_URL: ${DATABASE_URL:-}
       CLOUDFLARE_ACCESS_AUD: ${CLOUDFLARE_ACCESS_AUD:?Set CLOUDFLARE_ACCESS_AUD}
       CLOUDFLARE_ACCESS_TEAM_DOMAIN: ${CLOUDFLARE_ACCESS_TEAM_DOMAIN:?Set CLOUDFLARE_ACCESS_TEAM_DOMAIN}
       DASHBOARD_URL: ${DASHBOARD_URL:?Set DASHBOARD_URL to the public dashboard URL}
@@ -80,6 +83,7 @@ services:
       CLEANUP_GROUPS: ${CLEANUP_GROUPS:-}
       CRAWLER_HOST: 0.0.0.0
       DASHBOARD_URL: ${DASHBOARD_URL:-}
+      DATABASE_URL: ${DATABASE_URL:-}
       DEBUG: ${DEBUG:-}
       DISCORD_AVATAR_URL: ${DISCORD_AVATAR_URL:-}
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}

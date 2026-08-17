@@ -285,7 +285,7 @@ AI_API_KEY=<provider-api-key>
 ```sh
 pnpm install
 pnpm --filter @mf-dashboard/db build:demo
-DB_PATH=../../data/demo.db pnpm --filter @mf-dashboard/web dev
+DB_PATH=../../data/demo-db pnpm --filter @mf-dashboard/web dev
 ```
 
 `pnpm build:demo`で生成する静的な公開デモにはAPI routeが含まれないため、家計AIチャットの確認には使用しない。

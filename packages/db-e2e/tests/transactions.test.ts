@@ -48,7 +48,7 @@ describe.skipIf(!hasAuthState())("Transaction比較: スクレイピング vs DB
     await page?.close();
     await context?.close();
     await browser?.close();
-    closeDb();
+    await closeDb();
   });
 
   it("全グループの直近5ヶ月のtransactionがDBと一致すること", async () => {

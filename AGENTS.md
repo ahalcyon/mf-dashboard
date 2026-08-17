@@ -56,7 +56,7 @@ Never include personally identifiable information in tests, Storybook stories, c
 - Do not use real addresses, phone numbers, email addresses, account numbers, or card numbers.
 - Use placeholder email addresses such as `user-a@example.com`.
 - Do not include personal names in code comments.
-- Never use `data/moneyforward.db` as a source for test or Storybook data because it contains personal information. Use `data/demo.db` instead.
+- Never use the real database (`data/moneyforward-db` or the `DATABASE_URL` PostgreSQL) as a source for test or Storybook data because it contains personal information. Use `data/demo-db` instead.
 
 ### Monetary Colors
 
@@ -145,7 +145,7 @@ pnpm --filter <package> add <dependency>
 
 ### Database
 
-The SQLite database is stored at `data/moneyforward.db`.
+The database is PostgreSQL. When `DATABASE_URL` is set, the app connects to that remote PostgreSQL (e.g. AWS RDS). Otherwise it uses an embedded PGlite database stored at `data/moneyforward-db` (override with `DB_PATH`).
 
 ```bash
 pnpm --filter @mf-dashboard/db exec drizzle-kit generate
@@ -168,11 +168,11 @@ pnpm --filter @mf-dashboard/crawler dev:scrape
 - Save crawler screenshots in `apps/crawler/debug/`.
 - To log in with saved auth state, use `loginWithAuthState` from `apps/crawler/src/auth/login.ts`.
 
-Scraping mode is inferred from database existence:
+Scraping mode is inferred from database state:
 
-- If `data/moneyforward.db` exists, `month` mode re-fetches the current and previous accounting periods so delayed transactions and category updates are incorporated.
-- If it does not exist, `history` mode fetches from January of the previous year through the current accounting period.
+- If the database has data (`data/moneyforward-db` exists, or the `DATABASE_URL` database has groups), `month` mode re-fetches the current and previous accounting periods so delayed transactions and category updates are incorporated.
+- If it is empty, `history` mode fetches from January of the previous year through the current accounting period.
 - For testing, set `SCRAPE_MODE=history` or `SCRAPE_MODE=month` to override detection.
 - To remove groups no longer present in Money Forward, run with `CLEANUP_GROUPS=true`. Otherwise, groups are only upserted and never deleted.
 
-To re-fetch historical data, delete `data/moneyforward.db`, then start the crawler. Confirm the database is the intended target before deleting it.
+To re-fetch historical data, delete `data/moneyforward-db` (or run with `SCRAPE_MODE=history`), then start the crawler. Confirm the database is the intended target before deleting it.

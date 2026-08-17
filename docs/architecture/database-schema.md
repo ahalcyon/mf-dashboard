@@ -91,12 +91,12 @@ erDiagram
         integer holding_id FK "CASCADE"
         integer snapshot_id FK "CASCADE"
         integer amount
-        real quantity
-        real unit_price
-        real avg_cost_price
+        double_precision quantity
+        double_precision unit_price
+        double_precision avg_cost_price
         integer daily_change
         integer unrealized_gain
-        real unrealized_gain_pct
+        double_precision unrealized_gain_pct
         text created_at
         text updated_at
     }
