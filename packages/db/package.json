@@ -23,6 +23,7 @@
     "./queries/holding": "./src/queries/holding.ts",
     "./queries/transaction": "./src/queries/transaction.ts",
     "./shared/transfer": "./src/shared/transfer.ts",
+    "./sync/message": "./src/sync/message.ts",
     "./types": "./src/types.ts",
     "./utils": "./src/utils.ts",
     "./test-helpers": "./src/test-helpers.ts"
