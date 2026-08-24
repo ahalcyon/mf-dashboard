@@ -150,17 +150,6 @@ variable "noncurrent_version_retention_days" {
   default     = 30
 }
 
-variable "source_repository" {
-  description = "owner/name of the GitHub repository whose workflows may assume the site publisher role"
-  type        = string
-  default     = "ahalcyon/mf-dashboard"
-
-  validation {
-    condition     = can(regex("^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$", var.source_repository))
-    error_message = "source_repository must look like owner/name."
-  }
-}
-
 variable "ai_provider" {
   description = "LLM provider for the insight generator running inside the crawler. One of openai, anthropic, google. Empty disables the analytics phase's LLM call."
   type        = string

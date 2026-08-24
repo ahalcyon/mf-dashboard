@@ -58,8 +58,3 @@ output "ecs_cluster_name" {
   description = "ECS cluster running the crawler task"
   value       = aws_ecs_cluster.this.name
 }
-
-output "site_publisher_role_arn" {
-  description = "Role the GitHub Actions publish workflow assumes. Set it as the AWS_PUBLISH_ROLE_ARN repository variable."
-  value       = aws_iam_role.site_publisher.arn
-}

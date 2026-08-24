@@ -1,7 +1,8 @@
 import type { KnipConfig } from "knip";
 
 const config: KnipConfig = {
-  ignoreBinaries: ["ps"],
+  // terraform は publish:site が output を読むために呼ぶ。開発者が各自で入れる前提。
+  ignoreBinaries: ["ps", "terraform"],
   ignoreDependencies: ["lefthook"],
   workspaces: {
     "apps/crawler": {

@@ -21,9 +21,9 @@ EventBridge Scheduler (6:30 / 15:30 JST)
         │ ファイル全体の read-modify-write
         ▼
    S3: data バケット  s3://…/db/moneyforward.db  (バージョニング有効)
-        │ 07:00 / 16:00 JST
+        │ 手元から実行
         ▼
-   GitHub Actions: publish-site ── DB を読んで next build (output: "export")
+   pnpm publish:site ── DB を読んで next build (output: "export")
         │ s3 sync + invalidation
         ▼
    S3: site バケット ──▶ CloudFront (OAC)  ──▶ 利用者
@@ -149,16 +149,15 @@ bootstrap 用の小さなモジュールを別に切る。
 
 ## 静的サイトの発行
 
-ビルドは GitHub Actions の `publish-site` ワークフローで回す。CodeBuild を使うと
-GitHub 接続の認可が Terraform の管理外で必要になり、リポジトリと CI の二重管理に
-なるため採らない。
+フロントは実行時の DB 接続を持たないため、データを反映するにはビルドし直す。
+デプロイは手元から行う方針なので、CI ではなくスクリプトで完結させる。
 
-ワークフローは OIDC で `site_publisher_role_arn` を引き受ける。リポジトリ変数に
-次を設定する（いずれも `terraform output` の値）。
+```sh
+pnpm publish:site
+```
 
-| リポジトリ変数                   | 由来                         |
-| -------------------------------- | ---------------------------- |
-| `AWS_PUBLISH_ROLE_ARN`           | `site_publisher_role_arn`    |
-| `AWS_DATA_BUCKET`                | `data_bucket`                |
-| `AWS_SITE_BUCKET`                | `site_bucket`                |
-| `AWS_CLOUDFRONT_DISTRIBUTION_ID` | `cloudfront_distribution_id` |
+S3 からデータベースを取得し、それを焼き込んだ静的サイトをビルドして
+サイトバケットへ同期し、CloudFront を無効化するところまで行う。
+接続先は `terraform output` から読むので引数は要らない。
+
+crawler は 1 日 2 回走るが、サイトはこのコマンドを実行するまで更新されない。
