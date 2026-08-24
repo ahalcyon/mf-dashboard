@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "DB_PATH=../../data/demo.db DEMO_MODE=true next dev",
     "dev:prod": "DB_PATH=../../data/moneyforward.db CRAWLER_URL=http://127.0.0.1:8766 ALLOW_LOCAL_AUTH_BYPASS=true next dev --hostname 127.0.0.1",
+    "prebuild": "tsx scripts/generate-export.mts",
     "build": "next build",
+    "prebuild:demo": "DB_PATH=../../data/demo.db tsx scripts/generate-export.mts",
     "build:demo": "DB_PATH=../../data/demo.db DEMO_MODE=true next build",
     "start": "next start",
     "test": "vitest run",
@@ -17,18 +19,16 @@
     "test:e2e:ui": "pnpm pretest:e2e && playwright test --ui",
     "typecheck": "next typegen && tsc --noEmit",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "export:assets": "tsx scripts/generate-export.mts"
   },
   "dependencies": {
-    "@ai-sdk/react": "4.0.80",
     "@base-ui/react": "1.7.0",
     "@mf-dashboard/analytics": "workspace:*",
     "@mf-dashboard/date-utils": "workspace:*",
     "@mf-dashboard/db": "workspace:*",
     "@mf-dashboard/meta": "workspace:*",
     "@nivo/sankey": "0.99.0",
-    "@streamdown/cjk": "1.0.3",
-    "ai": "7.0.77",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "1.1.1",
@@ -38,7 +38,6 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "recharts": "3.10.1",
-    "streamdown": "2.5.0",
     "tailwind-merge": "3.6.0"
   },
   "devDependencies": {

@@ -21,7 +21,6 @@
     "./queries/bank-forecast-manual-event": "./src/queries/bank-forecast-manual-event.ts",
     "./queries/account": "./src/queries/account.ts",
     "./queries/holding": "./src/queries/holding.ts",
-    "./queries/read-only-query": "./src/queries/read-only-query.ts",
     "./queries/transaction": "./src/queries/transaction.ts",
     "./shared/transfer": "./src/shared/transfer.ts",
     "./types": "./src/types.ts",

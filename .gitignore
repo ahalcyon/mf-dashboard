@@ -28,6 +28,7 @@ test-results
 storybook-static/
 .playwright-mcp
 apps/crawler/tests/e2e/screenshots/
+apps/web/public/export/
 
 .worktrees/
 docs/plans

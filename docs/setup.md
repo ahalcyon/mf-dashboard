@@ -111,20 +111,20 @@ SSMへ資格情報を置く場合は、`MF_EMAIL`、`MF_PASSWORD`、`MF_TOTP_SEC
 
 `CLOUDFLARE_ACCESS_AUD`はまだ空のままでよい。Access Applicationの作成後に確定するため、Terraform適用後の手順3.3で設定する。
 
-| `.env`のキー                                 | 必須 | 設定タイミング       | 内容                                                                             |
-| -------------------------------------------- | ---- | -------------------- | -------------------------------------------------------------------------------- |
-| `REFRESH_TOKEN`                              | 必須 | Terraform適用前      | crawlerとwebが共有する内部API用Bearerトークン                                    |
-| `CLOUDFLARE_ACCESS_TEAM_DOMAIN`              | 必須 | Terraform適用前      | Access JWTの発行者となる`<team-name>.cloudflareaccess.com`                       |
-| `CLOUDFLARE_ACCESS_AUD`                      | 必須 | Terraform適用後      | Terraformが作成したAccess ApplicationのAUD                                       |
-| `DASHBOARD_URL`                              | 必須 | Terraform適用前      | Open Graph / Twitter metadataと通知に使う公開ダッシュボードURL                   |
-| `MF_EMAIL` / `MF_PASSWORD`                   | 必須 | Terraform適用前      | Money Forward MEのログイン情報。SSMへ置く場合は空でよい                          |
-| `MF_TOTP_SECRET`                             | 必須 | Terraform適用前      | 認証アプリのセットアップキー（Base32）。二段階認証が無効なら不要                 |
-| `SSM_PARAMETER_PREFIX`                       | 任意 | SSM利用時            | SSM Parameter Storeの接頭辞。既定値は`/mf-dashboard`                             |
-| `AI_PROVIDER` / `AI_MODEL` / `AI_API_KEY`    | 任意 | 機能を有効にするとき | 財務インサイト、家計AIチャット、LLMカテゴリ推論。利用する機能では3項目すべて必須 |
-| `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID`       | 任意 | 通知を有効にするとき | Slack通知                                                                        |
-| `DISCORD_WEBHOOK_URL` / `DISCORD_AVATAR_URL` | 任意 | 通知を有効にするとき | Discord通知                                                                      |
-| `HOST_UID` / `HOST_GID`                      | 任意 | Compose起動前        | Linuxで`./data`とTunnel tokenを所有するユーザーのUIDとGID。既定値は`1000:1000`   |
-| `AUTH_STATE_PATH`                            | 任意 | ローカル実行時       | ローカル実行時のブラウザーセッション保存先。Docker Composeでは設定しない         |
+| `.env`のキー                                 | 必須 | 設定タイミング       | 内容                                                                           |
+| -------------------------------------------- | ---- | -------------------- | ------------------------------------------------------------------------------ |
+| `REFRESH_TOKEN`                              | 必須 | Terraform適用前      | crawlerとwebが共有する内部API用Bearerトークン                                  |
+| `CLOUDFLARE_ACCESS_TEAM_DOMAIN`              | 必須 | Terraform適用前      | Access JWTの発行者となる`<team-name>.cloudflareaccess.com`                     |
+| `CLOUDFLARE_ACCESS_AUD`                      | 必須 | Terraform適用後      | Terraformが作成したAccess ApplicationのAUD                                     |
+| `DASHBOARD_URL`                              | 必須 | Terraform適用前      | Open Graph / Twitter metadataと通知に使う公開ダッシュボードURL                 |
+| `MF_EMAIL` / `MF_PASSWORD`                   | 必須 | Terraform適用前      | Money Forward MEのログイン情報。SSMへ置く場合は空でよい                        |
+| `MF_TOTP_SECRET`                             | 必須 | Terraform適用前      | 認証アプリのセットアップキー（Base32）。二段階認証が無効なら不要               |
+| `SSM_PARAMETER_PREFIX`                       | 任意 | SSM利用時            | SSM Parameter Storeの接頭辞。既定値は`/mf-dashboard`                           |
+| `AI_PROVIDER` / `AI_MODEL` / `AI_API_KEY`    | 任意 | 機能を有効にするとき | 財務インサイト、LLMカテゴリ推論。利用する機能では3項目すべて必須               |
+| `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID`       | 任意 | 通知を有効にするとき | Slack通知                                                                      |
+| `DISCORD_WEBHOOK_URL` / `DISCORD_AVATAR_URL` | 任意 | 通知を有効にするとき | Discord通知                                                                    |
+| `HOST_UID` / `HOST_GID`                      | 任意 | Compose起動前        | Linuxで`./data`とTunnel tokenを所有するユーザーのUIDとGID。既定値は`1000:1000` |
+| `AUTH_STATE_PATH`                            | 任意 | ローカル実行時       | ローカル実行時のブラウザーセッション保存先。Docker Composeでは設定しない       |
 
 Linuxでは`id -u`と`id -g`で値を確認し、`1000:1000`と異なる場合は`.env`の`HOST_UID`と`HOST_GID`へ設定する。web、crawler、cloudflaredが同じUID/GIDで動作し、`./data`とowner-read-onlyのTunnel tokenへ必要な範囲だけアクセスする。
 
@@ -290,9 +290,9 @@ terraform -chdir=terraform output -raw tunnel_id
 1. 通知先チャンネルの「連携サービス」からIncoming Webhookを作成する
 2. `.env`の`DISCORD_WEBHOOK_URL`へ、発行された`https://discord.com/api/webhooks/...`形式のURLを設定する
 
-### 財務インサイトと家計AIチャット
+### 財務インサイト
 
-財務インサイトと家計AIチャットを利用する場合は、`.env`に次の3項目を設定する。いずれかが空の場合、財務インサイトは生成されず、チャットUIも表示されない。
+財務インサイトを利用する場合は、`.env`に次の3項目を設定する。いずれかが空の場合、インサイトは生成されない。
 
 ```dotenv
 AI_PROVIDER=openai
@@ -304,6 +304,8 @@ AI_API_KEY=<provider-api-key>
 - `AI_MODEL`: 選択したプロバイダーで利用可能なモデルID
 - `AI_API_KEY`: 選択したプロバイダーのAPIキー。ブラウザーへは公開せず、`.env`だけに保存する
 
+インサイトはcrawlerのanalyticsフェーズで生成し、結果をデータベースへ保存する。Webアプリ側はその保存済みの結果を表示するだけで、実行時にAIプロバイダーへは接続しない。
+
 ローカルでデモデータを使って確認する場合は、リポジトリルートで次を実行する。
 
 ```sh
@@ -312,8 +314,6 @@ pnpm --filter @mf-dashboard/db build:demo
 DB_PATH=../../data/demo.db pnpm --filter @mf-dashboard/web dev
 ```
 
-`pnpm build:demo`で生成する静的な公開デモにはAPI routeが含まれないため、家計AIチャットの確認には使用しない。
-
 Docker Composeで設定を反映する場合は、webイメージを再ビルドして起動する。
 
 ```sh
@@ -321,13 +321,28 @@ docker compose build web
 docker compose up -d web
 ```
 
-起動後、ダッシュボード右下の「家計AIチャットを開く」ボタンを選び、質問を入力して送信する。チャットは現在のDrizzleスキーマから利用可能なテーブルとカラムを取得し、選択中のグループへread-only SQLを実行する。回答は本文として表示され、ユーザーが画面表示や遷移先を明示的に求めた場合だけ、検証済みのダッシュボード内部リンクを含む。該当データがない場合は、条件を勝手に変更したり金額を推測したりしない。
+インサイトが生成されない場合は、3つのAI環境変数、APIキーの権限・利用上限、モデルIDを確認する。家計データが未取得の場合はcrawlerを実行する。
 
-チャットの質問と、回答に必要な家計データは設定したAIプロバイダーへ送信される。会話はブラウザーのストレージへ保存されないが、AIプロバイダー側のデータ取扱方針を確認し、送信を許可できる場合だけ有効にする。本番環境では、Cloudflare Accessで認証された利用者だけがダッシュボードへアクセスできる構成を維持する。
+### 資産データのエクスポート
 
-回答生成に失敗した場合はチャット内にエラーが表示される。まず3つのAI環境変数、APIキーの権限・利用上限、モデルIDを確認する。家計データが未取得の場合はcrawlerを実行してから再度質問する。
+ビルド時に、資産データをJSONとMarkdownで`public/export/`へ書き出す。生成物は静的ファイルなので、静的エクスポートでもそのまま配信できる。手元のLLMへ読み込ませて分析する用途を想定している。
 
-従来のMCPサーバーとAIクライアント側のMCPセットアップは廃止済み。家計データの照会にはWebアプリ内の家計AIチャットを使用する。
+| パス                            | 内容                                 |
+| ------------------------------- | ------------------------------------ |
+| `/export/assets.json`           | 既定グループの資産データ             |
+| `/export/assets.md`             | 同じ内容をMarkdownの表で整形したもの |
+| `/export/<groupId>/assets.json` | グループ別の資産データ               |
+| `/export/<groupId>/assets.md`   | グループ別のMarkdown                 |
+
+含まれるのは、日次の資産総額の推移（カテゴリ別内訳つき）、資産・負債のカテゴリ別内訳、口座の残高と更新状態、保有銘柄の評価額と評価損益。ダッシュボードのサイドバーからもダウンロードできる。
+
+`pnpm --filter @mf-dashboard/web build`の前に自動で実行されるほか、単体では次で生成する。
+
+```sh
+DB_PATH=../../data/moneyforward.db pnpm --filter @mf-dashboard/web export:assets
+```
+
+エクスポートには口座名や残高が含まれる。公開URLへ配置する場合は、認証を通過した利用者だけが到達できる構成を維持する。
 
 ### 未分類取引のカテゴリ決定
 

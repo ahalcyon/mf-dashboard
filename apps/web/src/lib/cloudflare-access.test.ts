@@ -16,7 +16,10 @@ vi.mock("jose", () => mocks);
 
 const { hasValidCloudflareAccess } = await import("./cloudflare-access");
 
-function request(token?: string, url = "https://dashboard.example.com/api/chat"): Request {
+function request(
+  token?: string,
+  url = "https://dashboard.example.com/api/crawler/refresh",
+): Request {
   return new Request(url, {
     headers: token ? { "cf-access-jwt-assertion": token } : {},
   });
@@ -62,21 +65,21 @@ describe("hasValidCloudflareAccess", () => {
     await expect(hasValidCloudflareAccess(request())).resolves.toBe(true);
   });
 
-  it.each(["http://localhost:3000/api/chat", "http://127.0.0.1:3000/api/chat"])(
-    "allows an explicit loopback-only development session at %s",
-    async (url) => {
-      vi.stubEnv("NODE_ENV", "development");
-      vi.stubEnv("ALLOW_LOCAL_AUTH_BYPASS", "true");
+  it.each([
+    "http://localhost:3000/api/crawler/refresh",
+    "http://127.0.0.1:3000/api/crawler/refresh",
+  ])("allows an explicit loopback-only development session at %s", async (url) => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("ALLOW_LOCAL_AUTH_BYPASS", "true");
 
-      await expect(hasValidCloudflareAccess(request(undefined, url))).resolves.toBe(true);
-      expect(mocks.jwtVerify).not.toHaveBeenCalled();
-    },
-  );
+    await expect(hasValidCloudflareAccess(request(undefined, url))).resolves.toBe(true);
+    expect(mocks.jwtVerify).not.toHaveBeenCalled();
+  });
 
   it.each([
-    ["production mode", "production", "true", "http://127.0.0.1:3000/api/chat"],
-    ["a missing opt-in", "development", "", "http://127.0.0.1:3000/api/chat"],
-    ["a non-loopback host", "development", "true", "http://192.0.2.10:3000/api/chat"],
+    ["production mode", "production", "true", "http://127.0.0.1:3000/api/crawler/refresh"],
+    ["a missing opt-in", "development", "", "http://127.0.0.1:3000/api/crawler/refresh"],
+    ["a non-loopback host", "development", "true", "http://192.0.2.10:3000/api/crawler/refresh"],
   ])("does not bypass Access for %s", async (_case, nodeEnv, bypass, url) => {
     vi.stubEnv("NODE_ENV", nodeEnv);
     vi.stubEnv("ALLOW_LOCAL_AUTH_BYPASS", bypass);
