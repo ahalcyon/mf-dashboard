@@ -24,6 +24,22 @@ jobs:
       - run: pnpm knip
       - run: pnpm typecheck --affected
       - run: pnpm test --affected
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_version: 1.15.9
+          terraform_wrapper: false
+      - run: terraform fmt -check -recursive terraform
+      # validate は認証情報を必要としないため、backend を初期化せずプロバイダーだけ取得する
+      - run: terraform -chdir=terraform init -backend=false -input=false
+      - run: terraform -chdir=terraform validate
+      - run: terraform -chdir=terraform/aws init -backend=false -input=false
+      - run: terraform -chdir=terraform/aws validate
   build-demo:
     runs-on: ubuntu-latest
     steps:
