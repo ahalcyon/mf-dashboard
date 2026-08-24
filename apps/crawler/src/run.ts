@@ -1,4 +1,5 @@
 import { closeDb } from "@mf-dashboard/db";
+import { getDbPath } from "@mf-dashboard/db/db-path";
 import { buildCleanupGroupIds } from "./cleanup-groups.js";
 import {
   handleCrawlerFailure,
@@ -21,6 +22,8 @@ import {
 } from "./crawler-progress.js";
 import { error, info, warn } from "./logger.js";
 import { createGroupScope } from "./scrapers/group.js";
+import { buildRunId, loadSyncConfig } from "./sync/config.js";
+import { SyncPublisher } from "./sync/publisher.js";
 import { notifyWebRefresh } from "./web-refresh.js";
 
 async function disposeGroupScope(
@@ -36,6 +39,15 @@ async function disposeGroupScope(
 }
 
 export async function runCrawler(progress: CrawlerProgressReporter): Promise<void> {
+  // AWS 上では authoritative なデータベースは S3 にある。crawler は作業用の
+  // 複製を落として読み書きし、書き込みは payload として発行するだけに留める。
+  // スクレイプモードはデータベースの有無から決まるため、設定を読む前に取得する。
+  const syncConfig = loadSyncConfig();
+  const publisher = syncConfig ? new SyncPublisher(syncConfig, buildRunId()) : null;
+  if (publisher) {
+    await publisher.downloadDatabase(getDbPath());
+  }
+
   const config = runLoadPhase();
   let runtime: CrawlerRuntime | null = null;
 
@@ -88,6 +100,7 @@ export async function runCrawler(progress: CrawlerProgressReporter): Promise<voi
               historyMonths,
               cleanupResult?.ids,
               institutionCategories,
+              publisher,
             );
             if (cleanupResult) info("Cleaned up groups not found in MoneyForward");
             return savedCounts;
@@ -95,7 +108,7 @@ export async function runCrawler(progress: CrawlerProgressReporter): Promise<voi
         ),
       );
       await runCrawlerStep(progress, CRAWLER_STEPS.analytics, () =>
-        runAnalyticsPhase(activeRuntime.db, scrapeResult.groupDataList),
+        runAnalyticsPhase(activeRuntime.db, scrapeResult.groupDataList, publisher),
       );
     } catch (err) {
       crawlFailed = true;
@@ -139,6 +152,7 @@ export async function runCrawler(progress: CrawlerProgressReporter): Promise<voi
         await runtime.browser.close();
       }
     } finally {
+      publisher?.destroy();
       closeDb();
     }
   }

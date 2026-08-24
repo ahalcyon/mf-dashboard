@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./db-path": "./src/db-path.ts",
     "./schema": "./src/schema/schema.ts",
     "./repository/save-scraped-data": "./src/repositories/save-scraped-data.ts",
     "./repository/transactions": "./src/repositories/transactions.ts",
@@ -21,9 +22,9 @@
     "./queries/bank-forecast-manual-event": "./src/queries/bank-forecast-manual-event.ts",
     "./queries/account": "./src/queries/account.ts",
     "./queries/holding": "./src/queries/holding.ts",
-    "./queries/read-only-query": "./src/queries/read-only-query.ts",
     "./queries/transaction": "./src/queries/transaction.ts",
     "./shared/transfer": "./src/shared/transfer.ts",
+    "./sync/message": "./src/sync/message.ts",
     "./types": "./src/types.ts",
     "./utils": "./src/utils.ts",
     "./test-helpers": "./src/test-helpers.ts"

@@ -286,6 +286,8 @@ describe("runCrawler progress", () => {
       historyMonths,
       undefined,
       new Map([["account-a", "銀行"]]),
+      // DATA_BUCKET と WRITE_QUEUE_URL が無いので同期経路は無効
+      null,
     );
   });
 });

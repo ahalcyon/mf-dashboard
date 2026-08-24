@@ -15,12 +15,12 @@ describe("withBasePath", () => {
   it("keeps root-relative paths for root deployments", () => {
     delete process.env.NEXT_PUBLIC_BASE_PATH;
 
-    expect(withBasePath("/api/chat")).toBe("/api/chat");
+    expect(withBasePath("/api/crawler/refresh")).toBe("/api/crawler/refresh");
   });
 
   it("prefixes paths for subpath deployments", () => {
     process.env.NEXT_PUBLIC_BASE_PATH = "/dashboard";
 
-    expect(withBasePath("/api/chat")).toBe("/dashboard/api/chat");
+    expect(withBasePath("/api/crawler/refresh")).toBe("/dashboard/api/crawler/refresh");
   });
 });

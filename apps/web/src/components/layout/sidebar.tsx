@@ -7,11 +7,14 @@ import {
   Landmark,
   Calculator,
   Lightbulb,
+  FileJson,
+  FileText,
   X,
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { withBasePath } from "../../lib/base-path";
 import {
   buildGroupPath,
   extractGroupIdFromPath,
@@ -135,7 +138,44 @@ function NavContent({ onItemClick }: NavContentProps) {
           );
         })}
       </nav>
+      <ExportLinks groupId={groupId} onItemClick={onItemClick} />
       <ActionIcons variant="sidebar" />
+    </div>
+  );
+}
+
+interface ExportLinksProps {
+  groupId: string | null;
+  onItemClick?: () => void;
+}
+
+/**
+ * ビルド時に生成した資産エクスポートへのリンク。
+ * public/export/ 配下の静的ファイルなので、静的エクスポートでもそのまま機能する。
+ */
+function ExportLinks({ groupId, onItemClick }: ExportLinksProps) {
+  const jsonHref: `/${string}` = groupId ? `/export/${groupId}/assets.json` : "/export/assets.json";
+  const markdownHref: `/${string}` = groupId ? `/export/${groupId}/assets.md` : "/export/assets.md";
+  const files = [
+    { label: "資産データ (JSON)", href: jsonHref, icon: FileJson },
+    { label: "資産データ (Markdown)", href: markdownHref, icon: FileText },
+  ];
+
+  return (
+    <div className="border-t p-4">
+      <p className="px-3 pb-2 text-xs font-medium text-foreground/70">エクスポート</p>
+      {files.map((file) => (
+        <a
+          key={file.href}
+          href={withBasePath(file.href)}
+          download
+          onClick={onItemClick}
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-foreground/70 transition-all duration-200 hover:bg-muted hover:text-foreground"
+        >
+          <file.icon className="h-5 w-5" />
+          {file.label}
+        </a>
+      ))}
     </div>
   );
 }

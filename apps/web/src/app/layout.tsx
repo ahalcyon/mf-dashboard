@@ -1,15 +1,11 @@
-import { isLLMEnabled } from "@mf-dashboard/analytics/config";
 import { getAllGroups, getCurrentGroup, isDatabaseAvailable } from "@mf-dashboard/db";
 import { DatabaseZap } from "lucide-react";
 import "./globals.css";
 import type { ReactNode } from "react";
-import { ChatProvider } from "../components/chat/chat-provider";
-import { ChatShell } from "../components/chat/chat-shell";
 import { AccountNotifications } from "../components/info/account-notifications";
 import { Header } from "../components/layout/header";
 import { Sidebar } from "../components/layout/sidebar";
 import { SidebarProvider } from "../components/layout/sidebar-context";
-import { parseChatSuggestedPrompts } from "../lib/chat-config";
 import { createRootMetadata } from "../lib/metadata";
 import { waitForRuntimeData } from "../lib/runtime-rendering";
 
@@ -40,7 +36,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     const groups = await getAllGroups();
     const currentGroup = await getCurrentGroup();
     const defaultGroupId = currentGroup?.id ?? groups[0]?.id ?? null;
-    const dashboard = (
+    content = (
       <SidebarProvider>
         <Header
           groups={groups.map((group) => ({
@@ -60,16 +56,6 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </div>
       </SidebarProvider>
     );
-    if (!isLLMEnabled() || process.env.NEXT_PUBLIC_STATIC_DEMO_BUILD === "true") {
-      content = dashboard;
-    } else {
-      content = (
-        <ChatProvider currentGroupId={currentGroup?.id ?? null}>
-          {dashboard}
-          <ChatShell suggestedPrompts={parseChatSuggestedPrompts(process.env.AI_CHAT_PRESETS)} />
-        </ChatProvider>
-      );
-    }
   }
 
   return (
