@@ -82,11 +82,15 @@ test.describe("App flows", () => {
         await expect(dialog.getByText("予測").first()).toBeVisible();
         await expect(dialog.getByText(/取引後残高:/).first()).toBeVisible();
         await dialog.getByRole("button", { name: "明細を閉じる" }).click();
+        // 閉じる際にフォーカス復帰とスクロールロック解除でレイアウトが動くため、
+        // 閉じ切るまで待たないと次のトリガーが stable にならない
+        await expect(dialog).toBeHidden();
 
         await page.getByRole("button", { name: "楽天銀行の入出金詳細を開く" }).click();
         const actualDialog = page.getByRole("dialog", { name: "楽天銀行の入出金詳細" });
         await expect(actualDialog.getByText("実績").first()).toBeVisible();
         await actualDialog.getByRole("button", { name: "明細を閉じる" }).click();
+        await expect(actualDialog).toBeHidden();
       });
     }
 
@@ -101,7 +105,7 @@ test.describe("App flows", () => {
   });
 
   test("navigates between primary pages from the sidebar", async ({ page }) => {
-    // This scenario compiles and visits six routes. WebKit on CI can exceed
+    // This scenario compiles and visits six routes, which can exceed
     // Playwright's 30-second default while the Next.js dev server warms up.
     test.setTimeout(60_000);
 
@@ -128,7 +132,7 @@ test.describe("App flows", () => {
 
   test("keeps navigation in the selected group context", async ({ page }) => {
     // This scenario performs multiple client-side route transitions and select
-    // animations, which can exceed the default timeout on mobile WebKit in CI.
+    // animations, which can exceed the default timeout on a slow CI runner.
     test.setTimeout(60_000);
 
     await page.goto("/cf");
