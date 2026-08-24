@@ -13,6 +13,7 @@ debug/
 
 auth-state.json
 test-auth-state.json
+*recovery-code*
 
 test-groups-moneyforward.db
 test-moneyforward.db*

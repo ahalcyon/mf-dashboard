@@ -4,7 +4,7 @@
 
 セットアップは次の順番で進める。
 
-1. Money Forward MEと1Passwordを準備する
+1. Money Forward MEを準備する
 2. Cloudflare Zero TrustとGoogle OAuthを準備する
 3. アプリとインフラの設定ファイルを作成する
 4. Terraformを適用する
@@ -13,7 +13,6 @@
 ## 必須要件
 
 - [Money Forward ME](https://moneyforward.com/)
-- [1Password](https://1password.com/jp)（Service Account）
 - [Cloudflare](https://www.cloudflare.com/ja-jp/)アカウント（Zero Trustを有効化済み）
 - 公開先FQDNのゾーンをCloudflareで管理していること
 - ローカルPCが常時起動できる環境
@@ -30,12 +29,11 @@ git clone https://github.com/hiroppy/mf-dashboard.git
 cd mf-dashboard
 ```
 
-## 1. Money Forward MEと1Passwordの準備
+## 1. Money Forward MEの準備
 
 - Money Forward MEでワンタイムパスワードを設定する（[設定方法](https://support.me.moneyforward.com/hc/ja/articles/7359917171481-%E4%BA%8C%E6%AE%B5%E9%9A%8E%E8%AA%8D%E8%A8%BC%E3%81%AE%E8%A8%AD%E5%AE%9A%E6%96%B9%E6%B3%95)）
-- 1PasswordでService Accountを発行する（[設定方法](https://developer.1password.com/docs/service-accounts/get-started#create-a-service-account)）
-  - Private、Personal、Familyなど、最初から用意されている保管庫へService Accountはアクセスできない。Money Forward MEのアカウントを自分で作成した保管庫へ移し、Service Accountへアクセス権を付与する。
-  - Money Forward MEのログイン項目に、標準の`username`と`password`フィールド、およびワンタイムパスワードのフィールドを用意する。crawlerはこれらのフィールドを1Password SDKから読み取る。
+- 認証アプリ登録時に表示されるセットアップキー（Base32）を控えておく。crawlerはこのキーからワンタイムパスワードを生成する。
+- ログインに使うメールアドレスとパスワードを、手順3.1の`.env`かAWS SSM Parameter Storeのどちらに置くか決めておく。
 
 ## 2. Cloudflare Zero Trustの準備
 
@@ -71,7 +69,7 @@ Terraform用のAPI Tokenを発行する。必要な最小権限は次のとお�
 | Zone     | `Zone:Read`                                                  |
 | Zone     | `DNS:Edit`（対象ゾーンを含む）                               |
 
-発行したトークンをパスワードマネージャーなどへ保管し、手順3.2で作成するGit管理対象外の`terraform/terraform.tfvars`にある`cloudflare_api_token`へ設定する。Terraformは`.env`や1Passwordからインフラ設定を読み取らない。
+発行したトークンをパスワードマネージャーなどへ保管し、手順3.2で作成するGit管理対象外の`terraform/terraform.tfvars`にある`cloudflare_api_token`へ設定する。Terraformは`.env`からインフラ設定を読み取らない。
 
 `terraform.tfvars`とTerraform stateには秘密情報が含まれる。どちらもGitへ追加せず、ローカルディスクの暗号化とファイル権限`600`を維持する。
 
@@ -99,10 +97,9 @@ openssl rand -hex 32
 この時点では、次の値を`.env`へ設定する。
 
 ```dotenv
-OP_SERVICE_ACCOUNT_TOKEN=<1Password Service Accountのトークン>
-OP_VAULT=<保管庫名またはUUID>
-OP_ITEM=<項目名またはUUID>
-OP_TOTP_FIELD=<TOTPフィールド名またはID>
+MF_EMAIL=<Money Forward MEのログインメールアドレス>
+MF_PASSWORD=<Money Forward MEのパスワード>
+MF_TOTP_SECRET=<認証アプリ登録時のセットアップキー（Base32）>
 REFRESH_TOKEN=<openssl rand -hex 32の出力>
 CLOUDFLARE_ACCESS_TEAM_DOMAIN=<team-name>.cloudflareaccess.com
 DASHBOARD_URL=https://dashboard.example.com
@@ -118,8 +115,9 @@ DASHBOARD_URL=https://dashboard.example.com
 | `CLOUDFLARE_ACCESS_TEAM_DOMAIN`              | 必須 | Terraform適用前      | Access JWTの発行者となる`<team-name>.cloudflareaccess.com`                       |
 | `CLOUDFLARE_ACCESS_AUD`                      | 必須 | Terraform適用後      | Terraformが作成したAccess ApplicationのAUD                                       |
 | `DASHBOARD_URL`                              | 必須 | Terraform適用前      | Open Graph / Twitter metadataと通知に使う公開ダッシュボードURL                   |
-| `OP_SERVICE_ACCOUNT_TOKEN`                   | 必須 | Terraform適用前      | 1Password Service Accountのトークン                                              |
-| `OP_VAULT` / `OP_ITEM` / `OP_TOTP_FIELD`     | 必須 | Terraform適用前      | Money Forward MEの保管先。日本語を含む場合はUUIDを指定                           |
+| `MF_EMAIL` / `MF_PASSWORD`                   | 必須 | Terraform適用前      | Money Forward MEのログイン情報。SSMへ置く場合は空でよい                          |
+| `MF_TOTP_SECRET`                             | 必須 | Terraform適用前      | 認証アプリのセットアップキー（Base32）。二段階認証が無効なら不要                 |
+| `SSM_PARAMETER_PREFIX`                       | 任意 | SSM利用時            | SSM Parameter Storeの接頭辞。既定値は`/mf-dashboard`                             |
 | `AI_PROVIDER` / `AI_MODEL` / `AI_API_KEY`    | 任意 | 機能を有効にするとき | 財務インサイト、家計AIチャット、LLMカテゴリ推論。利用する機能では3項目すべて必須 |
 | `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID`       | 任意 | 通知を有効にするとき | Slack通知                                                                        |
 | `DISCORD_WEBHOOK_URL` / `DISCORD_AVATAR_URL` | 任意 | 通知を有効にするとき | Discord通知                                                                      |
@@ -128,13 +126,23 @@ DASHBOARD_URL=https://dashboard.example.com
 
 Linuxでは`id -u`と`id -g`で値を確認し、`1000:1000`と異なる場合は`.env`の`HOST_UID`と`HOST_GID`へ設定する。web、crawler、cloudflaredが同じUID/GIDで動作し、`./data`とowner-read-onlyのTunnel tokenへ必要な範囲だけアクセスする。
 
-#### 1PasswordのIDを確認する
+#### 資格情報をAWS SSM Parameter Storeへ置く
 
-1Password SDKは日本語の保管庫名や項目名を扱えないため、日本語を含む場合はUUIDを使う。
+`.env`へ平文で書く代わりに、SSM Parameter Storeから取得できる。crawlerは環境変数を優先し、空のものだけをSSMから解決する。標準ティアのパラメータとAWS管理キーによる`SecureString`は追加料金なしで利用できる。
 
-- `OP_VAULT`: サイドバーで保管庫を右クリックし、「UUIDをコピー」を選ぶ
-- `OP_ITEM`: アイテム画面右上のメニューから「UUIDをコピー」を選ぶ
-- `OP_TOTP_FIELD`: 同じメニューの「アイテムのJSONをコピー」を選び、`u`の値が`TOTP_`で始まるフィールドIDを取り出す
+```sh
+aws ssm put-parameter --name /mf-dashboard/email --type SecureString --value '<メールアドレス>'
+aws ssm put-parameter --name /mf-dashboard/password --type SecureString --value '<パスワード>'
+aws ssm put-parameter --name /mf-dashboard/totp-secret --type SecureString --value '<セットアップキー>'
+```
+
+実行するIAMプリンシパルには`ssm:GetParameters`と、`SecureString`の復号に使う`kms:Decrypt`が必要である。ECSで動かす場合はタスク定義の`secrets`が同じパラメータを環境変数として注入するため、コンテナ内ではSSMを直接呼ばない。
+
+#### 二段階認証のセットアップキーを取得する
+
+`MF_TOTP_SECRET`には6桁のコードではなく、認証アプリ登録時に表示されるBase32のセットアップキーを設定する。QRコードしか表示されない場合は「QRコードを読み取れない場合」の導線からキー文字列を表示する。crawlerはこのキーからRFC 6238のコードをローカルで生成するため、認証アプリと同じ値が同時に得られる。
+
+同じキーはスマートフォンの認証アプリにも並行して登録できる。手動ログイン用の控えとして登録しておくとよい。
 
 ### 3.2 インフラ設定
 

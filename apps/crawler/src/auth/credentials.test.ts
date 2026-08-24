@@ -2,42 +2,50 @@ import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 
 type AnyMock = (...args: any[]) => any;
 
-// Use vi.hoisted to create mock before hoisting
-const { mockResolve, mockCreateClient } = vi.hoisted(() => {
-  const mockResolve = vi.fn<AnyMock>();
-  const mockCreateClient = vi.fn<AnyMock>().mockResolvedValue({
-    secrets: {
-      resolve: mockResolve,
-    },
-  });
-  return { mockResolve, mockCreateClient };
+const { mockSend, mockDestroy, mockGetParametersCommand } = vi.hoisted(() => {
+  const mockSend = vi.fn<AnyMock>();
+  const mockDestroy = vi.fn<AnyMock>();
+  const mockGetParametersCommand = vi.fn<AnyMock>();
+  return { mockSend, mockDestroy, mockGetParametersCommand };
 });
 
-// Mock 1Password SDK
-vi.mock("@1password/sdk", () => ({
-  createClient: mockCreateClient,
+// SDK 側は new で生成されるため、モックもコンストラクタとして呼べる必要がある
+vi.mock("@aws-sdk/client-ssm", () => ({
+  SSMClient: class {
+    send = mockSend;
+    destroy = mockDestroy;
+  },
+  GetParametersCommand: class {
+    constructor(input: unknown) {
+      mockGetParametersCommand(input);
+    }
+  },
 }));
 
-// Mock process.exit
-vi.spyOn(process, "exit").mockImplementation(() => {
-  throw new Error("process.exit called");
-});
+import { getCredentials, getOTP, _resetCredentialsCache } from "./credentials.js";
+import { generateTotp } from "./totp.js";
 
-import { getCredentials, getOTP, _resetOpClient } from "./credentials.js";
+// RFC 6238 Appendix B の共有シークレット
+const TOTP_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+
+function ssmResponse(values: Record<string, string>) {
+  return {
+    Parameters: Object.entries(values).map(([Name, Value]) => ({ Name, Value })),
+    InvalidParameters: [],
+  };
+}
 
 describe("credentials", () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    _resetOpClient();
-    process.env = {
-      ...originalEnv,
-      OP_SERVICE_ACCOUNT_TOKEN: "test-token",
-      OP_VAULT: "test-vault",
-      OP_ITEM: "test-item",
-      OP_TOTP_FIELD: "totp",
-    };
+    _resetCredentialsCache();
+    process.env = { ...originalEnv };
+    delete process.env.MF_EMAIL;
+    delete process.env.MF_PASSWORD;
+    delete process.env.MF_TOTP_SECRET;
+    delete process.env.SSM_PARAMETER_PREFIX;
   });
 
   afterEach(() => {
@@ -45,57 +53,139 @@ describe("credentials", () => {
   });
 
   describe("getCredentials", () => {
-    test("returns credentials from 1Password", async () => {
-      mockResolve.mockImplementation((path: string) => {
-        if (path.includes("username")) return Promise.resolve("test-user@example.com");
-        if (path.includes("password")) return Promise.resolve("test-password");
-        return Promise.resolve("");
-      });
+    test("prefers environment variables and never calls SSM", async () => {
+      process.env.MF_EMAIL = "user-a@example.com";
+      process.env.MF_PASSWORD = "test-password";
 
       const result = await getCredentials();
 
-      expect(result).toEqual({
-        username: "test-user@example.com",
+      expect(result).toEqual({ username: "user-a@example.com", password: "test-password" });
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    test("trims surrounding whitespace from environment values", async () => {
+      process.env.MF_EMAIL = "  user-a@example.com  ";
+      process.env.MF_PASSWORD = "  test-password  ";
+
+      await expect(getCredentials()).resolves.toEqual({
+        username: "user-a@example.com",
         password: "test-password",
       });
-      expect(mockResolve).toHaveBeenCalledWith("op://test-vault/test-item/username");
-      expect(mockResolve).toHaveBeenCalledWith("op://test-vault/test-item/password");
     });
 
-    test("throws error when credentials are empty", async () => {
-      mockResolve.mockResolvedValue("");
+    test("falls back to SSM when environment variables are absent", async () => {
+      mockSend.mockResolvedValue(
+        ssmResponse({
+          "/mf-dashboard/email": "user-a@example.com",
+          "/mf-dashboard/password": "test-password",
+        }),
+      );
 
-      await expect(getCredentials()).rejects.toThrow("Failed to get credentials from 1Password");
+      const result = await getCredentials();
+
+      expect(result).toEqual({ username: "user-a@example.com", password: "test-password" });
+      expect(mockGetParametersCommand).toHaveBeenCalledWith({
+        Names: ["/mf-dashboard/email", "/mf-dashboard/password"],
+        WithDecryption: true,
+      });
     });
 
-    test("exits when OP_SERVICE_ACCOUNT_TOKEN is not set", async () => {
-      delete process.env.OP_SERVICE_ACCOUNT_TOKEN;
-      _resetOpClient();
+    test("requests only the values missing from the environment", async () => {
+      process.env.MF_EMAIL = "user-a@example.com";
+      mockSend.mockResolvedValue(ssmResponse({ "/mf-dashboard/password": "test-password" }));
 
-      await expect(getCredentials()).rejects.toThrow("process.exit called");
+      await getCredentials();
+
+      expect(mockGetParametersCommand).toHaveBeenCalledWith({
+        Names: ["/mf-dashboard/password"],
+        WithDecryption: true,
+      });
+    });
+
+    test("honours a custom parameter prefix", async () => {
+      process.env.SSM_PARAMETER_PREFIX = "/custom/path/";
+      mockSend.mockResolvedValue(
+        ssmResponse({
+          "/custom/path/email": "user-a@example.com",
+          "/custom/path/password": "test-password",
+        }),
+      );
+
+      await getCredentials();
+
+      expect(mockGetParametersCommand).toHaveBeenCalledWith({
+        Names: ["/custom/path/email", "/custom/path/password"],
+        WithDecryption: true,
+      });
+    });
+
+    test("reports which parameters are missing", async () => {
+      mockSend.mockResolvedValue({
+        Parameters: [{ Name: "/mf-dashboard/email", Value: "user-a@example.com" }],
+        InvalidParameters: ["/mf-dashboard/password"],
+      });
+
+      await expect(getCredentials()).rejects.toThrow("/mf-dashboard/password");
+    });
+
+    test("releases the SSM client even when the lookup fails", async () => {
+      mockSend.mockRejectedValue(new Error("AccessDeniedException"));
+
+      await expect(getCredentials()).rejects.toThrow("AccessDeniedException");
+      expect(mockDestroy).toHaveBeenCalled();
+    });
+
+    test("caches resolved values so a second call skips SSM", async () => {
+      mockSend.mockResolvedValue(
+        ssmResponse({
+          "/mf-dashboard/email": "user-a@example.com",
+          "/mf-dashboard/password": "test-password",
+        }),
+      );
+
+      await getCredentials();
+      await getCredentials();
+
+      expect(mockSend).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("getOTP", () => {
-    test("returns OTP from 1Password", async () => {
-      mockResolve.mockResolvedValue("123456");
+    test("generates a six digit code from the environment secret", async () => {
+      process.env.MF_TOTP_SECRET = TOTP_SECRET;
 
-      const result = await getOTP();
+      const otp = await getOTP();
 
-      expect(result).toBe("123456");
-      expect(mockResolve).toHaveBeenCalledWith("op://test-vault/test-item/totp?attribute=totp");
+      expect(otp).toMatch(/^\d{6}$/);
+      expect(otp).toBe(generateTotp(TOTP_SECRET));
+      expect(mockSend).not.toHaveBeenCalled();
     });
 
-    test("throws error when OP_TOTP_FIELD is not set", async () => {
-      delete process.env.OP_TOTP_FIELD;
+    test("generates a code from the secret stored in SSM", async () => {
+      mockSend.mockResolvedValue(ssmResponse({ "/mf-dashboard/totp-secret": TOTP_SECRET }));
 
-      await expect(getOTP()).rejects.toThrow("OP_TOTP_FIELD が設定されていません");
+      const otp = await getOTP();
+
+      expect(otp).toBe(generateTotp(TOTP_SECRET));
+      expect(mockGetParametersCommand).toHaveBeenCalledWith({
+        Names: ["/mf-dashboard/totp-secret"],
+        WithDecryption: true,
+      });
     });
 
-    test("throws error when OTP is empty", async () => {
-      mockResolve.mockResolvedValue("");
+    test("fails with a clear message when the secret is not stored anywhere", async () => {
+      mockSend.mockResolvedValue({
+        Parameters: [],
+        InvalidParameters: ["/mf-dashboard/totp-secret"],
+      });
 
-      await expect(getOTP()).rejects.toThrow("OTP の取得に失敗しました");
+      await expect(getOTP()).rejects.toThrow("/mf-dashboard/totp-secret");
+    });
+
+    test("rejects a secret that is not valid Base32", async () => {
+      process.env.MF_TOTP_SECRET = "not-a-valid-secret!";
+
+      await expect(getOTP()).rejects.toThrow("outside the Base32 alphabet");
     });
   });
 });
