@@ -54,6 +54,11 @@ output "writer_repository_url" {
   value       = aws_ecr_repository.writer.repository_url
 }
 
+output "site_builder_repository_url" {
+  description = "ECR repository the site builder image is pushed to"
+  value       = aws_ecr_repository.site_builder.repository_url
+}
+
 output "ecs_cluster_name" {
   description = "ECS cluster running the crawler task"
   value       = aws_ecs_cluster.this.name

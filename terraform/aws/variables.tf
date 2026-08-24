@@ -68,6 +68,24 @@ variable "crawler_timeout_minutes" {
   default     = 45
 }
 
+variable "site_builder_cpu" {
+  description = "Fargate CPU units for the site builder task. next build is the bottleneck."
+  type        = number
+  default     = 2048
+}
+
+variable "site_builder_memory" {
+  description = "Fargate memory (MiB) for the site builder task"
+  type        = number
+  default     = 4096
+}
+
+variable "site_builder_image_tag" {
+  description = "Image tag in the site builder ECR repository that the task definition runs"
+  type        = string
+  default     = "latest"
+}
+
 variable "writer_image_tag" {
   description = "Image tag in the writer ECR repository that the Lambda runs"
   type        = string

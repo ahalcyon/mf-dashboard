@@ -6,6 +6,10 @@ import { fileURLToPath } from "node:url";
 
 // S3 上のデータベースを取得し、その中身を焼き込んだ静的サイトを発行する。
 // フロントは実行時の DB 接続を持たないため、データを変えるにはこの手順が要る。
+//
+// 接続先は環境変数を優先し、無ければ terraform output から読む。
+// AWS 上の site-builder タスクはタスク定義から環境変数で受け取り、
+// 手元から叩く場合は terraform output で解決される。
 
 const projectDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 const terraformDir = join(projectDir, "terraform", "aws");
@@ -16,7 +20,7 @@ function run(command, args, options = {}) {
   execFileSync(command, args, { cwd: projectDir, stdio: "inherit", ...options });
 }
 
-function output(name) {
+function fromTerraform(name) {
   const value = execFileSync("terraform", [`-chdir=${terraformDir}`, "output", "-raw", name], {
     encoding: "utf8",
   }).trim();
@@ -24,10 +28,14 @@ function output(name) {
   return value;
 }
 
-const dataBucket = output("data_bucket");
-const siteBucket = output("site_bucket");
-const distributionId = output("cloudfront_distribution_id");
-const siteUrl = output("site_url");
+function setting(variable, outputName) {
+  return process.env[variable]?.trim() || fromTerraform(outputName);
+}
+
+const dataBucket = setting("DATA_BUCKET", "data_bucket");
+const siteBucket = setting("SITE_BUCKET", "site_bucket");
+const distributionId = setting("CLOUDFRONT_DISTRIBUTION_ID", "cloudfront_distribution_id");
+const siteUrl = setting("SITE_URL", "site_url");
 
 console.log(`Fetching the database from ${dataBucket}`);
 mkdirSync(dirname(databasePath), { recursive: true });

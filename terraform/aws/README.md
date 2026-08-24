@@ -21,9 +21,9 @@ EventBridge Scheduler (6:30 / 15:30 JST)
         │ ファイル全体の read-modify-write
         ▼
    S3: data バケット  s3://…/db/moneyforward.db  (バージョニング有効)
-        │ 手元から実行
+        │ EventBridge "Object Created"
         ▼
-   pnpm publish:site ── DB を読んで next build (output: "export")
+   ECS Fargate: site-builder ── DB を読んで next build (output: "export")
         │ s3 sync + invalidation
         ▼
    S3: site バケット ──▶ CloudFront (OAC)  ──▶ 利用者
@@ -150,14 +150,25 @@ bootstrap 用の小さなモジュールを別に切る。
 ## 静的サイトの発行
 
 フロントは実行時の DB 接続を持たないため、データを反映するにはビルドし直す。
-デプロイは手元から行う方針なので、CI ではなくスクリプトで完結させる。
+これは S3 のデータベース更新を起点に自動で走るので、通常は何もしなくてよい。
+
+```
+S3 の DB 更新 → EventBridge → ECS Fargate (site-builder) → s3 sync → invalidation
+```
+
+CodeBuild を使わないのは、GitHub 接続の認可が Terraform の管理外で必要になり、
+リポジトリと CI の二重管理になるため。crawler や writer と同じく、手元で
+イメージを push して apply する形に揃えている。ソースはイメージへ同梱するので、
+アプリを変更したときはイメージを作り直す。
+
+```sh
+wslc build -f docker/site-builder/Dockerfile -t "$(terraform -chdir=terraform/aws output -raw site_builder_repository_url):latest" .
+wslc push "$(terraform -chdir=terraform/aws output -raw site_builder_repository_url):latest"
+```
+
+手元から即座に発行したい場合は次を実行する。接続先は環境変数を優先し、
+無ければ `terraform output` から解決するため、同じスクリプトが両方で動く。
 
 ```sh
 pnpm publish:site
 ```
-
-S3 からデータベースを取得し、それを焼き込んだ静的サイトをビルドして
-サイトバケットへ同期し、CloudFront を無効化するところまで行う。
-接続先は `terraform output` から読むので引数は要らない。
-
-crawler は 1 日 2 回走るが、サイトはこのコマンドを実行するまで更新されない。
