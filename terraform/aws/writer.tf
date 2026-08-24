@@ -66,6 +66,12 @@ data "aws_iam_policy_document" "writer" {
   }
 
   statement {
+    sid       = "ReadCrawlPayloads"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.data.arn}/payloads/*"]
+  }
+
+  statement {
     sid       = "DiscoverDatabaseObject"
     actions   = ["s3:ListBucket"]
     resources = [aws_s3_bucket.data.arn]
@@ -85,8 +91,13 @@ resource "aws_iam_role_policy" "writer" {
 }
 
 # SQLite をまるごと書き換える単一ライタ。
-# reserved_concurrent_executions = 1 は性能調整ではなく正当性の要件で、
-# 2 以上にすると read-modify-write が競合して後勝ちでデータが消える。
+#
+# 書き込みが直列化されるのは、FIFO キューと単一 MessageGroupId により
+# SQS が同じグループを一度に 1 バッチしか配信しないため。これが一次保証で、
+# 送信側が MessageGroupId を分けた時点で read-modify-write が競合し、
+# 後勝ちでデータが消える。
+# reserved_concurrent_executions はその二重化だが、アカウントの
+# 同時実行クォータが 10 以下だと設定できない（変数の説明を参照）。
 resource "aws_lambda_function" "writer" {
   count = var.enable_writer ? 1 : 0
 
@@ -97,7 +108,7 @@ resource "aws_lambda_function" "writer" {
   timeout       = var.writer_timeout_seconds
   memory_size   = var.writer_memory
 
-  reserved_concurrent_executions = 1
+  reserved_concurrent_executions = var.writer_reserved_concurrency
 
   ephemeral_storage {
     size = 4096
@@ -126,9 +137,9 @@ resource "aws_lambda_event_source_mapping" "writes" {
   function_name    = aws_lambda_function.writer[0].arn
 
   # ファイル全体の書き換えは高コストなので、まとめて 1 回で適用する。
-  batch_size                         = 10
-  maximum_batching_window_in_seconds = 30
-  function_response_types            = ["ReportBatchItemFailures"]
+  # FIFO キューはバッチングウィンドウを受け付けないため batch_size だけで制御する。
+  batch_size              = 10
+  function_response_types = ["ReportBatchItemFailures"]
 }
 
 resource "aws_cloudwatch_metric_alarm" "writer_errors" {

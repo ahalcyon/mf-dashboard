@@ -85,6 +85,23 @@ variable "writer_timeout_seconds" {
   }
 }
 
+variable "writer_reserved_concurrency" {
+  description = <<-DESC
+    Reserved concurrency for the writer. Serialization is primarily guaranteed by the
+    FIFO queue and a single MessageGroupId, which SQS processes one batch at a time;
+    reserving 1 is defence in depth on top of that. Set to -1 to leave it unreserved,
+    which is required when the account's Lambda concurrency quota is 10 or lower
+    because AWS keeps unreserved concurrency at 10 or above.
+  DESC
+  type        = number
+  default     = -1
+
+  validation {
+    condition     = var.writer_reserved_concurrency == -1 || var.writer_reserved_concurrency >= 1
+    error_message = "writer_reserved_concurrency must be -1 (unreserved) or a positive number."
+  }
+}
+
 variable "writer_memory" {
   description = "Writer Lambda memory (MiB). The whole database is held in /tmp and memory during the rewrite."
   type        = number
@@ -119,6 +136,12 @@ variable "log_retention_days" {
   description = "CloudWatch Logs retention for the crawler, writer, and site build"
   type        = number
   default     = 30
+}
+
+variable "payload_retention_days" {
+  description = "How long crawl payloads are kept in S3 after the writer applies them. Retained only to investigate failures."
+  type        = number
+  default     = 14
 }
 
 variable "noncurrent_version_retention_days" {

@@ -110,6 +110,13 @@ data "aws_iam_policy_document" "crawler_task" {
   }
 
   statement {
+    sid = "PublishCrawlPayloads"
+    # SQS の 256 KiB 上限を超えるため、実データは S3 に置きメッセージには位置だけを載せる
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.data.arn}/payloads/*"]
+  }
+
+  statement {
     sid       = "ReadCredentialsAtRuntime"
     actions   = ["ssm:GetParameters", "ssm:GetParameter"]
     resources = local.crawler_secret_arns

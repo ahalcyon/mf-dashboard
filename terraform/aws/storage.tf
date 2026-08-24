@@ -46,6 +46,20 @@ resource "aws_s3_bucket_lifecycle_configuration" "data" {
   bucket     = aws_s3_bucket.data.id
   depends_on = [aws_s3_bucket_versioning.data]
 
+  # ペイロードは writer が適用した時点で用済み。失敗調査の猶予だけ残して消す。
+  rule {
+    id     = "expire-applied-payloads"
+    status = "Enabled"
+
+    filter {
+      prefix = "payloads/"
+    }
+
+    expiration {
+      days = var.payload_retention_days
+    }
+  }
+
   rule {
     id     = "expire-noncurrent-database-versions"
     status = "Enabled"
