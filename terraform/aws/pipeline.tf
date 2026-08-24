@@ -147,9 +147,11 @@ resource "aws_iam_role" "site_build_trigger" {
 }
 
 data "aws_iam_policy_document" "site_build_trigger" {
+  count = var.enable_site_build ? 1 : 0
+
   statement {
     actions   = ["codebuild:StartBuild"]
-    resources = [one(aws_codebuild_project.site[*].arn)]
+    resources = [aws_codebuild_project.site[0].arn]
   }
 }
 
@@ -158,7 +160,7 @@ resource "aws_iam_role_policy" "site_build_trigger" {
 
   name   = "start-site-build"
   role   = aws_iam_role.site_build_trigger[0].id
-  policy = data.aws_iam_policy_document.site_build_trigger.json
+  policy = data.aws_iam_policy_document.site_build_trigger[0].json
 }
 
 resource "aws_cloudwatch_event_rule" "database_updated" {

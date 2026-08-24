@@ -182,3 +182,35 @@ variable "enable_crawler_schedule" {
   type        = bool
   default     = false
 }
+
+# --- Basic 認証 -----------------------------------------------------------
+
+variable "basic_auth_username" {
+  description = "Username for the edge Basic authentication"
+  type        = string
+  default     = "mf"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9._~-]{1,64}$", var.basic_auth_username))
+    error_message = "basic_auth_username must be 1-64 URL-safe characters."
+  }
+}
+
+variable "basic_auth_password" {
+  description = "Password for the edge Basic authentication. Leave empty to generate one; read it back from the bookmark_url output."
+  type        = string
+  default     = ""
+  sensitive   = true
+
+  validation {
+    # ブックマーク URL (https://user:pass@host/) に埋め込むため、区切り文字を含められない
+    condition     = var.basic_auth_password == "" || can(regex("^[A-Za-z0-9._~-]{12,128}$", var.basic_auth_password))
+    error_message = "basic_auth_password must be 12-128 URL-safe characters."
+  }
+}
+
+variable "session_cookie_max_age_seconds" {
+  description = "How long the session cookie issued after a successful Basic auth stays valid in the browser"
+  type        = number
+  default     = 31536000
+}

@@ -3,6 +3,12 @@ output "site_url" {
   value       = var.hostname == "" ? "https://${aws_cloudfront_distribution.site.domain_name}" : "https://${var.hostname}"
 }
 
+output "bookmark_url" {
+  description = "URL to bookmark. Hitting it once exchanges Basic auth for a session cookie."
+  value       = "https://${var.basic_auth_username}:${local.basic_auth_password}@${var.hostname == "" ? aws_cloudfront_distribution.site.domain_name : var.hostname}/"
+  sensitive   = true
+}
+
 output "cloudfront_distribution_id" {
   description = "CloudFront distribution serving the dashboard"
   value       = aws_cloudfront_distribution.site.id

@@ -103,6 +103,35 @@ aws cloudfront create-invalidation \
   --paths '/*'
 ```
 
+## 認証
+
+エッジで Basic 認証を行い、成功した1回だけをセッションクッキーへ引き換える。
+ブラウザーは Basic のセッションを保持できないため、`https://user:pass@host/` を
+ブックマークして踏む運用を前提にしている。
+
+viewer-request は 1 つのビヘイビアに 1 つしか関連付けられないので、
+認証とディレクトリインデックスの書き換えは同じ関数にまとめている。
+
+1. クッキー `chv` があれば KeyValueStore の `session` と突き合わせ、一致なら通す
+2. 無ければ `Authorization: Basic` を KeyValueStore の `authorization` と照合し、
+   一致すれば **302 + `Set-Cookie: chv`** を返す（初回だけ通る入口）
+3. どちらも駄目なら **401 + `WWW-Authenticate: Basic`**
+
+`session` が読めない場合は誰も通さない（フェイルクローズ）。
+
+資格情報は関数コードではなく KeyValueStore に置く。コードへ埋め込むと、
+関数を再デプロイしない限り差し替えられなくなるため。
+
+ブックマークする URL は output から取得する。
+
+```sh
+terraform -chdir=terraform/aws output -raw bookmark_url
+```
+
+`basic_auth_password` を空のままにすると自動生成する。固定したい場合は
+`terraform.tfvars` で指定する。パスワードはブックマーク URL に埋め込む都合上、
+URL セーフな文字だけを受け付ける。
+
 ## state について
 
 現状はローカル state。`terraform/aws/.gitignore` で `*.tfstate` と `*.tfvars` を除外している。
@@ -124,7 +153,4 @@ bootstrap 用の小さなモジュールを別に切る。
    `output: "export"` に切り替わるが、同時に AI チャットを無効化し
    `NEXT_PUBLIC_STATIC_DEMO_BUILD` を立てる。本番データを「デモ」フラグでビルドする
    状態なので、`STATIC_EXPORT` のような名前へ分離するのが望ましい。
-5. **認証。** CloudFront は OAC で S3 オリジンを保護するだけで、人の認証は行わない。
-   静的サイトには資産エクスポート（`/export/assets.json` と `/export/assets.md`）が
-   含まれ、口座名・残高・保有銘柄が平文で入る。**認証を載せるまで、この配信構成を
-   公開ホスト名に接続してはいけない。**
+5. **crawler イメージ。** ECR へ push するまで `enable_crawler_schedule` は有効にできない。
