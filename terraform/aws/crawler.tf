@@ -110,6 +110,14 @@ data "aws_iam_policy_document" "crawler_task" {
   }
 
   statement {
+    sid = "ReadWorkingDatabaseCopy"
+    # crawler は authoritative なデータベースを持たない。読み取り用の複製を
+    # 落として作業し、書き込みはすべて payload として発行する。
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.data.arn}/${var.database_object_key}"]
+  }
+
+  statement {
     sid = "PublishCrawlPayloads"
     # SQS の 256 KiB 上限を超えるため、実データは S3 に置きメッセージには位置だけを載せる
     actions   = ["s3:PutObject"]
@@ -161,6 +169,9 @@ resource "aws_ecs_task_definition" "crawler" {
       { name = "SSM_PARAMETER_PREFIX", value = local.ssm_parameter_prefix },
       { name = "WRITE_QUEUE_URL", value = aws_sqs_queue.writes.url },
       { name = "WRITE_MESSAGE_GROUP_ID", value = local.write_message_group_id },
+      { name = "DATA_BUCKET", value = aws_s3_bucket.data.id },
+      { name = "DATABASE_OBJECT_KEY", value = var.database_object_key },
+      { name = "DB_PATH", value = "/tmp/moneyforward.db" },
       { name = "AWS_REGION", value = var.region },
       ],
       local.llm_enabled ? [

@@ -1,3 +1,4 @@
+import type { AnalyticsReportInput } from "../repositories/analytics";
 import type { TransactionPeriodReplacement } from "../repositories/transactions";
 import type { ScrapedData } from "../types";
 
@@ -21,10 +22,15 @@ export const SQS_MESSAGE_MAX_BYTES = 256 * 1024;
  * キューを流れるメッセージ本体。
  * 実データは S3 に置き、ここにはその位置だけを載せる。
  */
+export const SYNC_PAYLOAD_KINDS = ["scraped-data", "analytics-reports"] as const;
+
+export type SyncPayloadKind = (typeof SYNC_PAYLOAD_KINDS)[number];
+
 export interface SyncMessage {
   version: typeof SYNC_MESSAGE_VERSION;
   /** 1 回のクロールを識別する。ペイロードのキーにも使う */
   runId: string;
+  kind: SyncPayloadKind;
   producedAt: string;
   payload: { bucket: string; key: string };
 }
@@ -33,13 +39,22 @@ export interface SyncMessage {
  * S3 に置く実データ。saveScrapedDataBatch の引数と 1 対 1 で対応する。
  * Map は JSON にできないため、institutionCategories だけ entries 配列で持つ。
  */
-export interface SyncPayload {
+export interface ScrapedDataPayload {
+  kind: "scraped-data";
   cleanupGroupIds?: string[];
   fullData?: ScrapedData;
   groupOnlyData: ScrapedData[];
   historyMonths?: TransactionPeriodReplacement[];
   institutionCategories?: [string, string][];
 }
+
+/** インサイトは保存フェーズの後に生成されるため、別のメッセージで運ぶ。 */
+export interface AnalyticsReportsPayload {
+  kind: "analytics-reports";
+  reports: AnalyticsReportInput[];
+}
+
+export type SyncPayload = ScrapedDataPayload | AnalyticsReportsPayload;
 
 /** saveScrapedDataBatch がそのまま受け取れる形 */
 export interface SyncBatch {
@@ -50,19 +65,19 @@ export interface SyncBatch {
   institutionCategories?: ReadonlyMap<string, string>;
 }
 
-export function buildPayloadKey(runId: string): string {
-  return `payloads/${runId}.json`;
+export function buildPayloadKey(runId: string, kind: SyncPayloadKind): string {
+  return `payloads/${runId}/${kind}.json`;
 }
 
-export function encodeSyncPayload(batch: SyncBatch): SyncPayload {
+export function encodeScrapedDataPayload(batch: SyncBatch): ScrapedDataPayload {
   const { institutionCategories, ...rest } = batch;
   return institutionCategories
-    ? { ...rest, institutionCategories: [...institutionCategories] }
-    : rest;
+    ? { kind: "scraped-data", ...rest, institutionCategories: [...institutionCategories] }
+    : { kind: "scraped-data", ...rest };
 }
 
-export function decodeSyncPayload(payload: SyncPayload): SyncBatch {
-  const { institutionCategories, ...rest } = payload;
+export function decodeScrapedDataPayload(payload: ScrapedDataPayload): SyncBatch {
+  const { kind: _kind, institutionCategories, ...rest } = payload;
   return institutionCategories
     ? { ...rest, institutionCategories: new Map(institutionCategories) }
     : rest;
@@ -97,6 +112,9 @@ export function parseSyncMessage(raw: string): SyncMessage {
   }
   if (!isNonEmptyString(message.runId)) throw new Error("Sync message is missing runId");
   if (!isNonEmptyString(message.producedAt)) throw new Error("Sync message is missing producedAt");
+  if (!SYNC_PAYLOAD_KINDS.includes(message.kind as SyncPayloadKind)) {
+    throw new Error(`Unsupported sync payload kind: ${String(message.kind)}`);
+  }
 
   const payload = message.payload;
   if (typeof payload !== "object" || payload === null) {
@@ -109,6 +127,7 @@ export function parseSyncMessage(raw: string): SyncMessage {
   return {
     version: SYNC_MESSAGE_VERSION,
     runId: message.runId,
+    kind: message.kind as SyncPayloadKind,
     producedAt: message.producedAt,
     payload: { bucket, key },
   };
@@ -117,12 +136,14 @@ export function parseSyncMessage(raw: string): SyncMessage {
 export function buildSyncMessage(options: {
   bucket: string;
   runId: string;
+  kind: SyncPayloadKind;
   producedAt?: string;
 }): SyncMessage {
   return {
     version: SYNC_MESSAGE_VERSION,
     runId: options.runId,
+    kind: options.kind,
     producedAt: options.producedAt ?? new Date().toISOString(),
-    payload: { bucket: options.bucket, key: buildPayloadKey(options.runId) },
+    payload: { bucket: options.bucket, key: buildPayloadKey(options.runId, options.kind) },
   };
 }

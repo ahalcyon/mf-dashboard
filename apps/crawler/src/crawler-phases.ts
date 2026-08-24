@@ -2,14 +2,20 @@ import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { analyzeFinancialData } from "@mf-dashboard/analytics";
+import { getJstTodayIsoDate } from "@mf-dashboard/date-utils";
 import { initDb, type Db } from "@mf-dashboard/db";
 import { buildAccountIdMap } from "@mf-dashboard/db/repository/accounts";
+import {
+  getAnalyticsReportByDate,
+  type AnalyticsReportInput,
+} from "@mf-dashboard/db/repository/analytics";
 import { saveScrapedDataBatch } from "@mf-dashboard/db/repository/save-scraped-data";
 import {
   hasCashFlowPeriod,
   saveTransactionsForMonths,
   type TransactionPeriodReplacement,
 } from "@mf-dashboard/db/repository/transactions";
+import { encodeScrapedDataPayload } from "@mf-dashboard/db/sync/message";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { loginWithAuthState } from "./auth/login.js";
 import { hasAuthState } from "./auth/state.js";
@@ -38,6 +44,7 @@ import { scrapeAllGroups, type GroupData, type ScrapeResult } from "./scraper.js
 import { scrapeCashFlowHistory } from "./scrapers/cash-flow-history.js";
 import { isNoGroup, switchGroup, NO_GROUP_ID } from "./scrapers/group.js";
 import { scrapeInstitutionCategories } from "./scrapers/institution-categories.js";
+import type { SyncPublisher } from "./sync/publisher.js";
 
 const DEFAULT_ENV_PATH = path.resolve(import.meta.dirname, "../../../.env");
 const DEFAULT_DB_PATH = path.join(import.meta.dirname, "../../../data/moneyforward.db");
@@ -199,6 +206,7 @@ export async function runSavePhase(
   historyMonths: TransactionPeriodReplacement[] = [],
   cleanupGroupIds?: string[],
   institutionCategories?: ReadonlyMap<string, string>,
+  publisher: SyncPublisher | null = null,
 ): Promise<number[]> {
   phase("Save");
   const noGroupData = scrapeResult.groupDataList.find((groupData) => isNoGroup(groupData.group.id));
@@ -236,13 +244,21 @@ export async function runSavePhase(
     return buildGroupOnlyScrapedData(groupData);
   });
 
-  return saveScrapedDataBatch(db, {
+  const batch = {
     cleanupGroupIds,
     fullData,
     groupOnlyData: groupOnlyScrapedData,
     historyMonths,
     institutionCategories,
-  });
+  };
+
+  // ローカルの複製へ先に適用する。後続の分析フェーズが最新の値を読むため。
+  const savedCounts = await saveScrapedDataBatch(db, batch);
+
+  // S3 上の authoritative なデータベースへ適用するのは writer だけ。
+  await publisher?.publish("scraped-data", encodeScrapedDataPayload(batch));
+
+  return savedCounts;
 }
 
 export async function runInstitutionCategoryPhase(page: Page): Promise<Map<string, string>> {
@@ -386,7 +402,11 @@ export async function runCashFlowHistoryPhase(
   }
 }
 
-export async function runAnalyticsPhase(db: Db, groupDataList: GroupData[]): Promise<void> {
+export async function runAnalyticsPhase(
+  db: Db,
+  groupDataList: GroupData[],
+  publisher: SyncPublisher | null = null,
+): Promise<void> {
   phase("Analytics");
 
   if (groupDataList.length === 0) {
@@ -408,6 +428,43 @@ export async function runAnalyticsPhase(db: Db, groupDataList: GroupData[]): Pro
     }),
   );
   info(`Analytics finished: ${results.filter(Boolean).length}/${groupDataList.length} groups`);
+
+  if (publisher) {
+    // 分析は保存フェーズより後に走るため、別のメッセージで運ぶ
+    const reports = await collectAnalyticsReports(db, groupDataList);
+    if (reports.length > 0) {
+      await publisher.publish("analytics-reports", { kind: "analytics-reports", reports });
+    }
+  }
+}
+
+async function collectAnalyticsReports(
+  db: Db,
+  groupDataList: GroupData[],
+): Promise<AnalyticsReportInput[]> {
+  const today = getJstTodayIsoDate();
+  const reports: AnalyticsReportInput[] = [];
+
+  for (const groupData of groupDataList) {
+    const row = await getAnalyticsReportByDate(db, groupData.group.id, today);
+    if (!row) continue;
+
+    reports.push({
+      groupId: row.groupId,
+      date: row.date,
+      model: row.model,
+      insights: {
+        summary: row.summary,
+        savingsInsight: row.savingsInsight,
+        investmentInsight: row.investmentInsight,
+        spendingInsight: row.spendingInsight,
+        balanceInsight: row.balanceInsight,
+        liabilityInsight: row.liabilityInsight,
+      },
+    });
+  }
+
+  return reports;
 }
 
 export async function runNotificationPhase(

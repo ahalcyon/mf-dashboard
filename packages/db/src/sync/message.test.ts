@@ -2,8 +2,8 @@ import { describe, expect, test } from "vitest";
 import {
   buildPayloadKey,
   buildSyncMessage,
-  decodeSyncPayload,
-  encodeSyncPayload,
+  decodeScrapedDataPayload,
+  encodeScrapedDataPayload,
   parseSyncMessage,
   SYNC_MESSAGE_GROUP_ID,
   SYNC_MESSAGE_VERSION,
@@ -12,9 +12,10 @@ import {
 
 const validMessage: SyncMessage = {
   version: SYNC_MESSAGE_VERSION,
-  runId: "2026-08-25T063000Z-abcdef",
+  runId: "20260825T063000Z-abcdef",
+  kind: "scraped-data",
   producedAt: "2026-08-25T06:30:00.000Z",
-  payload: { bucket: "test-bucket", key: "payloads/2026-08-25T063000Z-abcdef.json" },
+  payload: { bucket: "test-bucket", key: "payloads/20260825T063000Z-abcdef/scraped-data.json" },
 };
 
 describe("buildSyncMessage", () => {
@@ -22,27 +23,36 @@ describe("buildSyncMessage", () => {
     const message = buildSyncMessage({
       bucket: "test-bucket",
       runId: "run-1",
+      kind: "analytics-reports",
       producedAt: "2026-08-25T06:30:00.000Z",
     });
 
     expect(message).toEqual({
       version: SYNC_MESSAGE_VERSION,
       runId: "run-1",
+      kind: "analytics-reports",
       producedAt: "2026-08-25T06:30:00.000Z",
-      payload: { bucket: "test-bucket", key: "payloads/run-1.json" },
+      payload: { bucket: "test-bucket", key: "payloads/run-1/analytics-reports.json" },
     });
   });
 
   test("producedAt を省略すると現在時刻を入れる", () => {
-    const message = buildSyncMessage({ bucket: "test-bucket", runId: "run-1" });
+    const message = buildSyncMessage({
+      bucket: "test-bucket",
+      runId: "run-1",
+      kind: "scraped-data",
+    });
 
     expect(Number.isNaN(Date.parse(message.producedAt))).toBe(false);
   });
 });
 
 describe("buildPayloadKey", () => {
-  test("payloads 配下へ配置する", () => {
-    expect(buildPayloadKey("run-1")).toBe("payloads/run-1.json");
+  test("run と種別でキーを分ける", () => {
+    expect(buildPayloadKey("run-1", "scraped-data")).toBe("payloads/run-1/scraped-data.json");
+    expect(buildPayloadKey("run-1", "analytics-reports")).toBe(
+      "payloads/run-1/analytics-reports.json",
+    );
   });
 });
 
@@ -62,6 +72,18 @@ describe("parseSyncMessage", () => {
     ["オブジェクトではない", '"string"'],
     ["nullである", "null"],
   ])("%s 場合は失敗する", (_label, raw) => {
+    expect(() => parseSyncMessage(raw)).toThrow();
+  });
+
+  test("未知の種別は失敗する", () => {
+    const raw = JSON.stringify({ ...validMessage, kind: "something-else" });
+
+    expect(() => parseSyncMessage(raw)).toThrow("Unsupported sync payload kind: something-else");
+  });
+
+  test("種別が欠けていたら失敗する", () => {
+    const raw = JSON.stringify({ ...validMessage, kind: undefined });
+
     expect(() => parseSyncMessage(raw)).toThrow();
   });
 
@@ -91,17 +113,17 @@ describe("parseSyncMessage", () => {
   });
 });
 
-describe("encodeSyncPayload / decodeSyncPayload", () => {
+describe("encodeScrapedDataPayload / decodeScrapedDataPayload", () => {
   test("institutionCategories の Map を往復できる", () => {
     const institutionCategories = new Map([
       ["mf-1", "銀行"],
       ["mf-2", "証券"],
     ]);
 
-    const encoded = encodeSyncPayload({ groupOnlyData: [], institutionCategories });
+    const encoded = encodeScrapedDataPayload({ groupOnlyData: [], institutionCategories });
 
     // JSON を経由しても失われないことまで確認する
-    const decoded = decodeSyncPayload(JSON.parse(JSON.stringify(encoded)));
+    const decoded = decodeScrapedDataPayload(JSON.parse(JSON.stringify(encoded)));
 
     expect(encoded.institutionCategories).toEqual([
       ["mf-1", "銀行"],
@@ -111,15 +133,19 @@ describe("encodeSyncPayload / decodeSyncPayload", () => {
   });
 
   test("institutionCategories が無い場合はキー自体を作らない", () => {
-    const encoded = encodeSyncPayload({ groupOnlyData: [] });
+    const encoded = encodeScrapedDataPayload({ groupOnlyData: [] });
 
+    expect(encoded.kind).toBe("scraped-data");
     expect("institutionCategories" in encoded).toBe(false);
-    expect("institutionCategories" in decodeSyncPayload(encoded)).toBe(false);
+    expect("institutionCategories" in decodeScrapedDataPayload(encoded)).toBe(false);
+    // decode 側は kind を落とし、saveScrapedDataBatch がそのまま受け取れる形にする
+    expect("kind" in decodeScrapedDataPayload(encoded)).toBe(false);
   });
 
   test("その他のフィールドはそのまま保つ", () => {
-    const encoded = encodeSyncPayload({ cleanupGroupIds: ["1"], groupOnlyData: [] });
+    const encoded = encodeScrapedDataPayload({ cleanupGroupIds: ["1"], groupOnlyData: [] });
 
+    expect(encoded.kind).toBe("scraped-data");
     expect(encoded.cleanupGroupIds).toEqual(["1"]);
   });
 });

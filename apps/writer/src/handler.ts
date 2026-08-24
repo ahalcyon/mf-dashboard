@@ -1,8 +1,10 @@
-import { closeDb, getDb } from "@mf-dashboard/db";
+import { closeDb, getDb, type Db } from "@mf-dashboard/db";
+import { saveAnalyticsReport } from "@mf-dashboard/db/repository/analytics";
 import { saveScrapedDataBatch } from "@mf-dashboard/db/repository/save-scraped-data";
 import {
-  decodeSyncPayload,
+  decodeScrapedDataPayload,
   parseSyncMessage,
+  type SyncMessage,
   type SyncPayload,
 } from "@mf-dashboard/db/sync/message";
 import type { SQSBatchResponse, SQSEvent } from "aws-lambda";
@@ -10,6 +12,24 @@ import { migrate } from "drizzle-orm/libsql/migrator";
 import { collectBatchItemFailures } from "./batch";
 import { loadConfig } from "./config";
 import { createS3Client, downloadDatabase, readJsonObject, uploadDatabase } from "./s3";
+
+async function applyPayload(db: Db, message: SyncMessage, payload: SyncPayload): Promise<void> {
+  // 種別がずれていたら、意図しない適用になる前に止める
+  if (message.kind !== payload.kind) {
+    throw new Error(`Payload kind ${payload.kind} does not match message kind ${message.kind}`);
+  }
+
+  switch (payload.kind) {
+    case "scraped-data":
+      await saveScrapedDataBatch(db, decodeScrapedDataPayload(payload));
+      return;
+    case "analytics-reports":
+      for (const report of payload.reports) {
+        await saveAnalyticsReport(db, report);
+      }
+      return;
+  }
+}
 
 /**
  * SQS から届いたクロール結果を、S3 上の SQLite へ適用する。
@@ -43,7 +63,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
       try {
         const message = parseSyncMessage(record.body);
         const payload = await readJsonObject<SyncPayload>(client, message.payload);
-        await saveScrapedDataBatch(db, decodeSyncPayload(payload));
+        await applyPayload(db, message, payload);
         appliedCount += 1;
       } catch (error) {
         console.error(`Failed to apply message ${record.messageId}:`, error);

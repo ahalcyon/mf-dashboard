@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./db-path": "./src/db-path.ts",
     "./schema": "./src/schema/schema.ts",
     "./repository/save-scraped-data": "./src/repositories/save-scraped-data.ts",
     "./repository/transactions": "./src/repositories/transactions.ts",

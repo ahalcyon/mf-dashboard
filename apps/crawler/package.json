@@ -11,7 +11,9 @@
     "./scrapers/cash-flow-history": "./src/scrapers/cash-flow-history.ts",
     "./scrapers/monthly-summary": "./src/scrapers/monthly-summary.ts",
     "./scrapers/portfolio": "./src/scrapers/portfolio.ts",
-    "./scrapers/liabilities": "./src/scrapers/liabilities.ts"
+    "./scrapers/liabilities": "./src/scrapers/liabilities.ts",
+    "./sync/config": "./src/sync/config.ts",
+    "./sync/publisher": "./src/sync/publisher.ts"
   },
   "scripts": {
     "dev:scrape": "DEBUG=true SKIP_REFRESH=true tsx src/index.ts",
@@ -23,6 +25,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1111.0",
+    "@aws-sdk/client-sqs": "^3.1111.0",
     "@aws-sdk/client-ssm": "^3.1111.0",
     "@mf-dashboard/analytics": "workspace:*",
     "@mf-dashboard/date-utils": "workspace:*",
