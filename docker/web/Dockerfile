@@ -42,6 +42,7 @@ ENV DASHBOARD_URL=${DASHBOARD_URL} \
     NEXT_PUBLIC_SIMULATOR_PENSION_START_AGE=${NEXT_PUBLIC_SIMULATOR_PENSION_START_AGE} \
     NEXT_PUBLIC_SIMULATOR_MONTHLY_OTHER_INCOME=${NEXT_PUBLIC_SIMULATOR_MONTHLY_OTHER_INCOME}
 RUN mkdir -p /pnpm \
+    && npm install -g corepack@latest \
     && corepack enable \
     && apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*

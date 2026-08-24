@@ -8,6 +8,7 @@ ENV PNPM_HOME=/pnpm \
     HOME=/home/node
 
 RUN mkdir -p /pnpm \
+    && npm install -g corepack@latest \
     && corepack enable \
     && apt-get update && apt-get install -y --no-install-recommends curl ca-certificates tini \
     && rm -rf /var/lib/apt/lists/*
