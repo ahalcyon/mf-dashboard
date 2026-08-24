@@ -105,7 +105,9 @@ CLOUDFLARE_ACCESS_TEAM_DOMAIN=<team-name>.cloudflareaccess.com
 DASHBOARD_URL=https://dashboard.example.com
 ```
 
-`REFRESH_TOKEN`はcrawlerとwebが共有するアプリ用の認証情報であり、Terraformでは管理しない。`CLOUDFLARE_ACCESS_TEAM_DOMAIN`にはCloudflare Zero Trustで確認したTeam domainを指定する。`DASHBOARD_URL`には、このあとTerraformの`hostname`へ指定する公開URLを設定する。
+SSMへ資格情報を置く場合は、`MF_EMAIL`、`MF_PASSWORD`、`MF_TOTP_SECRET`を空のままにして`pnpm secrets:pull`を実行する。
+
+`REFRESH_TOKEN`はcrawlerとwebが共有するアプリ用の認証情報であり、Terraformでは管理しない。Docker Composeが起動時に変数展開するため、crawlerの実行時解決とは違いSSMからは補えない。`.env`に実値が必要になる。`CLOUDFLARE_ACCESS_TEAM_DOMAIN`にはCloudflare Zero Trustで確認したTeam domainを指定する。`DASHBOARD_URL`には、このあとTerraformの`hostname`へ指定する公開URLを設定する。
 
 `CLOUDFLARE_ACCESS_AUD`はまだ空のままでよい。Access Applicationの作成後に確定するため、Terraform適用後の手順3.3で設定する。
 
@@ -134,9 +136,23 @@ Linuxでは`id -u`と`id -g`で値を確認し、`1000:1000`と異なる場合�
 aws ssm put-parameter --name /mf-dashboard/email --type SecureString --value '<メールアドレス>'
 aws ssm put-parameter --name /mf-dashboard/password --type SecureString --value '<パスワード>'
 aws ssm put-parameter --name /mf-dashboard/totp-secret --type SecureString --value '<セットアップキー>'
+aws ssm put-parameter --name /mf-dashboard/refresh-token --type SecureString --value '<openssl rand -hex 32の出力>'
+aws ssm put-parameter --name /mf-dashboard/recovery-code --type SecureString --value '<二段階認証のリカバリコード>'
 ```
 
 実行するIAMプリンシパルには`ssm:GetParameters`と、`SecureString`の復号に使う`kms:Decrypt`が必要である。ECSで動かす場合はタスク定義の`secrets`が同じパラメータを環境変数として注入するため、コンテナ内ではSSMを直接呼ばない。
+
+`/mf-dashboard/recovery-code`はアプリからは読まない。Money Forward MEから締め出されたときにだけ人が参照する。ローカルへ平文で置かない。
+
+#### 別のPCで作業を始める
+
+SSMを正とし、`.env`はそこから生成する。`aws configure`が済んでいるPCで次を実行する。
+
+```sh
+pnpm secrets:pull
+```
+
+`REFRESH_TOKEN`をSSMから取得して`.env`へ書き込み、パーミッションを`600`にする。`.env`が無ければ雛形ごと作成する。`MF_EMAIL`、`MF_PASSWORD`、`MF_TOTP_SECRET`は空のままにし、crawlerが実行時にSSMから解決する。`.env`を手で編集して秘密情報を書き足さない。
 
 #### 二段階認証のセットアップキーを取得する
 
