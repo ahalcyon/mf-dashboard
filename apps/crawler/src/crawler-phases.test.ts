@@ -9,14 +9,12 @@ import {
 } from "@mf-dashboard/db/repository/transactions";
 import type { CashFlowSummary } from "@mf-dashboard/db/types";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { categorizeCashFlowMonth } from "./category-decision/categorize-cash-flow.js";
 import {
   getDebugScreenshotPath,
   loadCrawlerConfig,
   runCashFlowHistoryPhase,
   runInstitutionCategoryPhase,
   runSavePhase,
-  type CategoryDecisionRuntime,
 } from "./crawler-phases.js";
 import { createCrawlerProgressReporter } from "./crawler-progress.js";
 import { buildGroupOnlyScrapedData, buildScrapedData } from "./data-builder.js";
@@ -25,10 +23,6 @@ import type { ScrapeResult } from "./scraper.js";
 import { scrapeCashFlowHistory } from "./scrapers/cash-flow-history.js";
 import { switchGroup } from "./scrapers/group.js";
 import { scrapeInstitutionCategories } from "./scrapers/institution-categories.js";
-
-vi.mock("./category-decision/categorize-cash-flow.js", () => ({
-  categorizeCashFlowMonth: vi.fn<() => Promise<CashFlowSummary>>(),
-}));
 
 vi.mock("./data-builder.js", () => ({
   buildScrapedData: vi.fn<() => { kind: string }>(() => ({ kind: "full" })),
@@ -86,16 +80,6 @@ function cashFlow(month: string, description: string): CashFlowSummary {
   };
 }
 
-function categoryDecisionRuntime(): CategoryDecisionRuntime {
-  return {
-    config: {
-      llm: { enabled: false, maxPerRun: 5, minConfidence: 0.65 },
-      rules: [{ descriptionContains: "Service A", category: "食費", subCategory: "食料品" }],
-    },
-    usage: { llmCallsUsed: 0 },
-  };
-}
-
 function scrapeResult(cashFlowSummary: CashFlowSummary): ScrapeResult {
   return {
     defaultGroup: null,
@@ -140,7 +124,6 @@ function scrapeResult(cashFlowSummary: CashFlowSummary): ScrapeResult {
 }
 
 beforeEach(() => {
-  vi.mocked(categorizeCashFlowMonth).mockReset();
   vi.mocked(buildScrapedData).mockClear();
   vi.mocked(buildGroupOnlyScrapedData).mockClear();
   vi.mocked(buildAccountIdMap).mockReset();
@@ -235,67 +218,48 @@ describe("getDebugScreenshotPath", () => {
 });
 
 describe("runSavePhase", () => {
-  test("カテゴリ決定が有効な場合は保存前に当月cash flowを分類する", async () => {
-    const page = {};
-    const db = {};
-    const originalCashFlow = cashFlow("2026-06", "Service A");
-    const categorizedCashFlow = {
-      ...originalCashFlow,
-      items: [
-        {
-          ...originalCashFlow.items[0]!,
-          category: "食費",
-          subCategory: "食料品",
-        },
-      ],
-    };
-    const categoryDecision = categoryDecisionRuntime();
-    vi.mocked(categorizeCashFlowMonth).mockResolvedValue(categorizedCashFlow);
+  function scrapeResultWithNoGroup(): ScrapeResult {
+    return {
+      globalData: {} as ScrapeResult["globalData"],
+      groupDataList: [
+        { group: { id: "0", name: "グループ選択なし" } },
+      ] as unknown as ScrapeResult["groupDataList"],
+      defaultGroup: null,
+    } as ScrapeResult;
+  }
 
-    await runSavePhase(
-      db as Parameters<typeof runSavePhase>[0],
-      page as Parameters<typeof runSavePhase>[1],
-      scrapeResult(originalCashFlow),
-      categoryDecision,
+  test("ローカルへ保存したものと同じ内容を同期キューへ発行する", async () => {
+    vi.mocked(saveScrapedDataBatch).mockResolvedValue([3]);
+    const publisher = { publish: vi.fn<() => Promise<void>>().mockResolvedValue(undefined) };
+
+    const savedCounts = await runSavePhase(
+      {} as Parameters<typeof runSavePhase>[0],
+      {} as Parameters<typeof runSavePhase>[1],
+      scrapeResultWithNoGroup(),
+      [],
+      undefined,
+      undefined,
+      publisher as unknown as Parameters<typeof runSavePhase>[6],
     );
 
-    expect(switchGroup).toHaveBeenCalledWith(page, "0");
-    expect(categorizeCashFlowMonth).toHaveBeenCalledWith({
-      page,
-      db,
-      cashFlow: originalCashFlow,
-      config: categoryDecision.config,
-      usage: categoryDecision.usage,
-    });
-    expect(buildScrapedData).toHaveBeenCalledWith(
-      expect.objectContaining({ cashFlow: categorizedCashFlow }),
-      expect.objectContaining({ group: expect.objectContaining({ id: "0" }) }),
-    );
-    expect(saveScrapedDataBatch).toHaveBeenCalledWith(db, {
-      cleanupGroupIds: undefined,
-      fullData: { kind: "full" },
-      groupOnlyData: [{ kind: "group-only" }],
-      historyMonths: [],
-      institutionCategories: undefined,
+    expect(savedCounts).toEqual([3]);
+    const [, savedBatch] = vi.mocked(saveScrapedDataBatch).mock.calls[0];
+    expect(publisher.publish).toHaveBeenCalledWith("scraped-data", {
+      kind: "scraped-data",
+      ...savedBatch,
     });
   });
 
-  test("履歴側で分類済みの場合は当月cash flowを二重分類しない", async () => {
-    const originalCashFlow = cashFlow("2026-06", "Service A");
+  test("同期経路が無効なら発行しない", async () => {
+    vi.mocked(saveScrapedDataBatch).mockResolvedValue([]);
 
     await runSavePhase(
       {} as Parameters<typeof runSavePhase>[0],
       {} as Parameters<typeof runSavePhase>[1],
-      scrapeResult(originalCashFlow),
-      categoryDecisionRuntime(),
-      [{ items: originalCashFlow.items, month: originalCashFlow.month }],
+      scrapeResultWithNoGroup(),
     );
 
-    expect(categorizeCashFlowMonth).not.toHaveBeenCalled();
-    expect(buildScrapedData).toHaveBeenCalledWith(
-      expect.objectContaining({ cashFlow: originalCashFlow }),
-      expect.anything(),
-    );
+    expect(saveScrapedDataBatch).toHaveBeenCalledOnce();
   });
 });
 
@@ -308,7 +272,6 @@ describe("runCashFlowHistoryPhase", () => {
       {} as Parameters<typeof runCashFlowHistoryPhase>[0],
       {} as Parameters<typeof runCashFlowHistoryPhase>[1],
       { isHistoryMode: false },
-      undefined,
       undefined,
       publishHistory,
     );
@@ -372,13 +335,7 @@ describe("runCashFlowHistoryPhase", () => {
       vi.mocked(switchGroup).mockRejectedValueOnce(new Error("navigation failed"));
 
       await expect(
-        runCashFlowHistoryPhase(
-          {} as never,
-          {} as never,
-          { isHistoryMode: true },
-          undefined,
-          progress,
-        ),
+        runCashFlowHistoryPhase({} as never, {} as never, { isHistoryMode: true }, progress),
       ).rejects.toThrow("navigation failed");
 
       expect(progress.getState().timeline).toEqual([
@@ -414,13 +371,7 @@ describe("runCashFlowHistoryPhase", () => {
       });
       vi.mocked(saveTransactionsForMonths).mockResolvedValue([1]);
 
-      await runCashFlowHistoryPhase(
-        {} as never,
-        {} as never,
-        { isHistoryMode: true },
-        undefined,
-        progress,
-      );
+      await runCashFlowHistoryPhase({} as never, {} as never, { isHistoryMode: true }, progress);
 
       expect(progress.getState().timeline).toEqual([
         expect.objectContaining({
@@ -459,7 +410,6 @@ describe("runCashFlowHistoryPhase", () => {
           db as Parameters<typeof runCashFlowHistoryPhase>[0],
           page as Parameters<typeof runCashFlowHistoryPhase>[1],
           { isHistoryMode: true },
-          undefined,
           progress,
         ),
       ).rejects.toThrow("history page unavailable");
@@ -503,7 +453,6 @@ describe("runCashFlowHistoryPhase", () => {
           db as Parameters<typeof runCashFlowHistoryPhase>[0],
           page as Parameters<typeof runCashFlowHistoryPhase>[1],
           { isHistoryMode: true },
-          undefined,
           progress,
         ),
       ).rejects.toThrow("database unavailable");
@@ -544,7 +493,6 @@ describe("runCashFlowHistoryPhase", () => {
         db as Parameters<typeof runCashFlowHistoryPhase>[0],
         page as Parameters<typeof runCashFlowHistoryPhase>[1],
         { isHistoryMode: true },
-        undefined,
         progress,
       );
 
@@ -558,50 +506,5 @@ describe("runCashFlowHistoryPhase", () => {
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
-  });
-
-  test("カテゴリ決定が有効な場合は履歴月を分類してから取引保存する", async () => {
-    const page = {};
-    const db = {};
-    const originalCashFlow = cashFlow("2026-06", "Service A");
-    const categorizedCashFlow = {
-      ...originalCashFlow,
-      items: [
-        {
-          ...originalCashFlow.items[0]!,
-          category: "食費",
-          subCategory: "食料品",
-        },
-      ],
-    };
-    const accountIdMap = new Map([["account-a", 1]]);
-    const categoryDecision = categoryDecisionRuntime();
-    vi.mocked(buildAccountIdMap).mockResolvedValue(accountIdMap);
-    vi.mocked(hasCashFlowPeriod).mockResolvedValue(true);
-    vi.mocked(scrapeCashFlowHistory).mockResolvedValue([
-      { month: "2026-06", data: originalCashFlow },
-    ]);
-    vi.mocked(categorizeCashFlowMonth).mockResolvedValue(categorizedCashFlow);
-    vi.mocked(saveTransactionsForMonths).mockResolvedValue([1]);
-
-    await runCashFlowHistoryPhase(
-      db as Parameters<typeof runCashFlowHistoryPhase>[0],
-      page as Parameters<typeof runCashFlowHistoryPhase>[1],
-      { isHistoryMode: true },
-      categoryDecision,
-    );
-
-    expect(categorizeCashFlowMonth).toHaveBeenCalledWith({
-      page,
-      db,
-      cashFlow: originalCashFlow,
-      config: categoryDecision.config,
-      usage: categoryDecision.usage,
-    });
-    expect(saveTransactionsForMonths).toHaveBeenCalledWith(
-      db,
-      [{ items: categorizedCashFlow.items, month: "2026-06" }],
-      accountIdMap,
-    );
   });
 });

@@ -1,4 +1,3 @@
-import type { AnalyticsReportInput } from "../repositories/analytics";
 import type { TransactionPeriodReplacement } from "../repositories/transactions";
 import type { ScrapedData } from "../types";
 
@@ -22,7 +21,7 @@ export const SQS_MESSAGE_MAX_BYTES = 256 * 1024;
  * キューを流れるメッセージ本体。
  * 実データは S3 に置き、ここにはその位置だけを載せる。
  */
-export const SYNC_PAYLOAD_KINDS = ["scraped-data", "analytics-reports"] as const;
+export const SYNC_PAYLOAD_KINDS = ["scraped-data"] as const;
 
 export type SyncPayloadKind = (typeof SYNC_PAYLOAD_KINDS)[number];
 
@@ -48,13 +47,7 @@ export interface ScrapedDataPayload {
   institutionCategories?: [string, string][];
 }
 
-/** インサイトは保存フェーズの後に生成されるため、別のメッセージで運ぶ。 */
-export interface AnalyticsReportsPayload {
-  kind: "analytics-reports";
-  reports: AnalyticsReportInput[];
-}
-
-export type SyncPayload = ScrapedDataPayload | AnalyticsReportsPayload;
+export type SyncPayload = ScrapedDataPayload;
 
 /** saveScrapedDataBatch がそのまま受け取れる形 */
 export interface SyncBatch {

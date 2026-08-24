@@ -4,7 +4,6 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   handleCrawlerFailure,
-  runAnalyticsPhase,
   runAuthPhase,
   runCashFlowHistoryPhase,
   runInstitutionCategoryPhase,
@@ -22,7 +21,6 @@ import { notifyWebRefresh } from "./web-refresh.js";
 vi.mock("@mf-dashboard/db", () => ({ closeDb: vi.fn<() => void>() }));
 vi.mock("./crawler-phases.js", () => ({
   handleCrawlerFailure: vi.fn<() => void>(),
-  runAnalyticsPhase: vi.fn<() => void>(),
   runAuthPhase: vi.fn<() => void>(),
   runCashFlowHistoryPhase: vi.fn<() => void>(),
   runInstitutionCategoryPhase: vi.fn<() => Map<string, string>>(),
@@ -56,7 +54,6 @@ beforeEach(async () => {
     browser: { close: vi.fn<() => Promise<void>>() } as never,
     context: {} as never,
     page: {} as never,
-    categoryDecision: { config: null, usage: { llmCallsUsed: 0 } },
   });
   vi.mocked(createGroupScope).mockResolvedValue({
     originalGroup: null,
@@ -67,7 +64,7 @@ beforeEach(async () => {
   vi.mocked(runSavePhase).mockResolvedValue([]);
   vi.mocked(runInstitutionCategoryPhase).mockResolvedValue(new Map([["account-a", "銀行"]]));
   vi.mocked(runCashFlowHistoryPhase).mockImplementation(
-    async (_db, _page, _config, _categoryDecision, _progress, publishHistory) => {
+    async (_db, _page, _config, _progress, publishHistory) => {
       if (!publishHistory) throw new Error("publishHistory is required");
       await publishHistory([]);
     },
@@ -167,7 +164,6 @@ describe("runCrawler progress", () => {
       { step: "group_data", status: "done" },
       { step: "institution_categories", status: "done" },
       { step: "database_save", status: "done" },
-      { step: "analytics", status: "done" },
       { step: "notification", status: "done" },
       { step: "web_cache_refresh", status: "done" },
     ]);
@@ -181,9 +177,7 @@ describe("runCrawler progress", () => {
       expect.objectContaining({ activeAccountingMonth: "2026-07" }),
       expect.anything(),
       expect.anything(),
-      expect.anything(),
     );
-    expect(runAnalyticsPhase).toHaveBeenCalledOnce();
   });
 
   test("グループ復元を完了してから成功通知を送る", async () => {
@@ -265,7 +259,7 @@ describe("runCrawler progress", () => {
     });
     const historyMonths = [{ items: [], month: "2026-06" }];
     vi.mocked(runCashFlowHistoryPhase).mockImplementation(
-      async (_db, _page, _config, _categoryDecision, _progress, publishHistory) => {
+      async (_db, _page, _config, _progress, publishHistory) => {
         if (!publishHistory) throw new Error("publishHistory is required");
         await publishHistory(historyMonths);
       },
@@ -279,7 +273,6 @@ describe("runCrawler progress", () => {
     await runCrawler(progress);
 
     expect(runSavePhase).toHaveBeenCalledWith(
-      expect.anything(),
       expect.anything(),
       expect.anything(),
       expect.anything(),

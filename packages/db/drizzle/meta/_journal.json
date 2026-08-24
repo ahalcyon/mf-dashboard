@@ -36,6 +36,13 @@
       "when": 1786339953751,
       "tag": "0004_short_thunderbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1787615023267,
+      "tag": "0005_slippery_sersi",
+      "breakpoints": true
     }
   ]
 }

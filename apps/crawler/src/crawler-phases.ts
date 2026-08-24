@@ -1,14 +1,8 @@
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { analyzeFinancialData } from "@mf-dashboard/analytics";
-import { getJstTodayIsoDate } from "@mf-dashboard/date-utils";
 import { initDb, type Db } from "@mf-dashboard/db";
 import { buildAccountIdMap } from "@mf-dashboard/db/repository/accounts";
-import {
-  getAnalyticsReportByDate,
-  type AnalyticsReportInput,
-} from "@mf-dashboard/db/repository/analytics";
 import { saveScrapedDataBatch } from "@mf-dashboard/db/repository/save-scraped-data";
 import {
   hasCashFlowPeriod,
@@ -20,12 +14,6 @@ import { chromium, type Browser, type BrowserContext, type Page } from "playwrig
 import { loginWithAuthState } from "./auth/login.js";
 import { hasAuthState } from "./auth/state.js";
 import { createBrowserContext } from "./browser/context.js";
-import { categorizeCashFlowMonth } from "./category-decision/categorize-cash-flow.js";
-import { loadCategoryDecisionConfig } from "./category-decision/config.js";
-import type {
-  CategoryDecisionUsage,
-  NormalizedCategoryDecisionConfig,
-} from "./category-decision/types.js";
 import {
   CRAWLER_STEPS,
   normalizeCrawlerError,
@@ -67,12 +55,6 @@ export interface CrawlerRuntime {
   browser: Browser;
   context: BrowserContext;
   page: Page;
-  categoryDecision: CategoryDecisionRuntime;
-}
-
-export interface CategoryDecisionRuntime {
-  config: NormalizedCategoryDecisionConfig | null;
-  usage: CategoryDecisionUsage;
 }
 
 export function runLoadPhase(): CrawlerConfig {
@@ -130,7 +112,6 @@ export async function runSetupPhase(config: CrawlerConfig): Promise<CrawlerRunti
   phase("Setup");
   info("Initializing database");
   const db = await initDb();
-  const categoryDecision = await loadCategoryDecisionRuntime();
 
   let browser: Browser | null = null;
   try {
@@ -147,7 +128,6 @@ export async function runSetupPhase(config: CrawlerConfig): Promise<CrawlerRunti
       browser,
       context,
       page,
-      categoryDecision,
     };
   } catch (err) {
     if (browser) {
@@ -155,20 +135,6 @@ export async function runSetupPhase(config: CrawlerConfig): Promise<CrawlerRunti
     }
     throw err;
   }
-}
-
-async function loadCategoryDecisionRuntime(): Promise<CategoryDecisionRuntime> {
-  const result = await loadCategoryDecisionConfig(undefined, warn);
-  if (result.enabled) {
-    info("Category decision: enabled (data/category-rules.json found)");
-  } else {
-    info("Category decision: disabled (data/category-rules.json not found or invalid)");
-  }
-
-  return {
-    config: result.config,
-    usage: { llmCallsUsed: 0 },
-  };
 }
 
 export async function runAuthPhase(page: Page, context: BrowserContext): Promise<void> {
@@ -202,7 +168,6 @@ export async function runSavePhase(
   db: Db,
   page: Page,
   scrapeResult: ScrapeResult,
-  categoryDecision: CategoryDecisionRuntime = { config: null, usage: { llmCallsUsed: 0 } },
   historyMonths: TransactionPeriodReplacement[] = [],
   cleanupGroupIds?: string[],
   institutionCategories?: ReadonlyMap<string, string>,
@@ -214,22 +179,7 @@ export async function runSavePhase(
 
   if (noGroupData) {
     info("Saving full data for no-group view");
-    let globalData = scrapeResult.globalData;
-    if (categoryDecision.config && historyMonths.length === 0) {
-      await switchGroup(page, NO_GROUP_ID);
-      globalData = {
-        ...globalData,
-        cashFlow: await categorizeCashFlowMonth({
-          page,
-          db,
-          cashFlow: globalData.cashFlow,
-          config: categoryDecision.config,
-          usage: categoryDecision.usage,
-        }),
-      };
-    }
-
-    fullData = buildScrapedData(globalData, noGroupData);
+    fullData = buildScrapedData(scrapeResult.globalData, noGroupData);
     debug("Full scraped data prepared");
   } else {
     warn("No no-group data found; skipped full data save");
@@ -274,7 +224,6 @@ export async function runCashFlowHistoryPhase(
   db: Db,
   page: Page,
   config: Pick<CrawlerConfig, "isHistoryMode"> & { activeAccountingMonth?: string },
-  categoryDecision: CategoryDecisionRuntime = { config: null, usage: { llmCallsUsed: 0 } },
   progress?: CrawlerProgressReporter,
   publishHistory: (months: TransactionPeriodReplacement[]) => Promise<number[]> = async (
     months,
@@ -363,22 +312,13 @@ export async function runCashFlowHistoryPhase(
           month: progressMonth,
         });
       }
-      const categorizedMonthData = categoryDecision.config
-        ? await categorizeCashFlowMonth({
-            page,
-            db,
-            cashFlow: monthData,
-            config: categoryDecision.config,
-            usage: categoryDecision.usage,
-          })
-        : monthData;
       preparedMonths.push({
         dateRange:
-          categorizedMonthData.periodStart && categorizedMonthData.periodEnd
-            ? { from: categorizedMonthData.periodStart, to: categorizedMonthData.periodEnd }
+          monthData.periodStart && monthData.periodEnd
+            ? { from: monthData.periodStart, to: monthData.periodEnd }
             : undefined,
-        isComplete: categorizedMonthData.isComplete,
-        items: categorizedMonthData.items,
+        isComplete: monthData.isComplete,
+        items: monthData.items,
         month,
         stepId,
       });
@@ -400,71 +340,6 @@ export async function runCashFlowHistoryPhase(
     await failRunningMonthSteps(failure);
     throw failure;
   }
-}
-
-export async function runAnalyticsPhase(
-  db: Db,
-  groupDataList: GroupData[],
-  publisher: SyncPublisher | null = null,
-): Promise<void> {
-  phase("Analytics");
-
-  if (groupDataList.length === 0) {
-    warn("No group available for analytics");
-    return;
-  }
-
-  const results = await Promise.all(
-    groupDataList.map(async (groupData, groupIndex) => {
-      const groupLabel = `group ${groupIndex + 1}`;
-      info(`Running financial analysis for ${groupLabel}`);
-      const report = await analyzeFinancialData(db, groupData.group.id);
-      if (report) {
-        info(`Analysis completed and saved for ${groupLabel}`);
-      } else {
-        log(`No changes detected, skipped analysis for ${groupLabel}`);
-      }
-      return report;
-    }),
-  );
-  info(`Analytics finished: ${results.filter(Boolean).length}/${groupDataList.length} groups`);
-
-  if (publisher) {
-    // 分析は保存フェーズより後に走るため、別のメッセージで運ぶ
-    const reports = await collectAnalyticsReports(db, groupDataList);
-    if (reports.length > 0) {
-      await publisher.publish("analytics-reports", { kind: "analytics-reports", reports });
-    }
-  }
-}
-
-async function collectAnalyticsReports(
-  db: Db,
-  groupDataList: GroupData[],
-): Promise<AnalyticsReportInput[]> {
-  const today = getJstTodayIsoDate();
-  const reports: AnalyticsReportInput[] = [];
-
-  for (const groupData of groupDataList) {
-    const row = await getAnalyticsReportByDate(db, groupData.group.id, today);
-    if (!row) continue;
-
-    reports.push({
-      groupId: row.groupId,
-      date: row.date,
-      model: row.model,
-      insights: {
-        summary: row.summary,
-        savingsInsight: row.savingsInsight,
-        investmentInsight: row.investmentInsight,
-        spendingInsight: row.spendingInsight,
-        balanceInsight: row.balanceInsight,
-        liabilityInsight: row.liabilityInsight,
-      },
-    });
-  }
-
-  return reports;
 }
 
 export async function runNotificationPhase(

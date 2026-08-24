@@ -120,7 +120,6 @@ SSMへ資格情報を置く場合は、`MF_EMAIL`、`MF_PASSWORD`、`MF_TOTP_SEC
 | `MF_EMAIL` / `MF_PASSWORD`                   | 必須 | Terraform適用前      | Money Forward MEのログイン情報。SSMへ置く場合は空でよい                        |
 | `MF_TOTP_SECRET`                             | 必須 | Terraform適用前      | 認証アプリのセットアップキー（Base32）。二段階認証が無効なら不要               |
 | `SSM_PARAMETER_PREFIX`                       | 任意 | SSM利用時            | SSM Parameter Storeの接頭辞。既定値は`/mf-dashboard`                           |
-| `AI_PROVIDER` / `AI_MODEL` / `AI_API_KEY`    | 任意 | 機能を有効にするとき | 財務インサイト、LLMカテゴリ推論。利用する機能では3項目すべて必須               |
 | `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID`       | 任意 | 通知を有効にするとき | Slack通知                                                                      |
 | `DISCORD_WEBHOOK_URL` / `DISCORD_AVATAR_URL` | 任意 | 通知を有効にするとき | Discord通知                                                                    |
 | `HOST_UID` / `HOST_GID`                      | 任意 | Compose起動前        | Linuxで`./data`とTunnel tokenを所有するユーザーのUIDとGID。既定値は`1000:1000` |
@@ -290,39 +289,6 @@ terraform -chdir=terraform output -raw tunnel_id
 1. 通知先チャンネルの「連携サービス」からIncoming Webhookを作成する
 2. `.env`の`DISCORD_WEBHOOK_URL`へ、発行された`https://discord.com/api/webhooks/...`形式のURLを設定する
 
-### 財務インサイト
-
-財務インサイトを利用する場合は、`.env`に次の3項目を設定する。いずれかが空の場合、インサイトは生成されない。
-
-```dotenv
-AI_PROVIDER=openai
-AI_MODEL=<provider-model-id>
-AI_API_KEY=<provider-api-key>
-```
-
-- `AI_PROVIDER`: `openai`、`anthropic`、`google`のいずれか
-- `AI_MODEL`: 選択したプロバイダーで利用可能なモデルID
-- `AI_API_KEY`: 選択したプロバイダーのAPIキー。ブラウザーへは公開せず、`.env`だけに保存する
-
-インサイトはcrawlerのanalyticsフェーズで生成し、結果をデータベースへ保存する。Webアプリ側はその保存済みの結果を表示するだけで、実行時にAIプロバイダーへは接続しない。
-
-ローカルでデモデータを使って確認する場合は、リポジトリルートで次を実行する。
-
-```sh
-pnpm install
-pnpm --filter @mf-dashboard/db build:demo
-DB_PATH=../../data/demo.db pnpm --filter @mf-dashboard/web dev
-```
-
-Docker Composeで設定を反映する場合は、webイメージを再ビルドして起動する。
-
-```sh
-docker compose build web
-docker compose up -d web
-```
-
-インサイトが生成されない場合は、3つのAI環境変数、APIキーの権限・利用上限、モデルIDを確認する。家計データが未取得の場合はcrawlerを実行する。
-
 ### 資産データのエクスポート
 
 ビルド時に、資産データをJSONとMarkdownで`public/export/`へ書き出す。生成物は静的ファイルなので、静的エクスポートでもそのまま配信できる。手元のLLMへ読み込ませて分析する用途を想定している。
@@ -343,56 +309,3 @@ DB_PATH=../../data/moneyforward.db pnpm --filter @mf-dashboard/web export:assets
 ```
 
 エクスポートには口座名や残高が含まれる。公開URLへ配置する場合は、認証を通過した利用者だけが到達できる構成を維持する。
-
-### 未分類取引のカテゴリ決定
-
-`data/category-rules.json`を作成すると、crawlerはデータベースへ保存する前に、新規の未分類取引へカテゴリを設定する。ファイルが存在しない場合、この機能は無効になり、取引を未分類のまま保存する。
-
-```sh
-cp data/category-rules.example.json data/category-rules.json
-```
-
-設定例:
-
-```json
-{
-  "llm": {
-    "enabled": false,
-    "maxPerRun": 5,
-    "minConfidence": 0.65
-  },
-  "rules": [
-    {
-      "accountName": "テスト口座",
-      "category": "食費",
-      "subCategory": "食料品"
-    },
-    {
-      "descriptionContains": "動画サービス",
-      "category": "趣味・娯楽",
-      "subCategory": "動画・音楽"
-    }
-  ]
-}
-```
-
-#### 固定ルール
-
-- 対象は「新規」「未分類」「非振替」「計算対象」の取引のみ
-- `accountName`は取引の口座名と完全一致する
-- `descriptionContains`は取引内容と部分一致する
-- 両方を指定した場合は、両条件に一致する取引だけを対象にする
-- 固定ルールに一致した場合はそのカテゴリを優先し、LLMを呼び出さない
-- `category`または`subCategory`がMoney Forward MEの候補に存在しない場合、そのルールを採用しない
-
-#### LLMによる推論
-
-固定ルールに一致しなかった取引だけをLLMで推論する場合は、`llm.enabled`を`true`へ変更し、`.env`に`AI_PROVIDER`、`AI_MODEL`、`AI_API_KEY`を設定する。
-
-- Money Forward MEから取得した候補カテゴリの中から選択し、カテゴリIDは生成しない
-- 1回の実行件数は`llm.maxPerRun`で制限する。既定値は`5`
-- 推論結果の確信度が`llm.minConfidence`未満の場合は反映しない。既定値は`0.65`
-- 取引の日付、種別、金額、内容、候補カテゴリのIDと名称を外部プロバイダーへ送信する
-- 更新に失敗してもcrawlerは停止せず、対象取引を未分類のまま保存する
-
-採用したカテゴリはMoney Forward MEの`/cf/update`へ反映する。その後、対象月を再取得してデータベースへ保存する。外部プロバイダーへ取引情報を送信してよい場合だけ、LLMによる推論を有効にする。

@@ -183,28 +183,11 @@ erDiagram
         text updated_at
     }
 
-    %% 分析系
-    analytics_reports {
-        integer id PK
-        text group_id FK "INDEX, CASCADE"
-        text date
-        text summary
-        text savings_insight
-        text investment_insight
-        text spending_insight
-        text balance_insight
-        text liability_insight
-        text model
-        text created_at
-        text updated_at
-    }
-
     %% リレーション
     groups ||--o{ daily_snapshots : "has many (CASCADE)"
     groups ||--o{ group_accounts : "has many (CASCADE)"
     groups ||--o{ asset_history : "has many (CASCADE)"
     groups ||--o{ spending_targets : "has many (CASCADE)"
-    groups ||--o{ analytics_reports : "has many (CASCADE)"
     groups ||--o{ bank_forecast_manual_events : "has many (CASCADE)"
     accounts ||--o{ group_accounts : "has many (CASCADE)"
     accounts ||--o{ transactions : "has many (CASCADE)"
@@ -242,8 +225,6 @@ erDiagram
 | asset_history_categories    | asset_history_categories_history_category_idx      | UNIQUE | asset_history_id, category_name           |
 | spending_targets            | spending_targets_group_category_idx                | UNIQUE | group_id, large_category_id               |
 | spending_targets            | spending_targets_group_id_idx                      | INDEX  | group_id                                  |
-| analytics_reports           | analytics_reports_group_date_idx                   | UNIQUE | group_id, date                            |
-| analytics_reports           | analytics_reports_group_id_idx                     | INDEX  | group_id                                  |
 
 ## ON DELETE Actions
 
@@ -260,7 +241,6 @@ erDiagram
 | groups                 | group_accounts              | CASCADE  |
 | groups                 | asset_history               | CASCADE  |
 | groups                 | spending_targets            | CASCADE  |
-| groups                 | analytics_reports           | CASCADE  |
 | groups                 | bank_forecast_manual_events | CASCADE  |
 | holdings               | holding_values              | CASCADE  |
 | daily_snapshots        | holding_values              | CASCADE  |

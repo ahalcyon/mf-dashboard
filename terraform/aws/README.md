@@ -144,8 +144,6 @@ bootstrap 用の小さなモジュールを別に切る。
    `output: "export"` に切り替わるが、同時に AI チャットを無効化し
    `NEXT_PUBLIC_STATIC_DEMO_BUILD` を立てる。本番データを「デモ」フラグでビルドする
    状態なので、`STATIC_EXPORT` のような名前へ分離するのが望ましい。
-3. **インサイト。** `ai_provider` と `ai_model`、および SSM の `ai-api-key` を
-   設定するまで生成されない。
 
 ## 静的サイトの発行
 

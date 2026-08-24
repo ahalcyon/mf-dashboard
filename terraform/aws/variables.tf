@@ -168,27 +168,6 @@ variable "noncurrent_version_retention_days" {
   default     = 30
 }
 
-variable "ai_provider" {
-  description = "LLM provider for the insight generator running inside the crawler. One of openai, anthropic, google. Empty disables the analytics phase's LLM call."
-  type        = string
-  default     = ""
-
-  validation {
-    condition     = contains(["", "openai", "anthropic", "google"], var.ai_provider)
-    error_message = "ai_provider must be one of \"\", openai, anthropic, or google."
-  }
-}
-
-variable "ai_model" {
-  description = "Model id passed to the configured provider. Required when ai_provider is set."
-  type        = string
-  default     = ""
-
-  validation {
-    condition     = (var.ai_provider == "") == (var.ai_model == "")
-    error_message = "ai_provider and ai_model must be set together."
-  }
-}
 
 # --- 段階的な有効化 -------------------------------------------------------
 # ECR イメージの push や GitHub 接続の認可は Terraform の管理外なので、
