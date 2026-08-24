@@ -150,16 +150,15 @@ variable "noncurrent_version_retention_days" {
   default     = 30
 }
 
-variable "source_repository_url" {
-  description = "Git repository CodeBuild clones to build the static site. The GitHub connection must be authorized once outside Terraform."
+variable "source_repository" {
+  description = "owner/name of the GitHub repository whose workflows may assume the site publisher role"
   type        = string
-  default     = "https://github.com/ahalcyon/mf-dashboard.git"
-}
+  default     = "ahalcyon/mf-dashboard"
 
-variable "source_branch" {
-  description = "Branch CodeBuild builds the static site from"
-  type        = string
-  default     = "main"
+  validation {
+    condition     = can(regex("^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$", var.source_repository))
+    error_message = "source_repository must look like owner/name."
+  }
 }
 
 variable "ai_provider" {
@@ -190,12 +189,6 @@ variable "ai_model" {
 
 variable "enable_writer" {
   description = "Create the writer Lambda. Requires an image already pushed to the writer ECR repository."
-  type        = bool
-  default     = false
-}
-
-variable "enable_site_build" {
-  description = "Create the CodeBuild project and its trigger. Requires the GitHub connection to be authorized first."
   type        = bool
   default     = false
 }

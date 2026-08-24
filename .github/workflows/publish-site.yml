@@ -1,0 +1,55 @@
+name: Publish site
+
+# crawler は 6:30 と 15:30 (JST) に走る。その完了を見込んで焼き直す。
+on:
+  schedule:
+    - cron: "0 22 * * *" # 07:00 JST
+    - cron: "0 7 * * *" # 16:00 JST
+  workflow_dispatch:
+
+concurrency:
+  group: publish-site
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ap-northeast-1
+      # apps/web を作業ディレクトリとして next build が走るため、そこからの相対パス
+      DB_PATH: ../../data/moneyforward.db
+      # next.config.ts はこのフラグで output: "export" に切り替わる
+      DEMO_MODE: "true"
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      - uses: aws-actions/configure-aws-credentials@v5.0.0
+        with:
+          role-to-assume: ${{ vars.AWS_PUBLISH_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Fetch the database
+        run: |
+          mkdir -p data
+          aws s3 cp "s3://${{ vars.AWS_DATA_BUCKET }}/db/moneyforward.db" data/moneyforward.db
+
+      - name: Build the static site
+        run: pnpm --filter @mf-dashboard/web build
+
+      - name: Publish
+        run: |
+          aws s3 sync apps/web/out "s3://${{ vars.AWS_SITE_BUCKET }}" \
+            --delete \
+            --exclude "_next/static/*" \
+            --cache-control "public, max-age=0, must-revalidate"
+          aws s3 sync apps/web/out/_next/static "s3://${{ vars.AWS_SITE_BUCKET }}/_next/static" \
+            --cache-control "public, max-age=31536000, immutable"
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.AWS_CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths '/*'

@@ -21,9 +21,9 @@ EventBridge Scheduler (6:30 / 15:30 JST)
         │ ファイル全体の read-modify-write
         ▼
    S3: data バケット  s3://…/db/moneyforward.db  (バージョニング有効)
-        │ EventBridge "Object Created"
+        │ 07:00 / 16:00 JST
         ▼
-   CodeBuild: site  ── DB を読んで next build (output: "export")
+   GitHub Actions: publish-site ── DB を読んで next build (output: "export")
         │ s3 sync + invalidation
         ▼
    S3: site バケット ──▶ CloudFront (OAC)  ──▶ 利用者
@@ -60,9 +60,6 @@ aws ssm put-parameter --type SecureString --name /mf-dashboard/password    --val
 aws ssm put-parameter --type SecureString --name /mf-dashboard/totp-secret --value '...'
 ```
 
-- CodeBuild の GitHub 接続を一度だけ認可しておく（Terraform 管理外）。
-  マネジメントコンソールの CodeBuild、または `aws codebuild import-source-credentials`。
-
 ## 適用手順
 
 ECS タスク定義と writer Lambda は ECR 上のイメージを参照するため、**先にリポジトリだけ
@@ -89,7 +86,7 @@ terraform -chdir=terraform/aws apply
 #    crawler は既存の docker/crawler/Dockerfile をそのまま使う
 
 # 3. 揃ったものから terraform.tfvars で有効化して再 apply
-#    enable_writer = true / enable_crawler_schedule = true / enable_site_build = true
+#    enable_writer = true / enable_crawler_schedule = true
 terraform -chdir=terraform/aws apply
 ```
 
@@ -143,14 +140,25 @@ bootstrap 用の小さなモジュールを別に切る。
 
 このモジュールは器だけを用意している。次はまだコードが存在しない。
 
-1. **crawler が SQS へ発行する経路。** 現状の crawler は `packages/db` 経由で
-   SQLite に直接書く。タスク定義は `WRITE_QUEUE_URL` / `WRITE_MESSAGE_GROUP_ID` を
-   環境変数として渡しているが、これを使う実装はまだない。
-2. **writer Lambda の実体。** S3 から DB を取得し、キューのメッセージを適用して
-   書き戻すコンテナイメージ（Lambda Runtime Interface Client 同梱）が必要。
-3. **メッセージスキーマ。** crawler と writer の間の契約が未定義。
-4. **`DEMO_MODE` の二重用途。** `next.config.ts` は `DEMO_MODE=true` で
+2. **`DEMO_MODE` の二重用途。** `next.config.ts` は `DEMO_MODE=true` で
    `output: "export"` に切り替わるが、同時に AI チャットを無効化し
    `NEXT_PUBLIC_STATIC_DEMO_BUILD` を立てる。本番データを「デモ」フラグでビルドする
    状態なので、`STATIC_EXPORT` のような名前へ分離するのが望ましい。
-5. **crawler イメージ。** ECR へ push するまで `enable_crawler_schedule` は有効にできない。
+3. **インサイト。** `ai_provider` と `ai_model`、および SSM の `ai-api-key` を
+   設定するまで生成されない。
+
+## 静的サイトの発行
+
+ビルドは GitHub Actions の `publish-site` ワークフローで回す。CodeBuild を使うと
+GitHub 接続の認可が Terraform の管理外で必要になり、リポジトリと CI の二重管理に
+なるため採らない。
+
+ワークフローは OIDC で `site_publisher_role_arn` を引き受ける。リポジトリ変数に
+次を設定する（いずれも `terraform output` の値）。
+
+| リポジトリ変数                   | 由来                         |
+| -------------------------------- | ---------------------------- |
+| `AWS_PUBLISH_ROLE_ARN`           | `site_publisher_role_arn`    |
+| `AWS_DATA_BUCKET`                | `data_bucket`                |
+| `AWS_SITE_BUCKET`                | `site_bucket`                |
+| `AWS_CLOUDFRONT_DISTRIBUTION_ID` | `cloudfront_distribution_id` |

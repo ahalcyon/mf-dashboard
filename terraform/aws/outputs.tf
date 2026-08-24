@@ -59,7 +59,7 @@ output "ecs_cluster_name" {
   value       = aws_ecs_cluster.this.name
 }
 
-output "site_build_project" {
-  description = "CodeBuild project that bakes the database into the static site"
-  value       = one(aws_codebuild_project.site[*].name)
+output "site_publisher_role_arn" {
+  description = "Role the GitHub Actions publish workflow assumes. Set it as the AWS_PUBLISH_ROLE_ARN repository variable."
+  value       = aws_iam_role.site_publisher.arn
 }
