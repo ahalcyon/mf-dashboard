@@ -10,12 +10,7 @@ inputs:
 runs:
   using: composite
   steps:
-    # 既定は npm 経由の self-installer で、runner 同梱の v11.19.0 から
-    # packageManager が指す版へ入れ替える。実測で 6.5 秒かかっていた。
-    # standalone は単一バイナリを取ってくるだけで済む。
     - uses: pnpm/action-setup@v6.0.10
-      with:
-        standalone: true
     - uses: actions/setup-node@v7.0.0
       with:
         node-version-file: .node-version
