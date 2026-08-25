@@ -10,20 +10,6 @@ import { resolveGroupId } from "../shared/group-filter";
 import { getHoldingsWithLatestValues } from "./holding";
 
 /**
- * 日付文字列をパース
- */
-export function parseDateString(dateStr: string): { year: number; month: number; day: number } {
-  return parseIsoDateKey(dateStr);
-}
-
-/**
- * 日付文字列を生成
- */
-export function toDateString(year: number, month: number, day: number): string {
-  return formatIsoDateKey({ year, month, day });
-}
-
-/**
  * 比較対象の日付を計算
  */
 export function calculateTargetDate(
