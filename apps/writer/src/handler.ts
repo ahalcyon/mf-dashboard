@@ -25,9 +25,9 @@ async function applyPayload(db: Db, message: SyncMessage, payload: SyncPayload):
  * SQS から届いたクロール結果を、S3 上の SQLite へ適用する。
  *
  * S3 には部分書き込みもロックも無いため、ファイル全体を取得して書き換え、
- * まとめて書き戻す。これが壊れないのは、FIFO キュー・単一 MessageGroupId・
- * 予約同時実行数 1 によって同時に走る書き込みが存在しないためで、
- * どれか 1 つでも外すと後勝ちでデータが消える。
+ * まとめて書き戻す。これが壊れないのは、FIFO キューと単一 MessageGroupId に
+ * よって同時に走る書き込みが存在しないためで、どちらかを外すと後勝ちで
+ * データが消える。予約同時実行数はその上に重ねる多重防御。
  */
 export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
   const config = loadConfig();
