@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-const send = vi.fn();
-const destroy = vi.fn();
+const send = vi.fn<(command: unknown) => Promise<unknown>>();
+const destroy = vi.fn<() => void>();
 
 // SDK のコマンドは new で組み立てられるので、アロー関数では代用できない
 function command(type: string) {
@@ -46,16 +46,15 @@ describe("パスの検証", () => {
   // CloudFront は /api/* をまとめてこの Lambda へ回す。静的エクスポートで
   // route handler が落ちた他の /api/* への POST は、ここで止まらなければ
   // クロールを起動してしまう。
-  test.for([
-    "/api/bank-forecast/dismiss/",
-    "/api/bank-forecast/manual-events/",
-    "/api/",
-  ])("%s への POST は 404 で、ECS を一切呼ばない", async (path) => {
-    const response = await handler(buildEvent(path));
+  test.for(["/api/bank-forecast/dismiss/", "/api/bank-forecast/manual-events/", "/api/"])(
+    "%s への POST は 404 で、ECS を一切呼ばない",
+    async (path) => {
+      const response = await handler(buildEvent(path));
 
-    expect(response).toMatchObject({ statusCode: 404 });
-    expect(send).not.toHaveBeenCalled();
-  });
+      expect(response).toMatchObject({ statusCode: 404 });
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
 
   test("/api/refresh/ への POST は ECS を呼ぶ", async () => {
     send
