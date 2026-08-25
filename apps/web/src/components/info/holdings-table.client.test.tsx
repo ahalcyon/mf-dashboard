@@ -211,6 +211,48 @@ describe("HoldingsTableTotal", () => {
   });
 });
 
+describe("負債の金額色", () => {
+  // AmountDisplay は fixedWidth のとき金額を内側の span へ入れるため、色は親に付く。
+  // どちらの形でも拾えるように、自身と親のクラスを合わせて見る。
+  function amountClasses(text: string) {
+    const node = screen.getByText(text);
+    return `${node.className} ${node.parentElement?.className ?? ""}`;
+  }
+
+  it("負債の合計を符号を反転して balance-negative で表示する", () => {
+    render(
+      <HoldingsFilterProvider>
+        <HoldingsTableTotal categories={categories} total={800} holdingsType="liability" />
+      </HoldingsFilterProvider>,
+    );
+
+    expect(amountClasses("-800円")).toContain("text-balance-negative");
+  });
+
+  it("資産の合計には色を付けない", () => {
+    render(
+      <HoldingsFilterProvider>
+        <HoldingsTableTotal categories={categories} total={800} />
+      </HoldingsFilterProvider>,
+    );
+
+    expect(amountClasses("800円")).not.toContain("text-balance-");
+  });
+
+  it("負債のカテゴリ小計と個別残高も balance-negative で表示する", () => {
+    render(
+      <HoldingsFilterProvider>
+        <HoldingsTableClient categories={[categories[0]]} holdingsType="liability" />
+      </HoldingsFilterProvider>,
+    );
+
+    // カテゴリ小計（600）と、その中の個別残高（100）
+    for (const label of ["-600円", "-100円"]) {
+      expect(amountClasses(label)).toContain("text-balance-negative");
+    }
+  });
+});
+
 describe("HoldingsTableClient", () => {
   it("共有された損益区分で保有資産表を絞り込む", () => {
     const mixedCategories = [
