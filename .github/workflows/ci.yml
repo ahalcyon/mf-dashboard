@@ -116,8 +116,6 @@ jobs:
           persist-credentials: false
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: ./.github/actions/setup-node
-        with:
-          cache-suffix: playwright-container
       - uses: actions/download-artifact@v8.0.1
         with:
           name: e2e-web-build
