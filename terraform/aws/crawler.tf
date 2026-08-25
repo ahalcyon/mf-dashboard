@@ -132,6 +132,9 @@ resource "aws_iam_role_policy" "crawler_task" {
 # スケジュール実行では一回きりの src/index.ts に差し替える。
 
 resource "aws_ecs_task_definition" "crawler" {
+  # イメージが push されてからタスク定義を更新する
+  depends_on = [terraform_data.image["crawler"]]
+
   family                   = "${var.name_prefix}-crawler"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
@@ -147,7 +150,7 @@ resource "aws_ecs_task_definition" "crawler" {
 
   container_definitions = jsonencode([{
     name             = "crawler"
-    image            = "${aws_ecr_repository.crawler.repository_url}:${var.crawler_image_tag}"
+    image            = local.image_uris.crawler
     essential        = true
     entryPoint       = ["/usr/bin/tini", "--"]
     command          = ["node", "--import", "tsx", "src/index.ts"]

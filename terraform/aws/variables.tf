@@ -56,10 +56,14 @@ variable "crawler_memory" {
   default     = 4096
 }
 
-variable "crawler_image_tag" {
-  description = "Image tag in the crawler ECR repository that the task definition runs"
+variable "container_cli" {
+  description = <<-DESC
+    Docker-compatible CLI used to build and push images during apply.
+    Set it to the WSL Container CLI path when developing on Windows, for example
+    "/mnt/c/Program Files/WSL/wslc.exe".
+  DESC
   type        = string
-  default     = "latest"
+  default     = "docker"
 }
 
 variable "crawler_timeout_minutes" {
@@ -78,18 +82,6 @@ variable "site_builder_memory" {
   description = "Fargate memory (MiB) for the site builder task"
   type        = number
   default     = 4096
-}
-
-variable "site_builder_image_tag" {
-  description = "Image tag in the site builder ECR repository that the task definition runs"
-  type        = string
-  default     = "latest"
-}
-
-variable "writer_image_tag" {
-  description = "Image tag in the writer ECR repository that the Lambda runs"
-  type        = string
-  default     = "latest"
 }
 
 variable "writer_timeout_seconds" {
@@ -172,12 +164,6 @@ variable "noncurrent_version_retention_days" {
 # --- 段階的な有効化 -------------------------------------------------------
 # ECR イメージの push や GitHub 接続の認可は Terraform の管理外なので、
 # それらが揃うまでは依存するリソースを作らずに済むようにする。
-
-variable "enable_writer" {
-  description = "Create the writer Lambda. Requires an image already pushed to the writer ECR repository."
-  type        = bool
-  default     = false
-}
 
 variable "enable_crawler_schedule" {
   description = "Enable the scheduled crawl. Requires an image already pushed to the crawler ECR repository."
