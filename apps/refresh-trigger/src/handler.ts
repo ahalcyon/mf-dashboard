@@ -6,7 +6,7 @@ import {
 } from "@aws-sdk/client-ecs";
 import type { LambdaFunctionURLEvent, LambdaFunctionURLResult } from "aws-lambda";
 import { loadConfig } from "./config.js";
-import { hasActiveTask, toResponse, type RefreshOutcome } from "./result.js";
+import { hasActiveTask, isRefreshPath, toResponse, type RefreshOutcome } from "./result.js";
 
 /**
  * ダッシュボードから当日分のクロールを起動する。
@@ -15,6 +15,12 @@ import { hasActiveTask, toResponse, type RefreshOutcome } from "./result.js";
  * Function URL は OAC で CloudFront からのみ到達できるようにしてある。
  */
 export async function handler(event: LambdaFunctionURLEvent): Promise<LambdaFunctionURLResult> {
+  // CloudFront は /api/* をまとめてこのオリジンへ回す。静的エクスポートで
+  // 落ちた他の /api/* への要求もここへ届くため、パスを先に確かめる。
+  if (!isRefreshPath(event.requestContext.http.path)) {
+    return toResponse({ kind: "not-found" });
+  }
+
   if (event.requestContext.http.method !== "POST") {
     return toResponse({ kind: "method-not-allowed" });
   }
