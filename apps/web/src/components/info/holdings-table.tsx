@@ -106,12 +106,14 @@ export async function HoldingsTable({
           <HoldingsTableTotal
             categories={orderedCategories}
             total={total}
+            holdingsType={type}
             enableSharedFilter={enableSharedFilter}
           />
         </div>
       </CardHeader>
       <HoldingsTableClient
         categories={orderedCategories}
+        holdingsType={type}
         hideAccountName={!!mfId}
         enableSharedFilter={enableSharedFilter}
       />

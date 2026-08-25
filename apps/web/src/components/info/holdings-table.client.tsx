@@ -41,10 +41,22 @@ export interface CategoryGroup {
   total: number;
 }
 
+export type HoldingsType = "asset" | "liability";
+
 interface HoldingsTableClientProps {
   categories: CategoryGroup[];
+  holdingsType?: HoldingsType;
   hideAccountName?: boolean;
   enableSharedFilter?: boolean;
+}
+
+/**
+ * 負債の残高は「マイナスの純資産」を意味するため、符号を反転して
+ * `type="balance"` で描画し、`text-balance-negative` に載せる。
+ * 資産はそのままの値を色なしで出す。account-summary-card と同じ扱い。
+ */
+function amountProps(amount: number, holdingsType: HoldingsType) {
+  return holdingsType === "liability" ? { amount: -amount, type: "balance" as const } : { amount };
 }
 
 function sortCategoryGroups(categories: readonly CategoryGroup[]): CategoryGroup[] {
@@ -98,10 +110,12 @@ export function filterCategories(
 export function HoldingsTableTotal({
   categories,
   total,
+  holdingsType = "asset",
   enableSharedFilter = false,
 }: {
   categories: CategoryGroup[];
   total: number;
+  holdingsType?: HoldingsType;
   enableSharedFilter?: boolean;
 }) {
   const filter = useHoldingsFilter();
@@ -118,11 +132,12 @@ export function HoldingsTableTotal({
     ? filteredCategories.reduce((sum, category) => sum + category.total, 0)
     : total;
 
-  return <AmountDisplay amount={filteredTotal} size="lg" weight="bold" />;
+  return <AmountDisplay {...amountProps(filteredTotal, holdingsType)} size="lg" weight="bold" />;
 }
 
 export function HoldingsTableClient({
   categories,
+  holdingsType = "asset",
   hideAccountName = false,
   enableSharedFilter = false,
 }: HoldingsTableClientProps) {
@@ -141,6 +156,7 @@ export function HoldingsTableClient({
           category={category}
           items={items}
           categoryTotal={categoryTotal}
+          holdingsType={holdingsType}
           hideAccountName={hideAccountName}
         />
       ))}
@@ -152,11 +168,13 @@ function CategoryCard({
   category,
   items,
   categoryTotal,
+  holdingsType,
   hideAccountName,
 }: {
   category: string;
   items: HoldingItem[];
   categoryTotal: number;
+  holdingsType: HoldingsType;
   hideAccountName: boolean;
 }) {
   const [currentPage, setCurrentPage] = useState(0);
@@ -195,7 +213,7 @@ function CategoryCard({
           <span className="font-bold text-foreground">{category}</span>
           <span className="text-sm text-muted-foreground">({items.length}件)</span>
         </div>
-        <AmountDisplay amount={categoryTotal} weight="bold" />
+        <AmountDisplay {...amountProps(categoryTotal, holdingsType)} weight="bold" />
       </div>
 
       {/* Chart + Legend area */}
@@ -242,6 +260,7 @@ function CategoryCard({
                   holding={holding}
                   color={colors[originalIndex]}
                   ratio={ratio}
+                  holdingsType={holdingsType}
                   hideAccountName={hideAccountName}
                 />
               );
@@ -267,11 +286,13 @@ function HoldingRow({
   holding,
   color,
   ratio,
+  holdingsType,
   hideAccountName,
 }: {
   holding: HoldingItem;
   color: string;
   ratio: number;
+  holdingsType: HoldingsType;
   hideAccountName: boolean;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -308,7 +329,7 @@ function HoldingRow({
             <div className="text-right tabular-nums">
               {holding.amount ? (
                 <AmountDisplay
-                  amount={holding.amount}
+                  {...amountProps(holding.amount, holdingsType)}
                   weight="semibold"
                   percentage={ratio}
                   percentageDecimals={1}
@@ -337,7 +358,7 @@ function HoldingRow({
           <div className="text-right shrink-0 tabular-nums">
             {holding.amount ? (
               <AmountDisplay
-                amount={holding.amount}
+                {...amountProps(holding.amount, holdingsType)}
                 weight="semibold"
                 percentage={ratio}
                 percentageDecimals={1}
