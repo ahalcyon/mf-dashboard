@@ -80,49 +80,6 @@ function cashFlow(month: string, description: string): CashFlowSummary {
   };
 }
 
-function scrapeResult(cashFlowSummary: CashFlowSummary): ScrapeResult {
-  return {
-    defaultGroup: null,
-    globalData: {
-      registeredAccounts: { accounts: [] },
-      portfolio: { items: [], totalAssets: 0 },
-      liabilities: { items: [], totalLiabilities: 0 },
-      cashFlow: cashFlowSummary,
-      refreshResult: null,
-    },
-    groupDataList: [
-      {
-        group: { id: "0", name: "グループ選択なし", isCurrent: false },
-        registeredAccounts: { accounts: [] },
-        assetHistory: { points: [] },
-        spendingTargets: null,
-        summary: {
-          totalAssets: "0",
-          dailyChange: "0",
-          dailyChangePercent: "0%",
-          monthlyChange: "0",
-          monthlyChangePercent: "0%",
-        },
-        items: [],
-      },
-      {
-        group: { id: "group-a", name: "Group A", isCurrent: true },
-        registeredAccounts: { accounts: [] },
-        assetHistory: { points: [] },
-        spendingTargets: null,
-        summary: {
-          totalAssets: "0",
-          dailyChange: "0",
-          dailyChangePercent: "0%",
-          monthlyChange: "0",
-          monthlyChangePercent: "0%",
-        },
-        items: [],
-      },
-    ],
-  };
-}
-
 beforeEach(() => {
   vi.mocked(buildScrapedData).mockClear();
   vi.mocked(buildGroupOnlyScrapedData).mockClear();

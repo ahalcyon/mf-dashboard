@@ -1,0 +1,21 @@
+{
+  "name": "@mf-dashboard/refresh-trigger",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bundle": "esbuild src/handler.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/index.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ecs": "^3.1111.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "8.10.160",
+    "@types/node": "catalog:",
+    "esbuild": "0.28.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

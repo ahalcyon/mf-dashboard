@@ -27,13 +27,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: refreshMock }),
 }));
 
-class EventSourceMock {
-  close() {}
-}
-
 beforeEach(() => {
   pathnameMock.mockReturnValue("/");
-  vi.stubGlobal("EventSource", EventSourceMock);
 });
 
 afterEach(() => {
@@ -50,7 +45,7 @@ describe("Header", () => {
       </SidebarProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "更新サービス未接続" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "金融機関データを更新" })).not.toBeNull();
   });
 
   it("shows the update time for the group selected by the URL", () => {
@@ -66,7 +61,7 @@ describe("Header", () => {
     expect(
       screen.getByText((_content, element) => element?.tagName === "TIME").getAttribute("datetime"),
     ).toBe("2025-04-30T15:20:00");
-    expect(screen.getByRole("button", { name: "更新サービス未接続" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "金融機関データを更新" })).not.toBeNull();
   });
 
   it("falls back to the default group when the URL group is unknown", () => {
@@ -82,7 +77,7 @@ describe("Header", () => {
     expect(
       screen.getByText((_content, element) => element?.tagName === "TIME").getAttribute("datetime"),
     ).toBe("2025-04-30T10:30:00");
-    expect(screen.getByRole("button", { name: "更新サービス未接続" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "金融機関データを更新" })).not.toBeNull();
   });
 
   it("uses the configured base path for the logo", () => {

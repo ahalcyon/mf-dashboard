@@ -33,6 +33,14 @@ locals {
       "pnpm-workspace.yaml",
       "tsconfig.json",
     ]
+    refresh-trigger = [
+      "docker/refresh-trigger",
+      "apps/refresh-trigger",
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "tsconfig.json",
+    ]
     "site-builder" = [
       "docker/site-builder",
       "scripts/publish-site.mjs",
@@ -54,9 +62,10 @@ locals {
   }
 
   ecr_repositories = {
-    crawler        = aws_ecr_repository.crawler.repository_url
-    writer         = aws_ecr_repository.writer.repository_url
-    "site-builder" = aws_ecr_repository.site_builder.repository_url
+    crawler         = aws_ecr_repository.crawler.repository_url
+    writer          = aws_ecr_repository.writer.repository_url
+    refresh-trigger = aws_ecr_repository.refresh_trigger.repository_url
+    "site-builder"  = aws_ecr_repository.site_builder.repository_url
   }
 }
 
