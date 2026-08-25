@@ -33,7 +33,6 @@ export const CRAWLER_STEPS = {
     label: "金融機関カテゴリを更新",
   },
   notification: { code: "notification", label: "更新結果を通知" },
-  webCacheRefresh: { code: "web_cache_refresh", label: "Web キャッシュを更新" },
 } as const satisfies Record<string, CrawlerCurrentStep>;
 
 const BASELINE_STEP_COUNT = Object.keys(CRAWLER_STEPS).length;
@@ -279,7 +278,6 @@ export function normalizeCrawlerError(error: unknown, fallbackCode: string): Cra
     const operationLabels: Record<string, string> = {
       database_save: "データベース保存",
       notification_failed: "更新結果の通知",
-      web_cache_refresh_failed: "Webキャッシュ更新",
     };
     const operationLabel = operationLabels[fallbackCode];
     if (operationLabel) {

@@ -50,8 +50,7 @@ export type CrawlerRunStepDetails =
   | { step: "database_save"; metadata: null }
   | { step: "institution_categories"; metadata: null }
   | { step: "analytics"; metadata: null }
-  | { step: "notification"; metadata: null }
-  | { step: "web_cache_refresh"; metadata: null };
+  | { step: "notification"; metadata: null };
 
 type CrawlerRunTimelineStatusDetails =
   | { status: "pending"; startedAt: null; finishedAt: null; reason: null }
@@ -170,7 +169,6 @@ function isCrawlerRunStepDetails(value: Record<string, unknown>): boolean {
     case "institution_categories":
     case "analytics":
     case "notification":
-    case "web_cache_refresh":
       return metadata === null;
     case "moneyforward_refresh":
       return (

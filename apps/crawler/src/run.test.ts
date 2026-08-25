@@ -16,7 +16,6 @@ import {
 import { CRAWLER_STEPS, createCrawlerProgressReporter } from "./crawler-progress.js";
 import { runCrawler } from "./run.js";
 import { createGroupScope } from "./scrapers/group.js";
-import { notifyWebRefresh } from "./web-refresh.js";
 
 vi.mock("@mf-dashboard/db", () => ({ closeDb: vi.fn<() => void>() }));
 vi.mock("./crawler-phases.js", () => ({
@@ -31,7 +30,6 @@ vi.mock("./crawler-phases.js", () => ({
   runSetupPhase: vi.fn<() => void>(),
 }));
 vi.mock("./scrapers/group.js", () => ({ createGroupScope: vi.fn<() => void>() }));
-vi.mock("./web-refresh.js", () => ({ notifyWebRefresh: vi.fn<() => void>() }));
 
 let tempDir: string;
 
@@ -60,7 +58,6 @@ beforeEach(async () => {
     [Symbol.asyncDispose]: vi.fn<() => Promise<void>>(),
   });
   vi.mocked(runNotificationPhase).mockResolvedValue(null);
-  vi.mocked(notifyWebRefresh).mockResolvedValue(undefined);
   vi.mocked(runSavePhase).mockResolvedValue([]);
   vi.mocked(runInstitutionCategoryPhase).mockResolvedValue(new Map([["account-a", "銀行"]]));
   vi.mocked(runCashFlowHistoryPhase).mockImplementation(
@@ -165,7 +162,6 @@ describe("runCrawler progress", () => {
       { step: "institution_categories", status: "done" },
       { step: "database_save", status: "done" },
       { step: "notification", status: "done" },
-      { step: "web_cache_refresh", status: "done" },
     ]);
     expect(runAuthPhase).toHaveBeenCalledOnce();
     expect(runSavePhase).toHaveBeenCalledOnce();
@@ -200,7 +196,7 @@ describe("runCrawler progress", () => {
     );
   });
 
-  test("グループ復元に失敗した場合は成功通知とweb refreshを実行しない", async () => {
+  test("グループ復元に失敗した場合は成功通知を実行しない", async () => {
     const restoreError = new Error("Group switch timed out");
     vi.mocked(createGroupScope).mockResolvedValueOnce({
       originalGroup: null,
@@ -215,7 +211,6 @@ describe("runCrawler progress", () => {
     await expect(runCrawler(progress)).rejects.toThrow("Group switch timed out");
 
     expect(runNotificationPhase).not.toHaveBeenCalled();
-    expect(notifyWebRefresh).not.toHaveBeenCalled();
     expect(handleCrawlerFailure).toHaveBeenCalledWith(
       restoreError,
       expect.anything(),

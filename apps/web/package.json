@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "DB_PATH=../../data/demo.db DEMO_MODE=true next dev",
-    "dev:prod": "DB_PATH=../../data/moneyforward.db CRAWLER_URL=http://127.0.0.1:8766 ALLOW_LOCAL_AUTH_BYPASS=true next dev --hostname 127.0.0.1",
+    "dev:prod": "DB_PATH=../../data/moneyforward.db next dev --hostname 127.0.0.1",
     "prebuild": "tsx scripts/generate-export.mts",
     "build": "next build",
     "prebuild:demo": "DB_PATH=../../data/demo.db tsx scripts/generate-export.mts",
@@ -32,7 +32,6 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "1.1.1",
-    "jose": "6.2.10",
     "lucide-react": "1.33.0",
     "next": "16.3.2",
     "react": "19.2.8",
