@@ -11,20 +11,18 @@ if (existsSync(rootEnvPath)) {
 }
 
 export default function createNextConfig(phase: string): NextConfig {
-  const isStaticDemoBuild = process.env.DEMO_MODE === "true" && phase === PHASE_PRODUCTION_BUILD;
+  // DEMO_MODE は「公開デモである」ことを表す別の関心なので混ぜない
+  const isStaticExport = process.env.STATIC_EXPORT === "true" && phase === PHASE_PRODUCTION_BUILD;
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || undefined;
 
   return {
     basePath,
-    output: isStaticDemoBuild ? "export" : "standalone",
+    output: isStaticExport ? "export" : "standalone",
     outputFileTracingRoot: join(import.meta.dirname, "../.."),
     outputFileTracingIncludes: {
       "/*": ["../../node_modules/@swc/helpers/**/*"],
     },
-    pageExtensions: isStaticDemoBuild ? ["tsx"] : ["tsx", "ts"],
-    env: {
-      NEXT_PUBLIC_STATIC_DEMO_BUILD: isStaticDemoBuild ? "true" : "false",
-    },
+    pageExtensions: isStaticExport ? ["tsx"] : ["tsx", "ts"],
     typedRoutes: true,
     images: {
       unoptimized: true,

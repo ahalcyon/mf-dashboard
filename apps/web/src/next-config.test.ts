@@ -15,20 +15,25 @@ afterEach(() => {
 });
 
 describe("next config", () => {
-  it("excludes TypeScript route handlers from demo static export builds", async () => {
-    const config = await loadConfig(PHASE_PRODUCTION_BUILD, { DEMO_MODE: "true" });
+  it("excludes TypeScript route handlers from static export builds", async () => {
+    const config = await loadConfig(PHASE_PRODUCTION_BUILD, { STATIC_EXPORT: "true" });
 
     expect(config.output).toBe("export");
     expect(config.pageExtensions).toEqual(["tsx"]);
-    expect(config.env?.NEXT_PUBLIC_STATIC_DEMO_BUILD).toBe("true");
   });
 
-  it("keeps TypeScript route handlers available for demo development", async () => {
-    const config = await loadConfig(PHASE_DEVELOPMENT_SERVER, { DEMO_MODE: "true" });
+  it("keeps TypeScript route handlers available during development", async () => {
+    const config = await loadConfig(PHASE_DEVELOPMENT_SERVER, { STATIC_EXPORT: "true" });
 
     expect(config.output).toBe("standalone");
     expect(config.pageExtensions).toEqual(["tsx", "ts"]);
-    expect(config.env?.NEXT_PUBLIC_STATIC_DEMO_BUILD).toBe("false");
+  });
+
+  it("does not switch to static export just because it is the demo", async () => {
+    const config = await loadConfig(PHASE_PRODUCTION_BUILD, { DEMO_MODE: "true" });
+
+    expect(config.output).toBe("standalone");
+    expect(config.pageExtensions).toEqual(["tsx", "ts"]);
   });
 
   it("keeps TypeScript route handlers available for runtime server builds", async () => {
