@@ -1,0 +1,235 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { createClient } from "@libsql/client";
+import type { SQSEvent, SQSRecord } from "aws-lambda";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { createFakeS3Client, FakeNoSuchKey, FakeS3 } from "./fake-s3.js";
+
+const store = new FakeS3();
+
+// s3.ts ごと差し替えず SDK を差し替える。NoSuchKey の扱いや
+// ストリームの受け渡しも writer 自身のコードで通したいため。
+vi.mock("@aws-sdk/client-s3", () => ({
+  S3Client: class {
+    private readonly delegate = createFakeS3Client(store);
+    send = (command: unknown) => this.delegate.send(command as never);
+    destroy = () => {};
+  },
+  GetObjectCommand: class {
+    readonly kind = "get";
+    constructor(readonly input: { Bucket: string; Key: string }) {}
+  },
+  PutObjectCommand: class {
+    readonly kind = "put";
+    constructor(readonly input: { Bucket: string; Key: string; Body: Buffer }) {}
+  },
+  NoSuchKey: FakeNoSuchKey,
+}));
+
+const { handler } = await import("./handler.js");
+
+const BUCKET = "test-data-bucket";
+const DB_KEY = "db/moneyforward.db";
+const MIGRATIONS_DIR = path.resolve(import.meta.dirname, "../../../packages/db/drizzle");
+
+let workDir: string;
+
+function scrapedData(groupId: string, groupName: string, totalAssets: number) {
+  return {
+    summary: {
+      totalAssets: String(totalAssets),
+      dailyChange: "+0",
+      dailyChangePercent: "+0%",
+      monthlyChange: "+0",
+      monthlyChangePercent: "+0%",
+    },
+    items: [],
+    cashFlow: {
+      month: "2026-07",
+      isComplete: true,
+      totalIncome: 0,
+      totalExpense: 0,
+      balance: 0,
+      items: [],
+    },
+    portfolio: { totalAssets, items: [] },
+    liabilities: { totalLiabilities: 0, items: [] },
+    assetHistory: { points: [] },
+    registeredAccounts: { accounts: [] },
+    spendingTargets: null,
+    currentGroup: { id: groupId, name: groupName, isCurrent: true },
+    refreshResult: { completed: true, incompleteAccounts: [] },
+    updatedAt: "2026-07-17T00:00:00.000Z",
+  };
+}
+
+/** payload を S3 へ置き、それを指す SQS レコードを組み立てる。 */
+function enqueue(messageId: string, runId: string, payload: unknown): SQSRecord {
+  const key = `payloads/${runId}/scraped-data.json`;
+  store.put(key, JSON.stringify(payload));
+
+  return {
+    messageId,
+    body: JSON.stringify({
+      version: 1,
+      runId,
+      kind: "scraped-data",
+      producedAt: "2026-07-17T00:00:00.000Z",
+      payload: { bucket: BUCKET, key },
+    }),
+  } as SQSRecord;
+}
+
+function goodRecord(messageId: string, groupId: string, groupName: string, totalAssets = 1000) {
+  return enqueue(messageId, messageId, {
+    kind: "scraped-data",
+    groupOnlyData: [scrapedData(groupId, groupName, totalAssets)],
+  });
+}
+
+/** kind が食い違うと handler が例外にする。適用失敗を作るのに使う。 */
+function poisonRecord(messageId: string): SQSRecord {
+  return enqueue(messageId, messageId, { kind: "unknown-kind" });
+}
+
+function asEvent(records: SQSRecord[]): SQSEvent {
+  return { Records: records };
+}
+
+async function readGroupNames(): Promise<string[]> {
+  const uploaded = store.get(DB_KEY);
+  expect(uploaded).toBeInstanceOf(Buffer);
+
+  const inspectPath = path.join(workDir, "inspect.db");
+  writeFileSync(inspectPath, uploaded!);
+  const client = createClient({ url: `file:${inspectPath}` });
+  try {
+    const result = await client.execute("select name from groups order by name");
+    return result.rows.map((row) => String(row.name));
+  } finally {
+    client.close();
+  }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  store.objects.clear();
+  store.puts.length = 0;
+  workDir = mkdtempSync(path.join(tmpdir(), "mf-writer-"));
+
+  vi.stubEnv("DATA_BUCKET", BUCKET);
+  vi.stubEnv("DATABASE_OBJECT_KEY", DB_KEY);
+  vi.stubEnv("DATABASE_LOCAL_PATH", path.join(workDir, "moneyforward.db"));
+  vi.stubEnv("MIGRATIONS_DIR", MIGRATIONS_DIR);
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.spyOn(console, "info").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  rmSync(workDir, { recursive: true, force: true });
+  vi.restoreAllMocks();
+});
+
+describe("初回クロール", () => {
+  // データベースがまだ無い状態。NoSuchKey を例外にしてしまうと
+  // 一度もクロールできない。
+  test("S3 に DB が無くてもマイグレーションから作って書き戻す", async () => {
+    const response = await handler(asEvent([goodRecord("m1", "g1", "Group A")]));
+
+    expect(response.batchItemFailures).toEqual([]);
+    expect(store.puts).toEqual([DB_KEY]);
+    expect(await readGroupNames()).toEqual(["Group A"]);
+  });
+});
+
+describe("最初の失敗で止める", () => {
+  test("2 件目が失敗したら 2 件目以降を失敗として返す", async () => {
+    const response = await handler(
+      asEvent([
+        goodRecord("m1", "g1", "Group A"),
+        poisonRecord("m2"),
+        goodRecord("m3", "g3", "Group C"),
+      ]),
+    );
+
+    // break を continue に変えると m2 だけになり、m3 が成功扱いで消える
+    expect(response.batchItemFailures).toEqual([
+      { itemIdentifier: "m2" },
+      { itemIdentifier: "m3" },
+    ]);
+  });
+
+  test("失敗より後ろのメッセージは適用しない", async () => {
+    await handler(
+      asEvent([
+        goodRecord("m1", "g1", "Group A"),
+        poisonRecord("m2"),
+        goodRecord("m3", "g3", "Group C"),
+      ]),
+    );
+
+    expect(await readGroupNames()).toEqual(["Group A"]);
+  });
+
+  test("1 件目が失敗したら何も書き戻さない", async () => {
+    const response = await handler(
+      asEvent([poisonRecord("m1"), goodRecord("m2", "g2", "Group B")]),
+    );
+
+    expect(response.batchItemFailures).toEqual([
+      { itemIdentifier: "m1" },
+      { itemIdentifier: "m2" },
+    ]);
+    expect(store.puts).toEqual([]);
+  });
+});
+
+describe("部分適用でも書き戻す", () => {
+  // ここを「全部成功したときだけ書き戻す」に変えると、適用済みの分が
+  // 消えたまま SQS からも削除され、その payload は二度と戻らない。
+  test("途中で失敗しても適用済みの分はアップロードする", async () => {
+    await handler(
+      asEvent([
+        goodRecord("m1", "g1", "Group A"),
+        goodRecord("m2", "g2", "Group B"),
+        poisonRecord("m3"),
+      ]),
+    );
+
+    expect(store.puts).toEqual([DB_KEY]);
+    expect(await readGroupNames()).toEqual(["Group A", "Group B"]);
+  });
+
+  test("アップロードは 1 回にまとめる", async () => {
+    await handler(
+      asEvent([
+        goodRecord("m1", "g1", "Group A"),
+        goodRecord("m2", "g2", "Group B"),
+        goodRecord("m3", "g3", "Group C"),
+      ]),
+    );
+
+    expect(store.puts).toEqual([DB_KEY]);
+  });
+});
+
+describe("既存のデータベースを引き継ぐ", () => {
+  test("2 回目の呼び出しは 1 回目の内容の上へ積む", async () => {
+    await handler(asEvent([goodRecord("m1", "g1", "Group A")]));
+    await handler(asEvent([goodRecord("m2", "g2", "Group B")]));
+
+    expect(await readGroupNames()).toEqual(["Group A", "Group B"]);
+  });
+
+  // SQS の再配信で同じメッセージがもう一度届く。saveScrapedDataBatch が
+  // upsert である前提に writer の部分失敗設計が乗っている。
+  test("同じメッセージを 2 回適用しても内容が増えない", async () => {
+    await handler(asEvent([goodRecord("m1", "g1", "Group A")]));
+    const afterFirst = await readGroupNames();
+
+    await handler(asEvent([goodRecord("m1", "g1", "Group A")]));
+
+    expect(await readGroupNames()).toEqual(afterFirst);
+  });
+});
