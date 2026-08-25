@@ -3,7 +3,7 @@ import { DatabaseZap } from "lucide-react";
 import "./globals.css";
 import type { ReactNode } from "react";
 import { AccountNotifications } from "../components/info/account-notifications";
-import { Header } from "../components/layout/header";
+import { DEFAULT_NOTIFICATIONS_KEY, Header } from "../components/layout/header";
 import { Sidebar } from "../components/layout/sidebar";
 import { SidebarProvider } from "../components/layout/sidebar-context";
 import { createRootMetadata } from "../lib/metadata";
@@ -36,6 +36,16 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     const groups = await getAllGroups();
     const currentGroup = await getCurrentGroup();
     const defaultGroupId = currentGroup?.id ?? groups[0]?.id ?? null;
+    // ルートレイアウトは表示中のグループを知れないため、グループごとに通知を
+    // 用意して Header に選ばせる。静的エクスポート中の重い計算はグループごとに
+    // 1 回で済む（lib/static-cache.ts）。
+    const notifications: Record<string, ReactNode> = {
+      [DEFAULT_NOTIFICATIONS_KEY]: <AccountNotifications />,
+    };
+    for (const group of groups) {
+      if (group.id === currentGroup?.id) continue;
+      notifications[group.id] = <AccountNotifications groupId={group.id} />;
+    }
     content = (
       <SidebarProvider>
         <Header
@@ -46,7 +56,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             lastScrapedAt: group.lastScrapedAt,
           }))}
           defaultGroupId={defaultGroupId}
-          notifications={<AccountNotifications />}
+          notifications={notifications}
         />
         <div className="flex pt-14">
           <Sidebar />

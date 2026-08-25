@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Header } from "./header";
+import { DEFAULT_NOTIFICATIONS_KEY, Header } from "./header";
 import { SidebarProvider } from "./sidebar-context";
 
 const { pathnameMock, refreshMock } = vi.hoisted(() => ({
@@ -94,5 +94,50 @@ describe("Header", () => {
       "http://localhost",
     );
     expect(imageUrl.searchParams.get("url")).toBe("/dashboard/logo.png");
+  });
+});
+
+describe("Header の通知", () => {
+  const notifications = {
+    [DEFAULT_NOTIFICATIONS_KEY]: <span>既定グループの通知</span>,
+    "group-b": <span>Group B の通知</span>,
+  };
+
+  it("グループ id を含む URL では、そのグループの通知を出す", () => {
+    pathnameMock.mockReturnValue("/group-b/bs");
+
+    render(
+      <SidebarProvider>
+        <Header groups={groups} defaultGroupId="group-a" notifications={notifications} />
+      </SidebarProvider>,
+    );
+
+    expect(screen.queryByText("Group B の通知")).not.toBeNull();
+    expect(screen.queryByText("既定グループの通知")).toBeNull();
+  });
+
+  it("グループ id を含まない URL では、既定グループの通知を出す", () => {
+    pathnameMock.mockReturnValue("/bs");
+
+    render(
+      <SidebarProvider>
+        <Header groups={groups} defaultGroupId="group-a" notifications={notifications} />
+      </SidebarProvider>,
+    );
+
+    expect(screen.queryByText("既定グループの通知")).not.toBeNull();
+    expect(screen.queryByText("Group B の通知")).toBeNull();
+  });
+
+  it("通知を持たないグループの URL では、既定グループの通知に落とす", () => {
+    pathnameMock.mockReturnValue("/group-unknown/cf");
+
+    render(
+      <SidebarProvider>
+        <Header groups={groups} defaultGroupId="group-a" notifications={notifications} />
+      </SidebarProvider>,
+    );
+
+    expect(screen.queryByText("既定グループの通知")).not.toBeNull();
   });
 });

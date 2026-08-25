@@ -5,6 +5,7 @@ import { getBankForecastManualEvents } from "@mf-dashboard/db/queries/bank-forec
 import { getHoldingsWithLatestValues } from "@mf-dashboard/db/queries/holding";
 import { getTransactions } from "@mf-dashboard/db/queries/transaction";
 import { cache } from "react";
+import { memoizeDuringStaticExport } from "../../lib/static-cache";
 import {
   buildBankCashFlowForecastViews,
   getBankForecastCurrentDate,
@@ -129,13 +130,20 @@ const getBankCashFlowForecastData = cache(async (groupId?: string) => {
   return { forecasts, manualEvents, manualEventMinDate, bankAccounts };
 });
 
+// このサイトで最も重い処理で、全ページのヘッダー（通知ベル）からも呼ばれる。
+// 静的エクスポート中はグループごとに 1 回で足りる。
+const loadBankCashFlowForecastData = memoizeDuringStaticExport(
+  getBankCashFlowForecastData,
+  (groupId) => groupId ?? "__default__",
+);
+
 export async function getBankCashFlowForecastViews(groupId?: string) {
-  return (await getBankCashFlowForecastData(groupId)).forecasts;
+  return (await loadBankCashFlowForecastData(groupId)).forecasts;
 }
 
 export async function BankCashFlowForecast({ groupId }: BankCashFlowForecastProps) {
   const { forecasts, manualEvents, manualEventMinDate, bankAccounts } =
-    await getBankCashFlowForecastData(groupId);
+    await loadBankCashFlowForecastData(groupId);
 
   return (
     <BankCashFlowForecastClient
