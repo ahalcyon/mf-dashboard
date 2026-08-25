@@ -1,3 +1,5 @@
+import { SYNC_MESSAGE_GROUP_ID } from "@mf-dashboard/db/sync/message";
+
 export interface SyncConfig {
   bucket: string;
   queueUrl: string;
@@ -17,7 +19,7 @@ export function loadSyncConfig(env: NodeJS.ProcessEnv = process.env): SyncConfig
   return {
     bucket,
     queueUrl,
-    messageGroupId: env.WRITE_MESSAGE_GROUP_ID?.trim() || "sqlite-write",
+    messageGroupId: env.WRITE_MESSAGE_GROUP_ID?.trim() || SYNC_MESSAGE_GROUP_ID,
     databaseObjectKey: env.DATABASE_OBJECT_KEY?.trim() || "db/moneyforward.db",
   };
 }

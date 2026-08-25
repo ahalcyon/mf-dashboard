@@ -1,7 +1,10 @@
 # S3 上の SQLite はファイル全体を書き換えるしかないため、書き込みは
-# 厳密に直列化する必要がある。FIFO キュー + 単一 MessageGroupId +
-# 予約同時実行数 1 の Lambda で、同時に走る書き込みを構造的に排除する。
+# 厳密に直列化する必要がある。それを担保しているのは FIFO キューと
+# 単一 MessageGroupId の 2 点で、writer の予約同時実行数はその上に重ねる
+# 多重防御（既定は無効。#10 を参照）。
 # 送信側は必ず MessageGroupId = local.write_message_group_id を使うこと。
+# この値は packages/db の SYNC_MESSAGE_GROUP_ID と一致していなければならず、
+# message.test.ts がこのファイルを読んで突き合わせている。
 
 locals {
   write_message_group_id = "sqlite-write"

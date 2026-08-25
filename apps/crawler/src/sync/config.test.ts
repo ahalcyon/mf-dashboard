@@ -1,3 +1,4 @@
+import { SYNC_MESSAGE_GROUP_ID } from "@mf-dashboard/db/sync/message";
 import { describe, expect, test } from "vitest";
 import { buildRunId, loadSyncConfig } from "./config.js";
 
@@ -19,7 +20,7 @@ describe("loadSyncConfig", () => {
     const config = loadSyncConfig({ DATA_BUCKET: "b", WRITE_QUEUE_URL: "q" });
 
     expect(config).toMatchObject({
-      messageGroupId: "sqlite-write",
+      messageGroupId: SYNC_MESSAGE_GROUP_ID,
       databaseObjectKey: "db/moneyforward.db",
     });
   });
