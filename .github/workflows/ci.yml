@@ -19,6 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: ./.github/actions/setup-node
+      # turbo のキャッシュ項目は入力のハッシュで引くため、古い版を復元しても
+      # 入力が一致しないものは再実行される。前方一致で復元して構わない。
+      - uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-${{ github.job }}-
       - run: pnpm lint --format=github
       - run: pnpm format --check
       - run: pnpm knip
@@ -45,6 +52,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: ./.github/actions/setup-node
+      # turbo のキャッシュ項目は入力のハッシュで引くため、古い版を復元しても
+      # 入力が一致しないものは再実行される。前方一致で復元して構わない。
+      - uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-${{ github.job }}-
       - run: pnpm build:demo --affected
       - run: pnpm --filter @mf-dashboard/db build:demo
       - run: pnpm --filter @mf-dashboard/db test:demo
@@ -70,6 +84,13 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node
+      # turbo のキャッシュ項目は入力のハッシュで引くため、古い版を復元しても
+      # 入力が一致しないものは再実行される。前方一致で復元して構わない。
+      - uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-${{ github.job }}-
       - run: DEMO_MODE=false pnpm --filter @mf-dashboard/web build
       - run: |
           cp -R apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
