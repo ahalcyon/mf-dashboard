@@ -8,7 +8,7 @@ import {
   normalizeCrawlerError,
   runCrawlerStep,
 } from "./crawler-progress.js";
-import { getCrawlerRunState, runWithCrawlerRunLock } from "./crawler-run-lock.js";
+import { readCrawlerRunState } from "./crawler-run-state.js";
 
 describe("crawler progress", () => {
   test("認証中の Playwright timeout を auth_failed に分類する", () => {
@@ -24,7 +24,6 @@ describe("crawler progress", () => {
   test.each([
     ["database_save", "データベース保存がタイムアウトしました"],
     ["notification_failed", "更新結果の通知がタイムアウトしました"],
-    ["web_cache_refresh_failed", "Webキャッシュ更新がタイムアウトしました"],
   ])("MoneyForward外の %s timeout に処理名を残す", (fallbackCode, expectedMessage) => {
     const timeout = new Error("Timeout 5000ms exceeded");
     timeout.name = "TimeoutError";
@@ -118,28 +117,27 @@ describe("crawler progress", () => {
 
   test("通常終了後も success と finishedAt を latest state に残す", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "crawler-progress-success-"));
-    const lockPath = path.join(tempDir, "crawler-run.lock");
+    const statePath = path.join(tempDir, "state.json");
     try {
-      await runWithCrawlerRunLock(
-        "test",
-        async (progress) => {
-          expect(progress.getState().progress).toEqual({ completed: 0, total: 12 });
-          await runCrawlerStep(progress, CRAWLER_STEPS.notification, async () => {
-            expect(progress.getState().progress).toEqual({ completed: 0, total: 12 });
-          });
-          expect(progress.getState().progress).toEqual({ completed: 1, total: 12 });
-        },
-        { lockPath },
-      );
+      const progress = await createCrawlerProgressReporter(statePath, {
+        id: "run-a",
+        source: "test",
+        startedAt: "2026-07-01T00:00:00.000Z",
+      });
+      expect(progress.getState().progress).toEqual({ completed: 0, total: 11 });
+      await runCrawlerStep(progress, CRAWLER_STEPS.notification, async () => {
+        expect(progress.getState().progress).toEqual({ completed: 0, total: 11 });
+      });
+      expect(progress.getState().progress).toEqual({ completed: 1, total: 11 });
+      await progress.finish("success");
 
-      const state = await getCrawlerRunState({ lockPath });
+      const state = await readCrawlerRunState({ statePath });
       expect(state).toMatchObject({
-        running: false,
         runStatus: "success",
         current: null,
       });
-      expect(state.finishedAt).toEqual(expect.any(String));
-      expect(state.timeline).toEqual([
+      expect(state?.finishedAt).toEqual(expect.any(String));
+      expect(state?.timeline).toEqual([
         expect.objectContaining({ step: "notification", status: "done" }),
       ]);
     } finally {

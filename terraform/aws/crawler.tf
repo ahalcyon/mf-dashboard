@@ -128,8 +128,6 @@ resource "aws_iam_role_policy" "crawler_task" {
 }
 
 # --- タスク定義 -----------------------------------------------------------
-# Dockerfile の ENTRYPOINT は server + supercronic の常駐用なので、
-# スケジュール実行では一回きりの src/index.ts に差し替える。
 
 resource "aws_ecs_task_definition" "crawler" {
   # イメージが push されてからタスク定義を更新する
@@ -149,12 +147,9 @@ resource "aws_ecs_task_definition" "crawler" {
   }
 
   container_definitions = jsonencode([{
-    name             = "crawler"
-    image            = local.image_uris.crawler
-    essential        = true
-    entryPoint       = ["/usr/bin/tini", "--"]
-    command          = ["node", "--import", "tsx", "src/index.ts"]
-    workingDirectory = "/app/apps/crawler"
+    name      = "crawler"
+    image     = local.image_uris.crawler
+    essential = true
 
     environment = [
       { name = "TZ", value = "Asia/Tokyo" },

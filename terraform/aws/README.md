@@ -1,9 +1,6 @@
-# Terraform: AWS 移行
+# Terraform: AWS
 
-Money Forward の取得・保存・配信を AWS 上に置き換えるためのルートモジュール。
-
-Cloudflare Tunnel / Access 用の `terraform/` とは独立した state を持つ。認証・公開の
-置き換えは本モジュールのスコープ外で、当面は既存の `terraform/` が並存する。
+Money Forward の取得・保存・配信を担うルートモジュール。
 
 ## 構成
 
@@ -17,7 +14,7 @@ EventBridge Scheduler (6:30 / 15:30 JST)
    SQS FIFO (単一 MessageGroupId) ──▶ DLQ ──▶ CloudWatch Alarm
         │
         ▼
-   Lambda: writer (予約同時実行数 1)
+   Lambda: writer
         │ ファイル全体の read-modify-write
         ▼
    S3: data バケット  s3://…/db/moneyforward.db  (バージョニング有効)
@@ -32,11 +29,15 @@ EventBridge Scheduler (6:30 / 15:30 JST)
 ### 設計上の制約（変更してはいけない箇所）
 
 - **S3 上の SQLite は部分書き込みもロックもできない。** 書き込みはファイル全体の
-  read-modify-write になる。これを安全に保つのは次の 3 点セットで、どれか 1 つでも
-  外すと後勝ちでデータが消える。
+  read-modify-write になる。同時に走る書き込みが 1 つも存在しないことが前提で、
+  これが崩れると後勝ちでデータが消える。直列性は次の 2 点が担保している。
   - SQS が FIFO キューであること
   - 送信側が常に同じ `MessageGroupId`（出力 `write_message_group_id`）を使うこと
-  - writer Lambda の `reserved_concurrent_executions = 1`
+
+  `writer_reserved_concurrency` はこの上に重ねる多重防御で、既定は `-1`（予約なし）。
+  アカウントの Lambda 同時実行数クォータが 10 以下だと予約できないため既定を外して
+  ある。クォータを引き上げたら `1` に戻す。
+
 - **data バケットのバージョニングは唯一の巻き戻し手段。** 全体書き換えを行う以上、
   誤った書き込みの復旧はバージョン復元しかない。
 - **キューの可視性タイムアウトは Lambda のタイムアウトを下回ってはならない。**
@@ -62,33 +63,19 @@ aws ssm put-parameter --type SecureString --name /mf-dashboard/totp-secret --val
 
 ## 適用手順
 
-ECS タスク定義と writer Lambda は ECR 上のイメージを参照するため、**先にリポジトリだけ
-作ってイメージを push し、その後に全体を apply する**。
-
-ECR イメージの push と CodeBuild の GitHub 認可は Terraform の管理外なので、
-それらに依存するリソースは既定で作成しない。順に有効化していく。
-
-| 変数                      | 既定    | 有効化の前提                        |
-| ------------------------- | ------- | ----------------------------------- |
-| `enable_writer`           | `false` | writer イメージを ECR へ push 済み  |
-| `enable_site_build`       | `false` | CodeBuild の GitHub 接続を認可済み  |
-| `enable_crawler_schedule` | `false` | crawler イメージを ECR へ push 済み |
-
 ```sh
 cp terraform/aws/terraform.tfvars.example terraform/aws/terraform.tfvars
-
 terraform -chdir=terraform/aws init
-
-# 1. 土台（S3 / CloudFront / SQS / ECR / ECS クラスタ / VPC）
-terraform -chdir=terraform/aws apply
-
-# 2. イメージを push する（リポジトリ URL は terraform output で確認）
-#    crawler は既存の docker/crawler/Dockerfile をそのまま使う
-
-# 3. 揃ったものから terraform.tfvars で有効化して再 apply
-#    enable_writer = true / enable_crawler_schedule = true
 terraform -chdir=terraform/aws apply
 ```
+
+ECS タスク定義と Lambda が参照するイメージは apply の中でビルドして ECR へ push する。
+タグは対象ソースのハッシュなので、ソースが変わらなければ push は走らない。以前は
+push を手順から切り出していたが、`No changes.` と表示されたまま古いイメージが動き
+続ける事故が起きたため apply へ取り込んだ。
+
+定期クロールだけは既定で無効になっている。初回は手でクロールを流して動作を確かめ、
+そのあと `enable_crawler_schedule = true` にして再適用する。
 
 静的サイトを手で公開する場合は、ビルドしてから同期する。
 
@@ -166,6 +153,9 @@ S3 の DB 更新 → EventBridge → ECS Fargate (site-builder) → s3 sync → 
 
 CodeBuild を使わないのは、GitHub 接続の認可が Terraform の管理外で必要になり、
 リポジトリと CI の二重管理になるため。ソースはイメージへ同梱する。
+
+手動更新はダッシュボードのヘッダーから起動する。CloudFront の `/api/*` が
+refresh-trigger Lambda へ届き、実行中の crawler タスクが無いときだけ RunTask する。
 
 手元から即座に発行したい場合は次を実行する。接続先は環境変数を優先し、
 無ければ `terraform output` から解決するため、同じスクリプトが両方で動く。

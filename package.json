@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "setup": "corepack enable pnpm",
-    "secrets:pull": "node scripts/pull-secrets.mjs",
     "publish:site": "node scripts/publish-site.mjs",
     "postinstall": "pnpm --filter @mf-dashboard/crawler exec playwright install chromium",
     "dev": "turbo dev --filter=@mf-dashboard/web",

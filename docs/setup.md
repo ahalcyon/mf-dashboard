@@ -1,280 +1,181 @@
 # セットアップ
 
-このガイドでは、ローカルPC上のDocker ComposeでWebダッシュボード、crawler、Cloudflare Tunnelを常時稼働させる。完了すると、許可されたGoogleアカウントでダッシュボードへアクセスでき、毎日6:30と15:30（JST）の自動更新と画面上からの手動更新を利用できる。
+このガイドでは、Money Forward MEのデータ取得から配信までをAWS上に構築する。完了すると、Basic認証で保護された静的ダッシュボードへアクセスでき、毎日6:30と15:30（JST）の自動更新と、画面上からの手動更新を利用できる。
 
 セットアップは次の順番で進める。
 
 1. Money Forward MEを準備する
-2. Cloudflare Zero TrustとGoogle OAuthを準備する
-3. アプリとインフラの設定ファイルを作成する
+2. 資格情報をAWS SSM Parameter Storeへ置く
+3. Terraform stateの保管先を作る
 4. Terraformを適用する
-5. Docker Composeを起動して動作を確認する
+5. 動作を確認する
+
+構成の詳細と設計上の制約は[terraform/aws/README.md](../terraform/aws/README.md)にある。
 
 ## 必須要件
 
 - [Money Forward ME](https://moneyforward.com/)
-- [Cloudflare](https://www.cloudflare.com/ja-jp/)アカウント（Zero Trustを有効化済み）
-- 公開先FQDNのゾーンをCloudflareで管理していること
-- ローカルPCが常時起動できる環境
+- AWSアカウント
 - ローカルにインストール済みのツール:
-  - **Docker Desktop**（System SettingsのLogin Itemsでログイン時起動を有効化）
   - `git`
-  - `terraform`（1.6以上）
-  - `openssl`
+  - `terraform`（1.15.9以上）
+  - `aws`（`aws configure`でプロファイル設定済み）
+  - Docker互換のCLI（`terraform apply`がコンテナイメージをビルドしてECRへpushする）
 
 リポジトリを取得し、以降のコマンドを実行するディレクトリへ移動する。
 
 ```sh
 git clone https://github.com/hiroppy/mf-dashboard.git
 cd mf-dashboard
+pnpm install
 ```
 
 ## 1. Money Forward MEの準備
 
 - Money Forward MEでワンタイムパスワードを設定する（[設定方法](https://support.me.moneyforward.com/hc/ja/articles/7359917171481-%E4%BA%8C%E6%AE%B5%E9%9A%8E%E8%AA%8D%E8%A8%BC%E3%81%AE%E8%A8%AD%E5%AE%9A%E6%96%B9%E6%B3%95)）
 - 認証アプリ登録時に表示されるセットアップキー（Base32）を控えておく。crawlerはこのキーからワンタイムパスワードを生成する。
-- ログインに使うメールアドレスとパスワードを、手順3.1の`.env`かAWS SSM Parameter Storeのどちらに置くか決めておく。
 
-## 2. Cloudflare Zero Trustの準備
+`MF_TOTP_SECRET`には6桁のコードではなく、Base32のセットアップキーを設定する。QRコードしか表示されない場合は「QRコードを読み取れない場合」の導線からキー文字列を表示する。crawlerはこのキーからRFC 6238のコードをローカルで生成するため、認証アプリと同じ値が同時に得られる。
 
-### 2.1 Zero Trustの有効化とTeam domainの確認
+同じキーはスマートフォンの認証アプリにも並行して登録できる。手動ログイン用の控えとして登録しておくとよい。
 
-CloudflareダッシュボードからZero Trustを有効化し、Team domain（`<team-name>.cloudflareaccess.com`）を控えておく。
+## 2. 資格情報をSSM Parameter Storeへ置く
 
-Team domainは、独自に公開する`dashboard.example.com`のようなホスト名とは別の値である。Cloudflare Zero Trustの設定画面に表示される`cloudflareaccess.com`で終わるドメインを、`https://`や末尾の`/`を付けずに使用する。この値はGoogle OAuth clientの設定と、後述する`.env`の`CLOUDFLARE_ACCESS_TEAM_DOMAIN`で共通して使う。
+crawlerはECSタスクとして動くため、資格情報はSSM Parameter Storeから注入する。標準ティアのパラメータとAWS管理キーによる`SecureString`は追加料金なしで利用できる。
 
-### 2.2 Google OAuth clientの準備
+```sh
+aws ssm put-parameter --type SecureString --name /mf-dashboard/email       --value '<メールアドレス>'
+aws ssm put-parameter --type SecureString --name /mf-dashboard/password    --value '<パスワード>'
+aws ssm put-parameter --type SecureString --name /mf-dashboard/totp-secret --value '<セットアップキー>'
+aws ssm put-parameter --type SecureString --name /mf-dashboard/recovery-code --value '<二段階認証のリカバリコード>'
+```
 
-Googleログイン用のWeb Application clientを作成する。
+`/mf-dashboard/recovery-code`はアプリからは読まない。Money Forward MEから締め出されたときにだけ人が参照する。ローカルへ平文で置かない。
 
-1. [Google Cloud Console](https://console.cloud.google.com/)でプロジェクトを作り、OAuth client IDを発行
-   - APIs & Services > Credentials > Create Credentials
-   - アプリケーションタイプ: `Web application`
-   - 承認済みの JavaScript 生成元: `https://<your-team-name>.cloudflareaccess.com`
-   - 承認済みのリダイレクト URI: `https://<your-team-name>.cloudflareaccess.com/cdn-cgi/access/callback`
-2. `Client ID`と`Client Secret`を控える
-3. 手順3.2で作成する`terraform/terraform.tfvars`の`google_oauth_client_id`と`google_oauth_client_secret`に設定する
+タスク定義の`secrets`が`email`、`password`、`totp-secret`を環境変数として注入するため、コンテナ内ではSSMを直接呼ばない。接頭辞を変える場合は`terraform.tfvars`の`ssm_parameter_prefix`と、crawlerの`SSM_PARAMETER_PREFIX`を揃える。
 
-TerraformがGoogle IdPをCloudflare Zero Trustへ登録し、Access ApplicationではこのIdPだけを許可する。
+## 3. Terraform stateの保管先を作る
 
-### 2.3 Cloudflare API Tokenの発行
+stateにはBasic認証のパスワードとセッショントークンが平文で入るため、gitへは置かずS3へ暗号化して保管する。stateバケット自体を本体のモジュールで作ると循環するので、`bootstrap/`を別に切ってある。
 
-Terraform用のAPI Tokenを発行する。必要な最小権限は次のとおり。
+```sh
+terraform -chdir=terraform/aws/bootstrap init
+terraform -chdir=terraform/aws/bootstrap apply
+```
 
-| スコープ | 権限                                                         |
-| -------- | ------------------------------------------------------------ |
-| Account  | `Cloudflare Tunnel:Edit`                                     |
-| Account  | `Access: Apps and Policies:Edit`                             |
-| Account  | `Access: Organizations, Identity Providers, and Groups:Edit` |
-| Zone     | `Zone:Read`                                                  |
-| Zone     | `DNS:Edit`（対象ゾーンを含む）                               |
+bootstrapのstateはローカルに残るが、作るのはバケット1つだけなので失っても`import`で復旧できる。
 
-発行したトークンをパスワードマネージャーなどへ保管し、手順3.2で作成するGit管理対象外の`terraform/terraform.tfvars`にある`cloudflare_api_token`へ設定する。Terraformは`.env`からインフラ設定を読み取らない。
+## 4. Terraformの適用
 
-`terraform.tfvars`とTerraform stateには秘密情報が含まれる。どちらもGitへ追加せず、ローカルディスクの暗号化とファイル権限`600`を維持する。
+設定ファイルを用意する。既定値のままでも適用できるので、上書きしたい項目だけコメントを外す。
 
-### 2.4 公開設定と既存リソースの確認
+```sh
+cp terraform/aws/terraform.tfvars.example terraform/aws/terraform.tfvars
+chmod 600 terraform/aws/terraform.tfvars
+```
 
-以下を決めておく。
+| 変数                      | 既定             | 内容                                                   |
+| ------------------------- | ---------------- | ------------------------------------------------------ |
+| `aws_profile`             | `default`        | 使用する名前付きAWSプロファイル                        |
+| `region`                  | `ap-northeast-1` | crawler、キュー、データベース、writerを置くリージョン  |
+| `hostname`                | 空               | 独自ドメイン。空ならCloudFrontの既定ドメインで配信する |
+| `acm_certificate_arn`     | 空               | `hostname`を設定する場合に必要なus-east-1の証明書      |
+| `container_cli`           | `docker`         | イメージのビルドに使うDocker互換CLI                    |
+| `basic_auth_username`     | `mf`             | エッジのBasic認証のユーザー名                          |
+| `basic_auth_password`     | 空               | 空なら自動生成する。`bookmark_url`から読み出せる       |
+| `schedule_expression`     | 6:30と15:30      | 自動更新のcron。`schedule_timezone`で評価する          |
+| `enable_crawler_schedule` | `false`          | 定期クロールの有効化                                   |
+| `ssm_parameter_prefix`    | `/mf-dashboard`  | 資格情報を置いたSSMの接頭辞                            |
 
-- Cloudflareのゾーン（例: `example.com`）
-- 公開するホスト名（例: `dashboard.example.com`）
-- Cloudflare Accessで許可するメールアドレス
+初回は定期クロールを無効のまま適用し、手動で1回流して動作を確かめてから有効化するとよい。
 
-`terraform apply`の前に、Cloudflare上に同じホスト名のDNSレコードや、同名のTunnel、Access Application、Google IdPがないことを確認する。既存リソースを継続利用する場合は、重複作成せずTerraformへインポートする。
+```sh
+terraform -chdir=terraform/aws init
+terraform -chdir=terraform/aws apply
+```
 
-## 3. セットアップ
+`apply`の中でcrawler、writer、site-builder、refresh-triggerの4イメージをビルドしてECRへpushする。イメージのタグはソースのハッシュなので、ソースを変えずに再適用してもpushは走らない。初回は数分かかる。
 
-### 3.1 アプリ設定
+Windowsで開発する場合は、`container_cli`にWSL Container CLIのパスを指定する。
+
+```hcl
+container_cli = "/mnt/c/Program Files/WSL/wslc.exe"
+```
+
+### 適用後の確認
+
+```sh
+terraform -chdir=terraform/aws output
+```
+
+`site_url`にダッシュボードのURLが出る。アクセスに使うブックマークURLは資格情報を含むため、明示的に読み出す。
+
+```sh
+terraform -chdir=terraform/aws output -raw bookmark_url
+```
+
+`https://<user>:<password>@<host>/`形式で出力される。ブラウザーはBasic認証のセッションを保持できないため、このURLをブックマークして踏む運用を前提にしている。初回だけBasicを検証し、以後はセッションクッキーで通す。
+
+## 5. 動作確認
+
+データベースがまだ空なので、最初のクロールを手で起動する。
+
+```sh
+aws ecs run-task \
+  --cluster "$(terraform -chdir=terraform/aws output -raw ecs_cluster_name)" \
+  --task-definition mf-dashboard-crawler \
+  --launch-type FARGATE \
+  --network-configuration 'awsvpcConfiguration={subnets=[<subnet-id>],securityGroups=[<sg-id>],assignPublicIp=ENABLED}'
+```
+
+進行状況はCloudWatch Logsの`/aws/ecs/mf-dashboard-crawler`で確認する。以降は次の順に自動で進む。
+
+```
+crawler → SQS FIFO → writer Lambda → S3のデータベース更新
+        → EventBridge → site-builder → S3へsync → CloudFrontのinvalidation
+```
+
+サイトが焼き上がったらブックマークURLでアクセスし、ダッシュボードが表示されることを確認する。確認できたら`terraform.tfvars`で`enable_crawler_schedule = true`にして再適用し、定期実行を有効にする。
+
+## 6. 運用
+
+- **手動で更新する**: ダッシュボードのヘッダーにある更新ボタンを押す。refresh-trigger Lambdaが実行中のcrawlerタスクの有無を確認してからECSタスクを起動する。すでに走っている場合は409を返して二重起動を防ぐ。
+- **サイトだけ焼き直す**: `pnpm publish:site`。S3のデータベースを読んでビルドし、syncとinvalidationまで行う。
+- **コードを変更して反映する**: `terraform -chdir=terraform/aws apply`。変更のあったイメージだけが再ビルドされ、タスク定義とLambdaが更新される。
+- **誤った書き込みを戻す**: dataバケットのバージョニングが唯一の巻き戻し手段である。S3上のSQLiteはファイル全体の書き換えになるため、バージョンを復元する以外に復旧方法がない。
+
+### ローカルで開発する
 
 `.env`を作成する。
 
 ```sh
 cp .env.example .env
-openssl rand -hex 32
 ```
 
-この時点では、次の値を`.env`へ設定する。
-
-```dotenv
-MF_EMAIL=<Money Forward MEのログインメールアドレス>
-MF_PASSWORD=<Money Forward MEのパスワード>
-MF_TOTP_SECRET=<認証アプリ登録時のセットアップキー（Base32）>
-REFRESH_TOKEN=<openssl rand -hex 32の出力>
-CLOUDFLARE_ACCESS_TEAM_DOMAIN=<team-name>.cloudflareaccess.com
-DASHBOARD_URL=https://dashboard.example.com
-```
-
-SSMへ資格情報を置く場合は、`MF_EMAIL`、`MF_PASSWORD`、`MF_TOTP_SECRET`を空のままにして`pnpm secrets:pull`を実行する。
-
-`REFRESH_TOKEN`はcrawlerとwebが共有するアプリ用の認証情報であり、Terraformでは管理しない。Docker Composeが起動時に変数展開するため、crawlerの実行時解決とは違いSSMからは補えない。`.env`に実値が必要になる。`CLOUDFLARE_ACCESS_TEAM_DOMAIN`にはCloudflare Zero Trustで確認したTeam domainを指定する。`DASHBOARD_URL`には、このあとTerraformの`hostname`へ指定する公開URLを設定する。
-
-`CLOUDFLARE_ACCESS_AUD`はまだ空のままでよい。Access Applicationの作成後に確定するため、Terraform適用後の手順3.3で設定する。
-
-| `.env`のキー                                 | 必須 | 設定タイミング       | 内容                                                                           |
-| -------------------------------------------- | ---- | -------------------- | ------------------------------------------------------------------------------ |
-| `REFRESH_TOKEN`                              | 必須 | Terraform適用前      | crawlerとwebが共有する内部API用Bearerトークン                                  |
-| `CLOUDFLARE_ACCESS_TEAM_DOMAIN`              | 必須 | Terraform適用前      | Access JWTの発行者となる`<team-name>.cloudflareaccess.com`                     |
-| `CLOUDFLARE_ACCESS_AUD`                      | 必須 | Terraform適用後      | Terraformが作成したAccess ApplicationのAUD                                     |
-| `DASHBOARD_URL`                              | 必須 | Terraform適用前      | Open Graph / Twitter metadataと通知に使う公開ダッシュボードURL                 |
-| `MF_EMAIL` / `MF_PASSWORD`                   | 必須 | Terraform適用前      | Money Forward MEのログイン情報。SSMへ置く場合は空でよい                        |
-| `MF_TOTP_SECRET`                             | 必須 | Terraform適用前      | 認証アプリのセットアップキー（Base32）。二段階認証が無効なら不要               |
-| `SSM_PARAMETER_PREFIX`                       | 任意 | SSM利用時            | SSM Parameter Storeの接頭辞。既定値は`/mf-dashboard`                           |
-| `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID`       | 任意 | 通知を有効にするとき | Slack通知                                                                      |
-| `DISCORD_WEBHOOK_URL` / `DISCORD_AVATAR_URL` | 任意 | 通知を有効にするとき | Discord通知                                                                    |
-| `HOST_UID` / `HOST_GID`                      | 任意 | Compose起動前        | Linuxで`./data`とTunnel tokenを所有するユーザーのUIDとGID。既定値は`1000:1000` |
-| `AUTH_STATE_PATH`                            | 任意 | ローカル実行時       | ローカル実行時のブラウザーセッション保存先。Docker Composeでは設定しない       |
-
-Linuxでは`id -u`と`id -g`で値を確認し、`1000:1000`と異なる場合は`.env`の`HOST_UID`と`HOST_GID`へ設定する。web、crawler、cloudflaredが同じUID/GIDで動作し、`./data`とowner-read-onlyのTunnel tokenへ必要な範囲だけアクセスする。
-
-#### 資格情報をAWS SSM Parameter Storeへ置く
-
-`.env`へ平文で書く代わりに、SSM Parameter Storeから取得できる。crawlerは環境変数を優先し、空のものだけをSSMから解決する。標準ティアのパラメータとAWS管理キーによる`SecureString`は追加料金なしで利用できる。
+`MF_EMAIL`、`MF_PASSWORD`、`MF_TOTP_SECRET`を空のままにすると、crawlerが実行時にSSMから解決する。`aws configure`が済んでいれば追記は不要である。
 
 ```sh
-aws ssm put-parameter --name /mf-dashboard/email --type SecureString --value '<メールアドレス>'
-aws ssm put-parameter --name /mf-dashboard/password --type SecureString --value '<パスワード>'
-aws ssm put-parameter --name /mf-dashboard/totp-secret --type SecureString --value '<セットアップキー>'
-aws ssm put-parameter --name /mf-dashboard/refresh-token --type SecureString --value '<openssl rand -hex 32の出力>'
-aws ssm put-parameter --name /mf-dashboard/recovery-code --type SecureString --value '<二段階認証のリカバリコード>'
+pnpm --filter @mf-dashboard/crawler dev:scrape   # ローカルのdata/moneyforward.dbへ取得する
+pnpm --filter @mf-dashboard/web dev              # デモデータでダッシュボードを起動する
 ```
 
-実行するIAMプリンシパルには`ssm:GetParameters`と、`SecureString`の復号に使う`kms:Decrypt`が必要である。ECSで動かす場合はタスク定義の`secrets`が同じパラメータを環境変数として注入するため、コンテナ内ではSSMを直接呼ばない。
+`.env`の各キーは次のとおり。
 
-`/mf-dashboard/recovery-code`はアプリからは読まない。Money Forward MEから締め出されたときにだけ人が参照する。ローカルへ平文で置かない。
+| `.env`のキー                                 | 必須 | 内容                                                           |
+| -------------------------------------------- | ---- | -------------------------------------------------------------- |
+| `MF_EMAIL` / `MF_PASSWORD`                   | 任意 | Money Forward MEのログイン情報。空ならSSMから解決する          |
+| `MF_TOTP_SECRET`                             | 任意 | 認証アプリのセットアップキー（Base32）。空ならSSMから解決する  |
+| `DASHBOARD_URL`                              | 任意 | Open Graph / Twitter metadataと通知に使う公開ダッシュボードURL |
+| `SSM_PARAMETER_PREFIX`                       | 任意 | SSM Parameter Storeの接頭辞。既定値は`/mf-dashboard`           |
+| `NEXT_PUBLIC_BASE_PATH`                      | 任意 | ドメインの直下以外で配信する場合のURL接頭辞                    |
+| `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID`       | 任意 | Slack通知                                                      |
+| `DISCORD_WEBHOOK_URL` / `DISCORD_AVATAR_URL` | 任意 | Discord通知                                                    |
+| `MAX_WAIT_MINUTES`                           | 任意 | 金融機関の一括更新を待つ上限（分）。既定値は20                 |
+| `AUTH_STATE_PATH`                            | 任意 | ブラウザーセッションの保存先。既定値は`data/auth-state.json`   |
 
-#### 別のPCで作業を始める
+デプロイされたサイトでは`DASHBOARD_URL`をsite-builderがCloudFrontのURLから渡すため、`.env`の値は使われない。
 
-SSMを正とし、`.env`はそこから生成する。`aws configure`が済んでいるPCで次を実行する。
-
-```sh
-pnpm secrets:pull
-```
-
-`REFRESH_TOKEN`をSSMから取得して`.env`へ書き込み、パーミッションを`600`にする。`.env`が無ければ雛形ごと作成する。`MF_EMAIL`、`MF_PASSWORD`、`MF_TOTP_SECRET`は空のままにし、crawlerが実行時にSSMから解決する。`.env`を手で編集して秘密情報を書き足さない。
-
-#### 二段階認証のセットアップキーを取得する
-
-`MF_TOTP_SECRET`には6桁のコードではなく、認証アプリ登録時に表示されるBase32のセットアップキーを設定する。QRコードしか表示されない場合は「QRコードを読み取れない場合」の導線からキー文字列を表示する。crawlerはこのキーからRFC 6238のコードをローカルで生成するため、認証アプリと同じ値が同時に得られる。
-
-同じキーはスマートフォンの認証アプリにも並行して登録できる。手動ログイン用の控えとして登録しておくとよい。
-
-### 3.2 インフラ設定
-
-Cloudflare API TokenとGoogle OAuth clientを用意したら、Git管理対象外のインフラ設定ファイルを作成する。
-
-```sh
-cp terraform/terraform.tfvars.example terraform/terraform.tfvars
-chmod 600 terraform/terraform.tfvars
-```
-
-`terraform/terraform.tfvars`に実値を設定する。
-
-```hcl
-cloudflare_api_token       = "..."
-google_oauth_client_id     = "..."
-google_oauth_client_secret = "..."
-
-zone_name = "example.com"
-hostname  = "dashboard.example.com"
-
-allowed_emails = [
-  "user-a@example.com",
-]
-```
-
-`terraform/terraform.tfvars`、Terraform state、`secrets/cloudflared-token`はGit管理対象外。秘密情報を含むため、内容を表示したりコミットしたりしない。
-
-### 3.3 インフラの適用
-
-Terraformを初期化し、インフラを適用する。
-
-```sh
-terraform -chdir=terraform init
-terraform -chdir=terraform apply
-```
-
-適用後にTerraformの出力とTunnelトークンファイルを確認する。
-
-```sh
-terraform -chdir=terraform output
-ls -l secrets/cloudflared-token
-```
-
-`tunnel_id`、`tunnel_cname_target`、`hostname`、`google_identity_provider_id`、`access_application_aud`が出力され、`secrets/cloudflared-token`の権限が`-r--------`（mode `400`）なら成功。
-
-Access ApplicationのAUDを取得する。
-
-```sh
-terraform -chdir=terraform output -raw access_application_aud
-```
-
-表示された値を`.env`の`CLOUDFLARE_ACCESS_AUD`へ設定する。前後に引用符や空白は付けない。
-
-```dotenv
-CLOUDFLARE_ACCESS_AUD=<上のコマンドで表示された値>
-```
-
-`Output "access_application_aud" not found`と表示された場合、現在のTerraform stateにはoutputがまだ反映されていない。特に以前のバージョンから更新した環境では、最新コードで再度`terraform plan`を確認してから`terraform apply`し、outputをstateへ反映する。Access Applicationを新規作成した直後も、`apply`が最後まで成功していることを確認する。
-
-### 3.4 Docker Composeの起動
-
-ビルド前にComposeの設定を検証する。
-
-```sh
-docker compose config --quiet
-docker compose build
-docker compose up -d
-```
-
-`docker compose config --quiet`が何も表示せず終了すれば、Composeが必要とする環境変数は設定済みである。`required variable ... is missing a value`と表示された場合は、メッセージに示されたキーが`.env`に存在し、`=`の右側が空でないことを確認する。
-
-Terraformの適用が成功し、`secrets/cloudflared-token`が作成されたことを確認してからDocker Composeを起動する。`dc`などのシェルエイリアスは環境によって存在しないため、このガイドでは正式な`docker compose`コマンドを使用する。
-
-以降はcrawlerコンテナ内のsupercronicが`crontab`のスケジュールで自動更新する。
-
-各コンテナの役割は次のとおり。
-
-- **migrate**: 起動時に共有データベースへマイグレーションを適用し、完了後に終了する
-- **web**: ダッシュボードを配信し、共有データベースを読み取る
-- **cloudflared**: Cloudflare Tunnelへ接続する
-- **crawler**: 定期更新と手動更新を受け付け、取得したデータを共有データベースへ保存する
-
-スケジュールを変更する場合は`docker/crawler/crontab`を編集し、`docker compose build crawler`でcrawlerを再ビルドする。
-
-### 3.5 TunnelとAccessの動作確認
-
-```sh
-docker compose ps
-docker compose logs -f
-```
-
-以下を確認する:
-
-- `docker compose ps --all`で`migrate`が`Exited (0)`、ほかの3サービスが`Up`になっている
-- ログに認証エラーやTunnel接続エラーがない
-- 未ログインで`https://<hostname>/`へアクセスするとGoogleログインへ移動する
-- 許可したアカウントではダッシュボードが表示される
-- 許可していないアカウントではアクセスが拒否される
-- Google以外のログイン方法が表示されない
-
-```sh
-# Cloudflare Access経由の応答を確認
-curl -I https://<hostname>/
-# → 302 + Location が <team-name>.cloudflareaccess.com 配下なら Access 動作中
-
-# Terraform管理中のTunnel IDを確認
-terraform -chdir=terraform output -raw tunnel_id
-```
-
-## 4. 運用
-
-- **ホストを再起動する**: Docker Desktopの自動起動後、`restart: unless-stopped`を設定した各コンテナも自動復帰する
-- **イメージを再ビルドする**: `docker compose build && docker compose up -d`
-- **crawlerをすぐに実行する**: `docker compose exec crawler pnpm --filter @mf-dashboard/crawler start`
-- **webの表示だけを更新する**: `docker compose exec crawler sh -c 'curl -fsS -X POST -H "Authorization: Bearer ${REFRESH_TOKEN}" "http://web:8765${NEXT_PUBLIC_BASE_PATH}/api/refresh/"'`
-
-## 5. オプション設定
+## 7. オプション設定
 
 ここからの設定は、基本セットアップの完了後に必要なものだけ追加する。
 

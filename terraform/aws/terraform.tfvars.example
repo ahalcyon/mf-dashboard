@@ -12,9 +12,6 @@
 # schedule_expression = "cron(30 6,15 * * ? *)"
 # schedule_timezone   = "Asia/Tokyo"
 
-# source_repository_url = "https://github.com/ahalcyon/mf-dashboard.git"
-# source_branch         = "main"
-
 # 定期クロールを有効にする
 # enable_crawler_schedule = true
 

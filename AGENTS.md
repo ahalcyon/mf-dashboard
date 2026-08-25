@@ -94,9 +94,9 @@ Import these functions from `./logger.js`.
 
 ### Docker Cleanup
 
-- If an orchestrator or LLM agent starts Docker Compose for validation, it must run `docker compose down --remove-orphans` before finishing, including after failures.
-- Do not pass `--volumes` unless the user explicitly authorizes deletion of persistent data.
 - Start one-off validation containers with `docker run --rm`, or explicitly remove them afterward.
+- If an agent leaves any container or image behind, remove it before finishing, including after failures.
+- Do not delete volumes unless the user explicitly authorizes deletion of persistent data.
 
 ## QA and Test Design
 

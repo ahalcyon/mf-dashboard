@@ -36,8 +36,6 @@ jobs:
           terraform_wrapper: false
       - run: terraform fmt -check -recursive terraform
       # validate は認証情報を必要としないため、backend を初期化せずプロバイダーだけ取得する
-      - run: terraform -chdir=terraform init -backend=false -input=false
-      - run: terraform -chdir=terraform validate
       - run: terraform -chdir=terraform/aws init -backend=false -input=false
       - run: terraform -chdir=terraform/aws validate
       - run: terraform -chdir=terraform/aws/bootstrap init -backend=false -input=false
@@ -53,19 +51,16 @@ jobs:
   docker-build:
     name: Docker build (${{ matrix.app }})
     runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_ACCESS_AUD: ci-access-audience
-      CLOUDFLARE_ACCESS_TEAM_DOMAIN: ci.cloudflareaccess.com
-      DASHBOARD_URL: https://dashboard.example.com
-      REFRESH_TOKEN: ci-refresh-token
     strategy:
       fail-fast: false
       matrix:
-        app: [crawler, web]
+        # terraform apply が push するイメージと同じものをビルドして壊れを検知する
+        app: [crawler, writer, site-builder, refresh-trigger]
     steps:
       - uses: actions/checkout@v7.0.1
-      - run: cp .env.example .env
-      - run: docker compose build ${{ matrix.app }}
+        with:
+          persist-credentials: false
+      - run: docker build -f docker/${{ matrix.app }}/Dockerfile .
   build-e2e-web:
     runs-on: ubuntu-latest
     env:

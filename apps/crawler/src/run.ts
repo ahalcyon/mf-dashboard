@@ -19,11 +19,10 @@ import {
   runCrawlerStep,
   type CrawlerProgressReporter,
 } from "./crawler-progress.js";
-import { error, info, warn } from "./logger.js";
+import { info, warn } from "./logger.js";
 import { createGroupScope } from "./scrapers/group.js";
 import { buildRunId, loadSyncConfig } from "./sync/config.js";
 import { SyncPublisher } from "./sync/publisher.js";
-import { notifyWebRefresh } from "./web-refresh.js";
 
 async function disposeGroupScope(
   groupScope: Awaited<ReturnType<typeof createGroupScope>>,
@@ -122,18 +121,6 @@ export async function runCrawler(progress: CrawlerProgressReporter): Promise<voi
       );
     } else {
       await progress.completeStep(notificationStep);
-    }
-
-    const webRefreshStep = await progress.startStep(CRAWLER_STEPS.webCacheRefresh);
-    try {
-      await notifyWebRefresh();
-      await progress.completeStep(webRefreshStep);
-    } catch (err) {
-      await progress.warnStep(
-        webRefreshStep,
-        normalizeCrawlerError(err, "web_cache_refresh_failed"),
-      );
-      error("Failed to refresh web cache:", err);
     }
 
     info("Completed!");
