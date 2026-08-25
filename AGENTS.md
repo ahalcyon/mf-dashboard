@@ -143,6 +143,10 @@ Bound structure-only E2E navigation independently from production crawl coverage
 
 Run the web E2E suite through `pnpm test:e2e:web`. Turbo regenerates `data/demo.db` from `^build:demo` first; invoking `playwright test` directly skips that step and every page fails with `no such table: groups`, or worse, runs against a stale snapshot.
 
+The local run starts `next dev`, which compiles each route on demand, so the first request is far slower than the prebuilt server CI uses. `apps/web/playwright.config.ts` therefore gives non-CI runs a longer web-server and assertion timeout; CI keeps the shorter ones.
+
+Set `E2E_PORT` when a web E2E run may overlap another one on this machine. The suite binds port 3000 by default, and a second run on the same port takes the port from the first, which then fails every page with `ERR_CONNECTION_REFUSED`.
+
 ## Common Commands
 
 ### Dependencies
