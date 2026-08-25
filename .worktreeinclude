@@ -1,5 +1,7 @@
 # git worktree を作るときに引き継ぐローカル設定。
-# .gitignore と同じ構文で「持っていきたいファイル」を書く。
+# リポジトリルートからの相対パスか glob を 1 行に 1 つ書く。`!` で除外できる。
+# post-checkout フックの scripts/sync-worktree-includes.mjs が読んで、
+# コピー先に無いものだけを引き写す。ディレクトリは対象外。
 #
 # 引き継がないもの:
 #   data/moneyforward.db  実データ。複製を増やしたくない。crawler の
