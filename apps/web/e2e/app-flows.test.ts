@@ -45,7 +45,6 @@ test.describe("App flows", () => {
       { path: "/", heading: "ダッシュボード" },
       { path: "/cf", heading: "収支" },
       { path: "/bs", heading: "資産" },
-      { path: "/insights", heading: "インサイト" },
       { path: "/simulator", heading: "シミュレーター" },
     ];
 
@@ -115,7 +114,6 @@ test.describe("App flows", () => {
     const destinations = [
       { link: "収支", path: "/cf", heading: "収支" },
       { link: "資産", path: "/bs", heading: "資産" },
-      { link: "インサイト", path: "/insights", heading: "インサイト" },
       { link: "連携サービス", path: "/accounts", heading: "連携サービス一覧" },
       { link: "シミュレーター", path: "/simulator", heading: "シミュレーター" },
       { link: "ダッシュボード", path: "/", heading: "ダッシュボード" },
@@ -147,11 +145,6 @@ test.describe("App flows", () => {
 
     const destinations = [
       { link: "資産", path: "/demo_group_001/bs", heading: "資産" },
-      {
-        link: "インサイト",
-        path: "/demo_group_001/insights",
-        heading: "財務インサイト",
-      },
       {
         link: "連携サービス",
         path: "/demo_group_001/accounts",
@@ -270,23 +263,6 @@ test.describe("App flows", () => {
     await expectLocation(page, "/demo_group_001/accounts/demo_000005");
     await expectHeading(page, "SBI証券");
     await expect(page.getByRole("combobox", { name: "グループを選択" })).toContainText("投資");
-  });
-
-  test("renders the financial insight sections", async ({ page }) => {
-    await page.goto("/insights");
-    await expectHeading(page, "財務インサイト");
-
-    for (const section of [
-      "貯蓄健全性",
-      "財務健全性スコア",
-      "収支バランス",
-      "支出パターン",
-      "投資パフォーマンス",
-      "負債分析",
-    ]) {
-      await expect(page.getByText(section, { exact: true })).toBeVisible();
-    }
-    await expect(page.getByText(/分析日:/)).toBeVisible();
   });
 
   test("updates simulator projections when a preset is selected", async ({ page }) => {

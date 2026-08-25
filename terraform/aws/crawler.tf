@@ -7,16 +7,6 @@ locals {
     totp_secret = "arn:aws:ssm:${var.region}:${local.account_id}:parameter${local.ssm_parameter_prefix}/totp-secret"
   }
 
-  # crawler の analytics フェーズ (runAnalyticsPhase -> analyzeFinancialData) が
-  # LLM を呼ぶため、有効化する場合だけ資格情報を追加で渡す。
-  llm_enabled = var.ai_provider != ""
-
-  ai_api_key_arn = "arn:aws:ssm:${var.region}:${local.account_id}:parameter${local.ssm_parameter_prefix}/ai-api-key"
-
-  crawler_secret_arns = concat(
-    values(local.ssm_parameter_arns),
-    local.llm_enabled ? [local.ai_api_key_arn] : [],
-  )
 }
 
 resource "aws_ecr_repository" "crawler" {
@@ -86,7 +76,7 @@ resource "aws_iam_role_policy_attachment" "crawler_execution_managed" {
 data "aws_iam_policy_document" "crawler_execution_secrets" {
   statement {
     actions   = ["ssm:GetParameters"]
-    resources = local.crawler_secret_arns
+    resources = values(local.ssm_parameter_arns)
   }
 }
 
@@ -127,7 +117,7 @@ data "aws_iam_policy_document" "crawler_task" {
   statement {
     sid       = "ReadCredentialsAtRuntime"
     actions   = ["ssm:GetParameters", "ssm:GetParameter"]
-    resources = local.crawler_secret_arns
+    resources = values(local.ssm_parameter_arns)
   }
 }
 
@@ -163,7 +153,7 @@ resource "aws_ecs_task_definition" "crawler" {
     command          = ["node", "--import", "tsx", "src/index.ts"]
     workingDirectory = "/app/apps/crawler"
 
-    environment = concat([
+    environment = [
       { name = "TZ", value = "Asia/Tokyo" },
       { name = "CRAWLER_RUN_SOURCE", value = "scheduled" },
       { name = "SSM_PARAMETER_PREFIX", value = local.ssm_parameter_prefix },
@@ -173,18 +163,13 @@ resource "aws_ecs_task_definition" "crawler" {
       { name = "DATABASE_OBJECT_KEY", value = var.database_object_key },
       { name = "DB_PATH", value = "/tmp/moneyforward.db" },
       { name = "AWS_REGION", value = var.region },
-      ],
-      local.llm_enabled ? [
-        { name = "AI_PROVIDER", value = var.ai_provider },
-        { name = "AI_MODEL", value = var.ai_model },
-    ] : [])
+    ]
 
-    secrets = concat([
+    secrets = [
       { name = "MF_EMAIL", valueFrom = local.ssm_parameter_arns.email },
       { name = "MF_PASSWORD", valueFrom = local.ssm_parameter_arns.password },
       { name = "MF_TOTP_SECRET", valueFrom = local.ssm_parameter_arns.totp_secret },
-      ],
-    local.llm_enabled ? [{ name = "AI_API_KEY", valueFrom = local.ai_api_key_arn }] : [])
+    ]
 
     logConfiguration = {
       logDriver = "awslogs"

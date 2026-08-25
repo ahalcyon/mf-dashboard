@@ -57,4 +57,3 @@ export * from "./queries/summary";
 export * from "./queries/account";
 export * from "./queries/asset";
 export * from "./queries/holding";
-export * from "./queries/analytics";

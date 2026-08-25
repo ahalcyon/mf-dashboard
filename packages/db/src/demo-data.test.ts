@@ -628,36 +628,4 @@ describe.skipIf(!demoDbExists)("demo.db 整合性テスト", () => {
       ).toHaveLength(0);
     });
   });
-
-  describe("分析レポート整合性", () => {
-    test("全グループにスナップショット日付のdemoレポートが存在する", async () => {
-      expect(
-        await findRows(`
-        SELECT g.id
-        FROM groups g
-        LEFT JOIN analytics_reports ar ON ar.group_id = g.id
-        CROSS JOIN (SELECT MAX(date) AS snapshot_date FROM daily_snapshots) snapshot
-        GROUP BY g.id
-        HAVING COUNT(ar.id) <> 1
-           OR MAX(ar.date) <> snapshot.snapshot_date
-           OR COALESCE(MAX(ar.model), '') <> 'demo'
-      `),
-      ).toHaveLength(0);
-    });
-
-    test("分析レポートに少なくとも1つのインサイトがある", async () => {
-      expect(
-        await findRows(`
-        SELECT id
-        FROM analytics_reports
-        WHERE NULLIF(TRIM(summary), '') IS NULL
-          AND NULLIF(TRIM(savings_insight), '') IS NULL
-          AND NULLIF(TRIM(investment_insight), '') IS NULL
-          AND NULLIF(TRIM(spending_insight), '') IS NULL
-          AND NULLIF(TRIM(balance_insight), '') IS NULL
-          AND NULLIF(TRIM(liability_insight), '') IS NULL
-      `),
-      ).toHaveLength(0);
-    });
-  });
 });

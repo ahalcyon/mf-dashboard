@@ -103,7 +103,9 @@ describe("crawler progress", () => {
       await rm(statePath);
       await mkdir(statePath);
 
-      await expect(progress.startStep(CRAWLER_STEPS.analytics)).rejects.toThrow(/EISDIR|directory/);
+      await expect(progress.startStep(CRAWLER_STEPS.notification)).rejects.toThrow(
+        /EISDIR|directory/,
+      );
       expect(progress.getState().timeline).toEqual([]);
 
       await rm(statePath, { recursive: true });
@@ -121,11 +123,11 @@ describe("crawler progress", () => {
       await runWithCrawlerRunLock(
         "test",
         async (progress) => {
-          expect(progress.getState().progress).toEqual({ completed: 0, total: 13 });
-          await runCrawlerStep(progress, CRAWLER_STEPS.analytics, async () => {
-            expect(progress.getState().progress).toEqual({ completed: 0, total: 13 });
+          expect(progress.getState().progress).toEqual({ completed: 0, total: 12 });
+          await runCrawlerStep(progress, CRAWLER_STEPS.notification, async () => {
+            expect(progress.getState().progress).toEqual({ completed: 0, total: 12 });
           });
-          expect(progress.getState().progress).toEqual({ completed: 1, total: 13 });
+          expect(progress.getState().progress).toEqual({ completed: 1, total: 12 });
         },
         { lockPath },
       );
@@ -138,7 +140,7 @@ describe("crawler progress", () => {
       });
       expect(state.finishedAt).toEqual(expect.any(String));
       expect(state.timeline).toEqual([
-        expect.objectContaining({ step: "analytics", status: "done" }),
+        expect.objectContaining({ step: "notification", status: "done" }),
       ]);
     } finally {
       await rm(tempDir, { recursive: true, force: true });

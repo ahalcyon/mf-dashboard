@@ -1,4 +1,4 @@
-const KNOWN_PATHS = ["cf", "bs", "accounts", "simulator", "insights"] as const;
+const KNOWN_PATHS = ["cf", "bs", "accounts", "simulator"] as const;
 export type KnownPath = (typeof KNOWN_PATHS)[number];
 
 function isKnownPath(path: string): path is KnownPath {

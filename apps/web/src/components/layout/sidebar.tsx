@@ -6,7 +6,6 @@ import {
   PiggyBank,
   Landmark,
   Calculator,
-  Lightbulb,
   FileJson,
   FileText,
   X,
@@ -47,11 +46,6 @@ const navItems: NavItem[] = [
     title: "資産",
     path: "bs",
     icon: PiggyBank,
-  },
-  {
-    title: "インサイト",
-    path: "insights",
-    icon: Lightbulb,
   },
   {
     title: "連携サービス",

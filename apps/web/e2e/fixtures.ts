@@ -20,7 +20,6 @@ export const pages = [
   { name: "Cash Flow", path: "/cf", heading: "収支" },
   { name: "Cash Flow (monthly)", path: "/cf/2025-12", heading: "収支 - 2025年12月" },
   { name: "Simulator", path: "/simulator", heading: "シミュレーター" },
-  { name: "Insights", path: "/insights", heading: "財務インサイト" },
   {
     name: "Group dashboard",
     path: "/demo_group_001",
@@ -42,11 +41,6 @@ export const pages = [
     name: "Group cash flow (monthly)",
     path: "/demo_group_001/cf/2025-12",
     heading: "収支 - 2025年12月",
-  },
-  {
-    name: "Group insights",
-    path: "/demo_group_001/insights",
-    heading: "財務インサイト",
   },
   {
     name: "Group simulator",

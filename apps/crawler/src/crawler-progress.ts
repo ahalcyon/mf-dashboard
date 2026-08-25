@@ -32,7 +32,6 @@ export const CRAWLER_STEPS = {
     code: "institution_categories",
     label: "金融機関カテゴリを更新",
   },
-  analytics: { code: "analytics", label: "金融データを分析" },
   notification: { code: "notification", label: "更新結果を通知" },
   webCacheRefresh: { code: "web_cache_refresh", label: "Web キャッシュを更新" },
 } as const satisfies Record<string, CrawlerCurrentStep>;

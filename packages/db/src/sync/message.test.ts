@@ -23,16 +23,16 @@ describe("buildSyncMessage", () => {
     const message = buildSyncMessage({
       bucket: "test-bucket",
       runId: "run-1",
-      kind: "analytics-reports",
+      kind: "scraped-data",
       producedAt: "2026-08-25T06:30:00.000Z",
     });
 
     expect(message).toEqual({
       version: SYNC_MESSAGE_VERSION,
       runId: "run-1",
-      kind: "analytics-reports",
+      kind: "scraped-data",
       producedAt: "2026-08-25T06:30:00.000Z",
-      payload: { bucket: "test-bucket", key: "payloads/run-1/analytics-reports.json" },
+      payload: { bucket: "test-bucket", key: "payloads/run-1/scraped-data.json" },
     });
   });
 
@@ -50,9 +50,6 @@ describe("buildSyncMessage", () => {
 describe("buildPayloadKey", () => {
   test("run と種別でキーを分ける", () => {
     expect(buildPayloadKey("run-1", "scraped-data")).toBe("payloads/run-1/scraped-data.json");
-    expect(buildPayloadKey("run-1", "analytics-reports")).toBe(
-      "payloads/run-1/analytics-reports.json",
-    );
   });
 });
 

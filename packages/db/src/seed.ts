@@ -32,7 +32,6 @@ import {
 } from "./seed/accounts";
 import { seedAssetHistory } from "./seed/asset-history";
 import { calculateHoldingTotals, holdingDefs } from "./seed/holdings";
-import { seedInsights } from "./seed/insights";
 import {
   createPick,
   createRandInt,
@@ -470,20 +469,6 @@ console.log(`資産履歴日数: ${assetHistoryDays}`);
 // 8. spending_targets (予算)
 // ---------------------------------------------------------------------------
 await seedSpendingTargets(db, now);
-
-// ---------------------------------------------------------------------------
-// 9. Analytics Reports (from pre-generated LLM insights)
-// ---------------------------------------------------------------------------
-const insightCount = await seedInsights({
-  db,
-  now,
-  yearEnd: YEAR_END,
-  monthEnd: MONTH_END,
-  fixedDay: DEMO_FORECAST_AS_OF_DAY,
-});
-if (insightCount > 0) {
-  console.log(`インサイトデータを挿入しました (${insightCount}グループ)`);
-}
 
 // ---------------------------------------------------------------------------
 // 完了

@@ -3,7 +3,6 @@ import { getDbPath } from "@mf-dashboard/db/db-path";
 import { buildCleanupGroupIds } from "./cleanup-groups.js";
 import {
   handleCrawlerFailure,
-  runAnalyticsPhase,
   runAuthPhase,
   runCashFlowHistoryPhase,
   runInstitutionCategoryPhase,
@@ -89,14 +88,12 @@ export async function runCrawler(progress: CrawlerProgressReporter): Promise<voi
             ...config,
             activeAccountingMonth: scrapeResult.globalData.cashFlow.month,
           },
-          activeRuntime.categoryDecision,
           progress,
           async (historyMonths) => {
             const savedCounts = await runSavePhase(
               activeRuntime.db,
               activeRuntime.page,
               scrapeResult,
-              activeRuntime.categoryDecision,
               historyMonths,
               cleanupResult?.ids,
               institutionCategories,
@@ -106,9 +103,6 @@ export async function runCrawler(progress: CrawlerProgressReporter): Promise<voi
             return savedCounts;
           },
         ),
-      );
-      await runCrawlerStep(progress, CRAWLER_STEPS.analytics, () =>
-        runAnalyticsPhase(activeRuntime.db, scrapeResult.groupDataList, publisher),
       );
     } catch (err) {
       crawlFailed = true;
