@@ -25,6 +25,7 @@ This repository is a monorepo built with pnpm workspaces and Turborepo.
 - Put debug scripts in the package's `debug/` directory. Do not create temporary `debug-*.ts` or `test-*.ts` files under `src/`.
 - Run commands on their own rather than piping them together, unless the next command actually consumes the previous output. Piping a long-running command such as `build` or `test` into `grep` or `tail` withholds every line until it finishes, so its progress is invisible while it runs. Run the command first, then inspect the result separately if you need to narrow it down.
 - When several pieces of work are independent of each other, use `git worktree` and run them in parallel rather than finishing one branch before starting the next. Group work that touches the same files into a single worktree so the branches do not conflict, and keep each worktree on its own branch.
+- List local files a worktree needs in `.worktreeinclude`; they are copied in when the worktree is created. It uses `.gitignore` syntax. Keep generated files out of it — the demo database comes from `^build:demo` and provider caches come from `terraform init`, so copying either just carries a stale snapshot along.
 
 ## Mandatory Engineering Rules
 
@@ -133,8 +134,10 @@ Bound structure-only E2E navigation independently from production crawl coverage
 | Format check        | `pnpm format:check`                              |
 | Web unit tests      | `pnpm --filter @mf-dashboard/web test:unit`      |
 | Web Storybook tests | `pnpm --filter @mf-dashboard/web test:storybook` |
-| Web E2E tests       | `pnpm --filter @mf-dashboard/web test:e2e`       |
+| Web E2E tests       | `pnpm test:e2e:web`                              |
 | Storybook           | `pnpm --filter @mf-dashboard/web storybook`      |
+
+Run the web E2E suite through `pnpm test:e2e:web`. Turbo regenerates `data/demo.db` from `^build:demo` first; invoking `playwright test` directly skips that step and every page fails with `no such table: groups`, or worse, runs against a stale snapshot.
 
 ## Common Commands
 
