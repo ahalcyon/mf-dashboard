@@ -11,6 +11,10 @@ const config: KnipConfig = {
       // package.json のスクリプトからではなく terraform の apply 中に呼ばれる
       entry: ["scripts/image-source-hash.mjs", "scripts/publish-image.mjs"],
     },
+    "apps/web": {
+      // playwright.config.ts が webServer のコマンド文字列から呼ぶ。
+      entry: ["scripts/require-demo-db.mjs"],
+    },
     "apps/crawler": {
       ignore: ["src/hooks/helpers.ts"],
     },
