@@ -155,14 +155,7 @@ S3 の DB 更新 → EventBridge → ECS Fargate (site-builder) → s3 sync → 
 ```
 
 CodeBuild を使わないのは、GitHub 接続の認可が Terraform の管理外で必要になり、
-リポジトリと CI の二重管理になるため。crawler や writer と同じく、手元で
-イメージを push して apply する形に揃えている。ソースはイメージへ同梱するので、
-アプリを変更したときはイメージを作り直す。
-
-```sh
-wslc build -f docker/site-builder/Dockerfile -t "$(terraform -chdir=terraform/aws output -raw site_builder_repository_url):latest" .
-wslc push "$(terraform -chdir=terraform/aws output -raw site_builder_repository_url):latest"
-```
+リポジトリと CI の二重管理になるため。ソースはイメージへ同梱する。
 
 手元から即座に発行したい場合は次を実行する。接続先は環境変数を優先し、
 無ければ `terraform output` から解決するため、同じスクリプトが両方で動く。

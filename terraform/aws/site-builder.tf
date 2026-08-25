@@ -83,6 +83,8 @@ resource "aws_iam_role_policy" "site_builder_task" {
 }
 
 resource "aws_ecs_task_definition" "site_builder" {
+  depends_on = [terraform_data.image["site-builder"]]
+
   family                   = "${var.name_prefix}-site-builder"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
@@ -98,7 +100,7 @@ resource "aws_ecs_task_definition" "site_builder" {
 
   container_definitions = jsonencode([{
     name      = "site-builder"
-    image     = "${aws_ecr_repository.site_builder.repository_url}:${var.site_builder_image_tag}"
+    image     = local.image_uris["site-builder"]
     essential = true
 
     environment = [

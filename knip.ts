@@ -5,6 +5,10 @@ const config: KnipConfig = {
   ignoreBinaries: ["ps", "terraform"],
   ignoreDependencies: ["lefthook"],
   workspaces: {
+    ".": {
+      // package.json のスクリプトからではなく terraform の apply 中に呼ばれる
+      entry: ["scripts/image-source-hash.mjs", "scripts/publish-image.mjs"],
+    },
     "apps/crawler": {
       ignore: ["src/hooks/helpers.ts"],
     },

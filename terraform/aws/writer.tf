@@ -99,12 +99,10 @@ resource "aws_iam_role_policy" "writer" {
 # reserved_concurrent_executions はその二重化だが、アカウントの
 # 同時実行クォータが 10 以下だと設定できない（変数の説明を参照）。
 resource "aws_lambda_function" "writer" {
-  count = var.enable_writer ? 1 : 0
-
   function_name = "${var.name_prefix}-writer"
   role          = aws_iam_role.writer.arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.writer.repository_url}:${var.writer_image_tag}"
+  image_uri     = local.image_uris.writer
   timeout       = var.writer_timeout_seconds
   memory_size   = var.writer_memory
 
@@ -127,14 +125,12 @@ resource "aws_lambda_function" "writer" {
     log_group  = aws_cloudwatch_log_group.writer.name
   }
 
-  depends_on = [aws_iam_role_policy.writer]
+  depends_on = [aws_iam_role_policy.writer, terraform_data.image["writer"]]
 }
 
 resource "aws_lambda_event_source_mapping" "writes" {
-  count = var.enable_writer ? 1 : 0
-
   event_source_arn = aws_sqs_queue.writes.arn
-  function_name    = aws_lambda_function.writer[0].arn
+  function_name    = aws_lambda_function.writer.arn
 
   # ファイル全体の書き換えは高コストなので、まとめて 1 回で適用する。
   # FIFO キューはバッチングウィンドウを受け付けないため batch_size だけで制御する。
@@ -143,8 +139,6 @@ resource "aws_lambda_event_source_mapping" "writes" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "writer_errors" {
-  count = var.enable_writer ? 1 : 0
-
   alarm_name          = "${var.name_prefix}-writer-errors"
   alarm_description   = "The SQLite writer Lambda is failing."
   namespace           = "AWS/Lambda"
@@ -157,6 +151,6 @@ resource "aws_cloudwatch_metric_alarm" "writer_errors" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    FunctionName = aws_lambda_function.writer[0].function_name
+    FunctionName = aws_lambda_function.writer.function_name
   }
 }

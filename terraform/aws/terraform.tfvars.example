@@ -15,7 +15,9 @@
 # source_repository_url = "https://github.com/ahalcyon/mf-dashboard.git"
 # source_branch         = "main"
 
-# イメージの push や GitHub 認可が済んでから有効化する
-# enable_writer           = true
-# enable_site_build       = true
+# 定期クロールを有効にする
 # enable_crawler_schedule = true
+
+# イメージのビルドに使う Docker 互換 CLI。
+# Windows で開発する場合は WSL Container CLI を指す。
+# container_cli = "/mnt/c/Program Files/WSL/wslc.exe"
