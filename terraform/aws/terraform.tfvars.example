@@ -18,3 +18,6 @@
 # イメージのビルドに使う Docker 互換 CLI。
 # Windows で開発する場合は WSL Container CLI を指す。
 # container_cli = "/mnt/c/Program Files/WSL/wslc.exe"
+
+# クロール結果の通知先。設定すると AWS から確認メールが届くので承認する。
+# notification_email = "user-a@example.com"

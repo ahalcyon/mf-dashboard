@@ -168,6 +168,7 @@ pnpm --filter @mf-dashboard/web dev              # デモデータでダッシ�
 | `DASHBOARD_URL`                        | 任意 | Open Graph / Twitter metadataと通知に使う公開ダッシュボードURL |
 | `SSM_PARAMETER_PREFIX`                 | 任意 | SSM Parameter Storeの接頭辞。既定値は`/mf-dashboard`           |
 | `NEXT_PUBLIC_BASE_PATH`                | 任意 | ドメインの直下以外で配信する場合のURL接頭辞                    |
+| `NOTIFICATION_TOPIC_ARN`               | 任意 | 通知先のSNSトピック。デプロイ時はTerraformが渡す               |
 | `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID` | 任意 | Slack通知                                                      |
 | `MAX_WAIT_MINUTES`                     | 任意 | 金融機関の一括更新を待つ上限（分）。既定値は20                 |
 | `AUTH_STATE_PATH`                      | 任意 | ブラウザーセッションの保存先。既定値は`data/auth-state.json`   |
@@ -177,6 +178,24 @@ pnpm --filter @mf-dashboard/web dev              # デモデータでダッシ�
 ## 7. オプション設定
 
 ここからの設定は、基本セットアップの完了後に必要なものだけ追加する。
+
+### メール通知（SNS）
+
+クロール完了時に、総資産と前日比・今月比、資産内訳、口座の更新状態をメールで受け取れる。クロールが失敗したときも通知が届く。
+
+`terraform/aws/terraform.tfvars`に宛先を設定して適用する。
+
+```hcl
+notification_email = "user-a@example.com"
+```
+
+適用後、AWSから確認メールが届くので本文のリンクを開いて承認する。承認するまで`PendingConfirmation`のままで、通知は配信されない。状態は次で確認できる。
+
+```sh
+terraform -chdir=terraform/aws output -raw notification_subscription_status
+```
+
+宛先を設定しない場合もトピック自体は作られるが、購読者がいないため何も届かない。crawlerは`NOTIFICATION_TOPIC_ARN`が無ければ通知を試みない。
 
 ### Slack通知
 

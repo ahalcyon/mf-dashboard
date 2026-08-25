@@ -21,6 +21,7 @@ import {
 } from "./crawler-progress.js";
 import { info, warn } from "./logger.js";
 import { createGroupScope } from "./scrapers/group.js";
+import { destroySnsClient } from "./sns.js";
 import { buildRunId, loadSyncConfig } from "./sync/config.js";
 import { SyncPublisher } from "./sync/publisher.js";
 
@@ -134,6 +135,8 @@ export async function runCrawler(progress: CrawlerProgressReporter): Promise<voi
       }
     } finally {
       publisher?.destroy();
+      // AWS SDK のクライアントはソケットを掴んだままなので、閉じてから抜ける
+      destroySnsClient();
       closeDb();
     }
   }

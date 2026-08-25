@@ -202,3 +202,18 @@ variable "session_cookie_max_age_seconds" {
   type        = number
   default     = 31536000
 }
+
+variable "notification_email" {
+  description = <<-DESC
+    Address that receives the crawl result. Leave empty to create the topic without
+    a subscriber. AWS sends a confirmation mail that must be accepted by hand before
+    anything is delivered.
+  DESC
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.notification_email == "" || can(regex("^[^@[:space:]]+@[^@[:space:]]+$", var.notification_email))
+    error_message = "notification_email must be a single email address."
+  }
+}
