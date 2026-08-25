@@ -71,8 +71,10 @@ output "notification_topic_arn" {
 
 output "notification_subscription_status" {
   description = "Whether the email subscription still needs to be confirmed by hand"
+  # 宛先そのものは参照しない。SSM の SecureString 由来で sensitive なので、
+  # 条件に使うだけでも出力全体が sensitive 扱いになり plan が通らなくなる。
   value = (
-    local.notification_email == null
+    var.notification_email_parameter == ""
     ? "no subscriber configured"
     : one(aws_sns_topic_subscription.email[*].confirmation_was_authenticated) == true
     ? "confirmed"
