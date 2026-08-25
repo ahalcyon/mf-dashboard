@@ -1,5 +1,12 @@
 name: Setup Node
 description: Setup pnpm and Node.js with dependencies
+inputs:
+  browsers:
+    description: >-
+      Install the Chromium build Playwright drives. Only the job running the
+      Storybook browser tests needs it: the E2E jobs use the browsers baked into
+      the Playwright container image, and no other job launches one.
+    default: "false"
 runs:
   using: composite
   steps:
@@ -13,17 +20,21 @@ runs:
     # setup-node の cache: pnpm は lockfile ハッシュの完全一致しか見ないため、
     # 依存を 1 つ変えただけで 525 パッケージ全部を落とし直していた。
     # restore-keys を足して、変わらなかった分はストアから再利用する。
-    - uses: actions/cache@v4
+    - uses: actions/cache@v6.1.0
       with:
         path: ${{ steps.store.outputs.path }}
         key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: pnpm-store-${{ runner.os }}-
-    # postinstall が crawler 用の Chromium を落とすので、node を使う全ジョブに効く。
-    # 取り違えても playwright が不足分を落とし直すだけなので、前方一致で構わない。
-    - uses: actions/cache@v4
+    # 282MB あるので、ブラウザーを起動するジョブだけが復元する。
+    # 取り違えても playwright が不足分を落とし直すだけなので前方一致で構わない。
+    - if: inputs.browsers == 'true'
+      uses: actions/cache@v6.1.0
       with:
         path: ~/.cache/ms-playwright
         key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: playwright-${{ runner.os }}-
     - run: pnpm install --frozen-lockfile
+      shell: bash
+    - if: inputs.browsers == 'true'
+      run: pnpm --filter @mf-dashboard/web exec playwright install chromium
       shell: bash

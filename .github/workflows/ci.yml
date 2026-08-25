@@ -18,10 +18,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
+      # Storybook のテストは @vitest/browser-playwright で Chromium を起動する
       - uses: ./.github/actions/setup-node
+        with:
+          browsers: "true"
       # turbo のキャッシュ項目は入力のハッシュで引くため、古い版を復元しても
       # 入力が一致しないものは再実行される。前方一致で復元して構わない。
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6.1.0
         with:
           path: .turbo/cache
           key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
@@ -52,13 +55,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: ./.github/actions/setup-node
-      # turbo のキャッシュ項目は入力のハッシュで引くため、古い版を復元しても
-      # 入力が一致しないものは再実行される。前方一致で復元して構わない。
-      - uses: actions/cache@v4
-        with:
-          path: .turbo/cache
-          key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
-          restore-keys: turbo-${{ runner.os }}-${{ github.job }}-
+      # turbo のキャッシュは張らない。build:demo は turbo.json で cache: false に
+      # してあるため保存されるものが無く、実測でも 194 B しか積まれなかった。
       - run: pnpm build:demo --affected
       - run: pnpm --filter @mf-dashboard/db build:demo
       - run: pnpm --filter @mf-dashboard/db test:demo
@@ -86,7 +84,7 @@ jobs:
       - uses: ./.github/actions/setup-node
       # turbo のキャッシュ項目は入力のハッシュで引くため、古い版を復元しても
       # 入力が一致しないものは再実行される。前方一致で復元して構わない。
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6.1.0
         with:
           path: .turbo/cache
           key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
