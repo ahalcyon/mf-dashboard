@@ -8,7 +8,7 @@
     "prebuild": "tsx scripts/generate-export.mts",
     "build": "next build",
     "prebuild:demo": "DB_PATH=../../data/demo.db tsx scripts/generate-export.mts",
-    "build:demo": "DB_PATH=../../data/demo.db DEMO_MODE=true next build",
+    "build:demo": "DB_PATH=../../data/demo.db DEMO_MODE=true STATIC_EXPORT=true next build",
     "start": "next start",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",

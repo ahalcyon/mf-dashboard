@@ -15,16 +15,16 @@ afterEach(() => {
 });
 
 describe("waitForRuntimeData", () => {
-  it("waits for a runtime request outside demo export builds", async () => {
-    delete process.env.DEMO_MODE;
+  it("waits for a runtime request outside static export builds", async () => {
+    delete process.env.STATIC_EXPORT;
 
     await waitForRuntimeData();
 
     expect(connectionMock).toHaveBeenCalledTimes(1);
   });
 
-  it("does not force runtime rendering for demo static export builds", async () => {
-    process.env.DEMO_MODE = "true";
+  it("does not force runtime rendering for static export builds", async () => {
+    process.env.STATIC_EXPORT = "true";
 
     await waitForRuntimeData();
 

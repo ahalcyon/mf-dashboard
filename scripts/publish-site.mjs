@@ -53,8 +53,9 @@ run("pnpm", ["--filter", "@mf-dashboard/web", "build"], {
     ...process.env,
     // apps/web を作業ディレクトリとして next build が走るため、そこからの相対パス
     DB_PATH: "../../data/moneyforward.db",
-    // next.config.ts はこのフラグで output: "export" に切り替わる
-    DEMO_MODE: "true",
+    // next.config.ts はこのフラグで output: "export" に切り替わる。
+    // DEMO_MODE は付けない。ここでビルドするのは本番データであり、デモではない。
+    STATIC_EXPORT: "true",
     DASHBOARD_URL: siteUrl,
   },
 });

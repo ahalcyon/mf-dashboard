@@ -93,7 +93,7 @@ terraform -chdir=terraform/aws apply
 静的サイトを手で公開する場合は、ビルドしてから同期する。
 
 ```sh
-DB_PATH=../../data/demo.db DEMO_MODE=true pnpm --filter @mf-dashboard/web build
+DB_PATH=../../data/moneyforward.db STATIC_EXPORT=true pnpm --filter @mf-dashboard/web build
 aws s3 sync apps/web/out "s3://$(terraform -chdir=terraform/aws output -raw site_bucket)" --delete
 aws cloudfront create-invalidation \
   --distribution-id "$(terraform -chdir=terraform/aws output -raw cloudfront_distribution_id)" \
@@ -135,15 +135,6 @@ URL セーフな文字だけを受け付ける。
 S3 バックエンド（Terraform 1.10 以降は `use_lockfile = true` で DynamoDB 不要）への移行は
 未実施。state バケット自体をこのモジュールで作ると循環するため、移行する場合は
 bootstrap 用の小さなモジュールを別に切る。
-
-## 未実装（アプリ側の対応が必要）
-
-このモジュールは器だけを用意している。次はまだコードが存在しない。
-
-2. **`DEMO_MODE` の二重用途。** `next.config.ts` は `DEMO_MODE=true` で
-   `output: "export"` に切り替わるが、同時に AI チャットを無効化し
-   `NEXT_PUBLIC_STATIC_DEMO_BUILD` を立てる。本番データを「デモ」フラグでビルドする
-   状態なので、`STATIC_EXPORT` のような名前へ分離するのが望ましい。
 
 ## 静的サイトの発行
 
