@@ -41,7 +41,7 @@ function toAsciiAmount(amount: string): string {
 export function buildSuccessMessage(data: ScrapedData): string {
   const { summary, items, updatedAt, groupName } = data;
 
-  // 前日比は資産内訳の「合計」行が持つ。Slack と同じ取り方をする。
+  // 前日比は資産内訳の「合計」行が持つ。
   const totalItem = items.find((item) => item.name === "合計");
   const dailyChange = totalItem?.change || "-";
   const breakdown = items.filter((item) => item.name !== "合計");

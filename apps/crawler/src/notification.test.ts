@@ -5,16 +5,16 @@ import {
   sendSuccessNotifications,
 } from "./notification.js";
 import type { GroupData } from "./scraper.js";
-import { sendSlackNotification } from "./slack.js";
+import { sendSnsNotification } from "./sns.js";
 
-vi.mock("./slack.js", () => ({
-  sendSlackNotification: vi.fn<() => Promise<void>>(),
-  sendErrorNotification: vi.fn<() => Promise<void>>(),
+vi.mock("./sns.js", () => ({
+  sendSnsNotification: vi.fn<() => Promise<void>>(),
+  sendSnsErrorNotification: vi.fn<() => Promise<void>>(),
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(sendSlackNotification).mockResolvedValue(undefined);
+  vi.mocked(sendSnsNotification).mockResolvedValue(undefined);
 });
 
 function makeGroupData(id: string, name: string): GroupData {
@@ -115,7 +115,7 @@ describe("buildNotificationPayload", () => {
 describe("sendSuccessNotifications", () => {
   test("通知 channel の失敗を caller に返す", async () => {
     const failure = new Error("notification unavailable");
-    vi.mocked(sendSlackNotification).mockRejectedValue(failure);
+    vi.mocked(sendSnsNotification).mockRejectedValue(failure);
 
     await expect(
       sendSuccessNotifications([makeGroupData("group-a", "Group A")], null),

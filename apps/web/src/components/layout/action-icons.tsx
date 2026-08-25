@@ -180,8 +180,8 @@ function HelpButton({ iconSize, className }: { iconSize: string; className?: str
                   </span>
                 </li>
                 <li>
-                  <span className="font-medium text-foreground">Slack 通知</span>
-                  <span className="block ml-5 mt-1">前日との差分を Slack へ自動投稿できます。</span>
+                  <span className="font-medium text-foreground">メール通知</span>
+                  <span className="block ml-5 mt-1">前日との差分をメールで受け取れます。</span>
                 </li>
                 <li>
                   <span className="font-medium text-foreground">カスタム処理（Hooks）</span>
