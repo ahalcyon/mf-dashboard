@@ -19,5 +19,10 @@
 # Windows で開発する場合は WSL Container CLI を指す。
 # container_cli = "/mnt/c/Program Files/WSL/wslc.exe"
 
-# クロール結果の通知先。設定すると AWS から確認メールが届くので承認する。
-# notification_email = "user-a@example.com"
+# クロール結果と障害通知の宛先を保持する SSM パラメータ。
+# 先に値を入れてから設定する。適用後、AWS から届く確認メールを承認する。
+#
+#   aws ssm put-parameter --type SecureString \
+#     --name /mf-dashboard/notification-email --value '...'
+#
+# notification_email_parameter = "/mf-dashboard/notification-email"

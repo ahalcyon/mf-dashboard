@@ -9,14 +9,27 @@ resource "aws_sns_topic" "notifications" {
   display_name = "mf-dashboard"
 }
 
+# 宛先は SSM に置く。tfvars だと開発機ごとに持ち回ることになり、
+# 機械が変わると通知先が消える。
+data "aws_ssm_parameter" "notification_email" {
+  count = var.notification_email_parameter == "" ? 0 : 1
+
+  name            = var.notification_email_parameter
+  with_decryption = true
+}
+
+locals {
+  notification_email = one(data.aws_ssm_parameter.notification_email[*].value)
+}
+
 # メールの subscription は AWS からの確認メールを承認するまで
 # PendingConfirmation のまま残る。承認は利用者が手で行う。
 resource "aws_sns_topic_subscription" "email" {
-  count = var.notification_email == "" ? 0 : 1
+  count = local.notification_email == null ? 0 : 1
 
   topic_arn = aws_sns_topic.notifications.arn
   protocol  = "email"
-  endpoint  = var.notification_email
+  endpoint  = local.notification_email
 }
 
 # --- 障害の通知 -----------------------------------------------------------
