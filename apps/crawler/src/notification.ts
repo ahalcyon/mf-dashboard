@@ -1,6 +1,5 @@
 import type { Group } from "@mf-dashboard/db/types";
 import { formatUpdatedAt } from "./data-builder.js";
-import { sendDiscordNotification, sendDiscordErrorNotification } from "./discord.js";
 import { error, warn } from "./logger.js";
 import type { GroupData } from "./scraper.js";
 import { sendSlackNotification, sendErrorNotification } from "./slack.js";
@@ -45,10 +44,7 @@ export async function sendSuccessNotifications(
   }
 
   const notifyPayload = buildNotificationPayload(notifyGroupData);
-  const results = await Promise.allSettled([
-    sendSlackNotification(notifyPayload),
-    sendDiscordNotification(notifyPayload),
-  ]);
+  const results = await Promise.allSettled([sendSlackNotification(notifyPayload)]);
 
   logNotificationFailures(results, "Failed to send notification:");
   const failure = results.find(
@@ -58,10 +54,7 @@ export async function sendSuccessNotifications(
 }
 
 export async function sendFailureNotifications(err: Error) {
-  const results = await Promise.allSettled([
-    sendErrorNotification(err),
-    sendDiscordErrorNotification(err),
-  ]);
+  const results = await Promise.allSettled([sendErrorNotification(err)]);
 
   logNotificationFailures(results, "Failed to send error notification:");
 }

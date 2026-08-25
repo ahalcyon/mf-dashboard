@@ -94,18 +94,5 @@ else
 
   post_slack_message "$(printf 'Crawler E2E テストが失敗しました\n```%s```' "$failure_summary")"
 
-  if [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
-    payload=$(jq -n --arg avatar_url "${DISCORD_AVATAR_URL:-}" '
-      if ($avatar_url | length) > 0 then
-        {content: "Crawler E2E テストが失敗しました", avatar_url: $avatar_url}
-      else
-        {content: "Crawler E2E テストが失敗しました"}
-      end
-    ')
-    curl -sS -X POST "$DISCORD_WEBHOOK_URL" \
-      -H "Content-Type: application/json" \
-      -d "$payload"
-  fi
-
   exit 1
 fi

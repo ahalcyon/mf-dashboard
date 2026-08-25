@@ -161,17 +161,16 @@ pnpm --filter @mf-dashboard/web dev              # デモデータでダッシ�
 
 `.env`の各キーは次のとおり。
 
-| `.env`のキー                                 | 必須 | 内容                                                           |
-| -------------------------------------------- | ---- | -------------------------------------------------------------- |
-| `MF_EMAIL` / `MF_PASSWORD`                   | 任意 | Money Forward MEのログイン情報。空ならSSMから解決する          |
-| `MF_TOTP_SECRET`                             | 任意 | 認証アプリのセットアップキー（Base32）。空ならSSMから解決する  |
-| `DASHBOARD_URL`                              | 任意 | Open Graph / Twitter metadataと通知に使う公開ダッシュボードURL |
-| `SSM_PARAMETER_PREFIX`                       | 任意 | SSM Parameter Storeの接頭辞。既定値は`/mf-dashboard`           |
-| `NEXT_PUBLIC_BASE_PATH`                      | 任意 | ドメインの直下以外で配信する場合のURL接頭辞                    |
-| `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID`       | 任意 | Slack通知                                                      |
-| `DISCORD_WEBHOOK_URL` / `DISCORD_AVATAR_URL` | 任意 | Discord通知                                                    |
-| `MAX_WAIT_MINUTES`                           | 任意 | 金融機関の一括更新を待つ上限（分）。既定値は20                 |
-| `AUTH_STATE_PATH`                            | 任意 | ブラウザーセッションの保存先。既定値は`data/auth-state.json`   |
+| `.env`のキー                           | 必須 | 内容                                                           |
+| -------------------------------------- | ---- | -------------------------------------------------------------- |
+| `MF_EMAIL` / `MF_PASSWORD`             | 任意 | Money Forward MEのログイン情報。空ならSSMから解決する          |
+| `MF_TOTP_SECRET`                       | 任意 | 認証アプリのセットアップキー（Base32）。空ならSSMから解決する  |
+| `DASHBOARD_URL`                        | 任意 | Open Graph / Twitter metadataと通知に使う公開ダッシュボードURL |
+| `SSM_PARAMETER_PREFIX`                 | 任意 | SSM Parameter Storeの接頭辞。既定値は`/mf-dashboard`           |
+| `NEXT_PUBLIC_BASE_PATH`                | 任意 | ドメインの直下以外で配信する場合のURL接頭辞                    |
+| `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID` | 任意 | Slack通知                                                      |
+| `MAX_WAIT_MINUTES`                     | 任意 | 金融機関の一括更新を待つ上限（分）。既定値は20                 |
+| `AUTH_STATE_PATH`                      | 任意 | ブラウザーセッションの保存先。既定値は`data/auth-state.json`   |
 
 デプロイされたサイトでは`DASHBOARD_URL`をsite-builderがCloudFrontのURLから渡すため、`.env`の値は使われない。
 
@@ -184,11 +183,6 @@ pnpm --filter @mf-dashboard/web dev              # デモデータでダッシ�
 1. [Slack API](https://api.slack.com/apps)でBotを作成し、`xoxb-`から始まるトークンを発行する
 2. Botへ`chat:write`権限を付与し、投稿先チャンネルへ招待する
 3. `.env`の`SLACK_BOT_TOKEN`と`SLACK_CHANNEL_ID`を設定する
-
-### Discord通知
-
-1. 通知先チャンネルの「連携サービス」からIncoming Webhookを作成する
-2. `.env`の`DISCORD_WEBHOOK_URL`へ、発行された`https://discord.com/api/webhooks/...`形式のURLを設定する
 
 ### 資産データのエクスポート
 

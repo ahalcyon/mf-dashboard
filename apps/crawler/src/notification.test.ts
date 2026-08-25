@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { sendDiscordNotification } from "./discord.js";
 import {
   buildNotificationPayload,
   selectNotificationGroup,
@@ -8,10 +7,6 @@ import {
 import type { GroupData } from "./scraper.js";
 import { sendSlackNotification } from "./slack.js";
 
-vi.mock("./discord.js", () => ({
-  sendDiscordNotification: vi.fn<() => Promise<void>>(),
-  sendDiscordErrorNotification: vi.fn<() => Promise<void>>(),
-}));
 vi.mock("./slack.js", () => ({
   sendSlackNotification: vi.fn<() => Promise<void>>(),
   sendErrorNotification: vi.fn<() => Promise<void>>(),
@@ -20,7 +15,6 @@ vi.mock("./slack.js", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(sendSlackNotification).mockResolvedValue(undefined);
-  vi.mocked(sendDiscordNotification).mockResolvedValue(undefined);
 });
 
 function makeGroupData(id: string, name: string): GroupData {
@@ -126,6 +120,5 @@ describe("sendSuccessNotifications", () => {
     await expect(
       sendSuccessNotifications([makeGroupData("group-a", "Group A")], null),
     ).rejects.toBe(failure);
-    expect(sendDiscordNotification).toHaveBeenCalledTimes(1);
   });
 });
