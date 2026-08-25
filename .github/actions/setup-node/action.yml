@@ -7,6 +7,13 @@ inputs:
       Storybook browser tests needs it: the E2E jobs use the browsers baked into
       the Playwright container image, and no other job launches one.
     default: "false"
+  cache-suffix:
+    description: >-
+      Distinguishes the dependency cache when the job runs somewhere with a
+      different toolchain from the default runner. Native builds
+      (better-sqlite3, esbuild, sharp, workerd) end up inside node_modules, so a
+      tree filled on the host must never be restored into a container.
+    default: host
 runs:
   using: composite
   steps:
@@ -14,17 +21,42 @@ runs:
     - uses: actions/setup-node@v7.0.0
       with:
         node-version-file: .node-version
-    - id: store
+
+    # 依存の解決結果そのものを持ち回る。ストアを復元しても pnpm install は
+    # 525 パッケージ分のリンクを張り直すため、実測で 17 秒かかっていた。
+    # node_modules を丸ごと戻せばその 17 秒が消える。
+    #
+    # 前方一致では復元しない。中途半端に古い node_modules は、無いより悪い。
+    # lockfile と workspace 定義が完全に一致したときだけ使う。
+    - id: modules
+      uses: actions/cache@v6.1.0
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          packages/*/node_modules
+        key: >-
+          node-modules-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-suffix }}-${{
+          hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc') }}
+
+    # ここから下は node_modules を引き当てられなかったときの経路。
+    # ストアは内容アドレスなので、古い版から変わらなかった分を再利用できる。
+    - if: steps.modules.outputs.cache-hit != 'true'
+      id: store
       run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       shell: bash
-    # setup-node の cache: pnpm は lockfile ハッシュの完全一致しか見ないため、
-    # 依存を 1 つ変えただけで 525 パッケージ全部を落とし直していた。
-    # restore-keys を足して、変わらなかった分はストアから再利用する。
-    - uses: actions/cache@v6.1.0
+
+    - if: steps.modules.outputs.cache-hit != 'true'
+      uses: actions/cache@v6.1.0
       with:
         path: ${{ steps.store.outputs.path }}
         key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: pnpm-store-${{ runner.os }}-
+
+    - if: steps.modules.outputs.cache-hit != 'true'
+      run: pnpm install --frozen-lockfile
+      shell: bash
+
     # 282MB あるので、ブラウザーを起動するジョブだけが復元する。
     # 取り違えても playwright が不足分を落とし直すだけなので前方一致で構わない。
     - if: inputs.browsers == 'true'
@@ -33,8 +65,7 @@ runs:
         path: ~/.cache/ms-playwright
         key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: playwright-${{ runner.os }}-
-    - run: pnpm install --frozen-lockfile
-      shell: bash
+
     - if: inputs.browsers == 'true'
       run: pnpm --filter @mf-dashboard/web exec playwright install chromium
       shell: bash
