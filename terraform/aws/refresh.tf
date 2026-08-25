@@ -151,3 +151,23 @@ resource "aws_cloudfront_origin_access_control" "refresh_trigger" {
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"
 }
+
+resource "aws_cloudwatch_metric_alarm" "refresh_trigger_errors" {
+  alarm_name          = "${var.name_prefix}-refresh-trigger-errors"
+  alarm_description   = "The manual refresh trigger is failing. The dashboard button no longer starts a crawl."
+  namespace           = "AWS/Lambda"
+  metric_name         = "Errors"
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.notifications.arn]
+  ok_actions    = [aws_sns_topic.notifications.arn]
+
+  dimensions = {
+    FunctionName = aws_lambda_function.refresh_trigger.function_name
+  }
+}
