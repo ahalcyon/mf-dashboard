@@ -55,7 +55,7 @@ export async function getAssetSummary(page: Page): Promise<AssetSummary> {
     debug("Monthly change selector failed");
   }
 
-  // dailyChange will be calculated from asset items in slack.ts
+  // dailyChange will be calculated from asset items in sns.ts
   return {
     totalAssets: totalAssets.trim(),
     dailyChange: "",

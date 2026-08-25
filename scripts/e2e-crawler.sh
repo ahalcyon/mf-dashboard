@@ -21,30 +21,27 @@ if [ -f .env ]; then
   set +a
 fi
 
-post_slack_message() {
-  local text="$1"
-  local payload
-  local response
+# 本文は SNS の Message へそのまま入れる。Subject は ASCII のみ 100 文字以内という
+# SNS の制約があるため、日本語を入れずに固定文字列で組み立てる。
+publish_notification() {
+  local subject="$1"
+  local message="$2"
 
-  if [ -z "${SLACK_BOT_TOKEN:-}" ] || [ -z "${SLACK_CHANNEL_ID:-}" ]; then
+  if [ -z "${NOTIFICATION_TOPIC_ARN:-}" ]; then
     return 0
   fi
 
-  payload=$(jq -n \
-    --arg channel "$SLACK_CHANNEL_ID" \
-    --arg text "$text" \
-    '{channel: $channel, text: $text}')
-
-  if ! response=$(curl -sS -X POST https://slack.com/api/chat.postMessage \
-    -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-    -H "Content-Type: application/json" \
-    -d "$payload"); then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') Failed to send Slack notification"
+  if ! command -v aws > /dev/null 2>&1; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') aws CLI not found, skipping notification"
     return 0
   fi
 
-  if [[ "$response" != *'"ok":true'* ]]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') Slack API returned an error: $response"
+  if ! aws sns publish \
+    --topic-arn "$NOTIFICATION_TOPIC_ARN" \
+    --subject "$subject" \
+    --message "$message" \
+    --output text > /dev/null; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') Failed to publish the notification"
   fi
 }
 
@@ -83,7 +80,7 @@ trap 'rm -f "$RUN_LOG"' EXIT
 
 if pnpm --filter @mf-dashboard/crawler test:e2e 2>&1 | tee "$RUN_LOG"; then
   echo "$(date '+%Y-%m-%d %H:%M:%S') E2E tests passed"
-  post_slack_message "Crawler E2E テストが成功しました"
+  publish_notification "Crawler E2E passed" "Crawler E2E テストが成功しました"
 else
   echo "$(date '+%Y-%m-%d %H:%M:%S') E2E tests failed"
 
@@ -92,7 +89,7 @@ else
     failure_summary="失敗内容を抽出できませんでした。ローカルログを確認してください。"
   fi
 
-  post_slack_message "$(printf 'Crawler E2E テストが失敗しました\n```%s```' "$failure_summary")"
+  publish_notification "Crawler E2E failed" "$(printf 'Crawler E2E テストが失敗しました\n\n%s' "$failure_summary")"
 
   exit 1
 fi
