@@ -23,6 +23,7 @@ This repository is a monorepo built with pnpm workspaces and Turborepo.
 - Keep changes scoped to the request and preserve unrelated work in the worktree.
 - Import directly from source files. Do not create barrel files (`index.ts` files that re-export modules).
 - Put debug scripts in the package's `debug/` directory. Do not create temporary `debug-*.ts` or `test-*.ts` files under `src/`.
+- Run commands on their own rather than piping them together, unless the next command actually consumes the previous output. Piping a long-running command such as `build` or `test` into `grep` or `tail` withholds every line until it finishes, so its progress is invisible while it runs. Run the command first, then inspect the result separately if you need to narrow it down.
 
 ## Mandatory Engineering Rules
 
