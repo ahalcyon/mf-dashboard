@@ -13,7 +13,7 @@ describe("memoizeDuringStaticExport", () => {
     );
     const memoized = memoizeDuringStaticExport(load, (groupId) => groupId ?? "__default__");
 
-    const results = await Promise.all([memoized("a"), memoized("a"), memoized()]);
+    const results = await Promise.all([memoized("a"), memoized("a"), memoized(undefined)]);
 
     expect(results).toEqual(["loaded:a", "loaded:a", "loaded:default"]);
     expect(load).toHaveBeenCalledTimes(2);
