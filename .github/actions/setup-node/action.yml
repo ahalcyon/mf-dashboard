@@ -7,6 +7,23 @@ runs:
     - uses: actions/setup-node@v7.0.0
       with:
         node-version-file: .node-version
-        cache: pnpm
+    - id: store
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      shell: bash
+    # setup-node の cache: pnpm は lockfile ハッシュの完全一致しか見ないため、
+    # 依存を 1 つ変えただけで 525 パッケージ全部を落とし直していた。
+    # restore-keys を足して、変わらなかった分はストアから再利用する。
+    - uses: actions/cache@v4
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: pnpm-store-${{ runner.os }}-
+    # postinstall が crawler 用の Chromium を落とすので、node を使う全ジョブに効く。
+    # 取り違えても playwright が不足分を落とし直すだけなので、前方一致で構わない。
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: playwright-${{ runner.os }}-
     - run: pnpm install --frozen-lockfile
       shell: bash
