@@ -1,0 +1,14 @@
+# git worktree を作るときに引き継ぐローカル設定。
+# .gitignore と同じ構文で「持っていきたいファイル」を書く。
+#
+# 引き継がないもの:
+#   data/moneyforward.db  実データ。複製を増やしたくない。crawler の
+#                         スクレイプモード判定にも影響する
+#   data/demo.db          turbo の test:e2e が ^build:demo で生成する。
+#                         コピーすると古い断面が残りうる
+#   terraform/**/.terraform/  プロバイダのキャッシュ。terraform init で解決する
+
+.env
+
+terraform/aws/terraform.tfvars
+terraform/aws/bootstrap/terraform.tfvars
