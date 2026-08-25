@@ -55,6 +55,11 @@ resource "aws_cloudwatch_metric_alarm" "writes_dlq_not_empty" {
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
 
+  # 宛先が無いと発報しても誰にも届かない。DLQ に落ちた分はそのクロールが
+  # 失われているので、気づけないと古い数字を見続けることになる。
+  alarm_actions = [aws_sns_topic.notifications.arn]
+  ok_actions    = [aws_sns_topic.notifications.arn]
+
   dimensions = {
     QueueName = aws_sqs_queue.writes_dlq.name
   }

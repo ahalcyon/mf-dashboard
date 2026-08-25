@@ -150,6 +150,11 @@ resource "aws_cloudwatch_metric_alarm" "writer_errors" {
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
 
+  # writer が失敗すると S3 の SQLite が更新されない。画面は正常に見えるので
+  # 通知が無いと気づけない。
+  alarm_actions = [aws_sns_topic.notifications.arn]
+  ok_actions    = [aws_sns_topic.notifications.arn]
+
   dimensions = {
     FunctionName = aws_lambda_function.writer.function_name
   }

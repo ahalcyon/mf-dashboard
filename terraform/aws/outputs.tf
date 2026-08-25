@@ -72,10 +72,11 @@ output "notification_topic_arn" {
 output "notification_subscription_status" {
   description = "Whether the email subscription still needs to be confirmed by hand"
   value = (
-    var.notification_email == ""
+    local.notification_email == null
     ? "no subscriber configured"
     : one(aws_sns_topic_subscription.email[*].confirmation_was_authenticated) == true
     ? "confirmed"
-    : "pending confirmation - accept the mail AWS sent to ${var.notification_email}"
+    : "pending confirmation - accept the mail AWS sent to the configured address"
   )
 }
+

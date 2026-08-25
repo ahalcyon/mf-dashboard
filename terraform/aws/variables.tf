@@ -203,17 +203,14 @@ variable "session_cookie_max_age_seconds" {
   default     = 31536000
 }
 
-variable "notification_email" {
+variable "notification_email_parameter" {
   description = <<-DESC
-    Address that receives the crawl result. Leave empty to create the topic without
-    a subscriber. AWS sends a confirmation mail that must be accepted by hand before
-    anything is delivered.
+    SSM parameter holding the address that receives crawl results and alarms.
+    Leave empty to create the topic without a subscriber. The address is kept in
+    SSM rather than in tfvars so it travels with the deployment instead of the
+    machine. Note that Terraform still records the resolved value in state.
   DESC
   type        = string
   default     = ""
-
-  validation {
-    condition     = var.notification_email == "" || can(regex("^[^@[:space:]]+@[^@[:space:]]+$", var.notification_email))
-    error_message = "notification_email must be a single email address."
-  }
 }
+
