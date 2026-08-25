@@ -3,6 +3,9 @@ import type { KnipConfig } from "knip";
 const config: KnipConfig = {
   // terraform は publish:site が output を読むために呼ぶ。開発者が各自で入れる前提。
   ignoreBinaries: ["terraform"],
+  // CloudFront Functions のソース。JS からは import されず、terraform の
+  // templatefile が読んでエッジへ配る。テストは中身をテキストとして読む。
+  ignore: ["terraform/aws/functions/*.js"],
   workspaces: {
     ".": {
       // package.json のスクリプトからではなく terraform の apply 中に呼ばれる
