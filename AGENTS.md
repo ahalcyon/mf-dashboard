@@ -126,6 +126,20 @@ Bound structure-only E2E navigation independently from production crawl coverage
 - After adding or changing Storybook stories, run `pnpm --filter @mf-dashboard/web test:storybook`.
 - Run checks relevant to the files changed. Before finishing, confirm the requested behavior, review the diff for regressions, and report which checks ran and any that were not run.
 
+### Infrastructure Changes
+
+When a change touches `terraform/`, prove it applies before opening the pull request. `terraform validate` does not catch what only surfaces during planning, and CI cannot run `plan` because it holds no AWS credentials, so a broken plan otherwise reaches `main` and blocks every later apply until a follow-up fixes it.
+
+1. Run `terraform plan` on the feature branch **without `-target`**. A targeted plan skips the outputs and dependencies outside the target, which is exactly how a broken output reached `main` once.
+2. Run `terraform apply` on the feature branch.
+3. Verify the behavior with the headless-browser E2E suite (`pnpm test:e2e:web`).
+4. Run `terraform apply` on `main` again to put the deployment back.
+5. Only then open the pull request.
+
+Applying a feature branch deploys unmerged infrastructure to the real AWS account. That is acceptable here because the account serves one person, but never leave the deployment on a branch: step 4 is not optional.
+
+Expect this to take time. Image tags are content hashes, so moving between a branch and `main` rebuilds and pushes every image whose sources differ.
+
 ### Validation Commands
 
 | Check               | Command                                          |
