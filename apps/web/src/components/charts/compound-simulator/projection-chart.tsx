@@ -13,9 +13,10 @@ import {
 } from "recharts";
 import { CHART_INITIAL_DIMENSION } from "../../../lib/chart";
 import { formatCurrency } from "../../../lib/format";
+import { formatManOku } from "../../../lib/format";
 import { chartTooltipStyle } from "../chart-tooltip";
 import type { YearlyProjection } from "./calculate-compound";
-import { formatYAxisAmount, getLabelMap } from "./compound-simulator-utils";
+import { getLabelMap } from "./compound-simulator-utils";
 
 export interface ProjectionChartProps {
   projections: YearlyProjection[];
@@ -84,7 +85,7 @@ export function ProjectionChart({
             tick={{ fontSize: 12 }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={formatYAxisAmount}
+            tickFormatter={formatManOku}
           />
           <Tooltip
             formatter={(value, name) => [

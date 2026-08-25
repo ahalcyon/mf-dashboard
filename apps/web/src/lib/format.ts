@@ -9,6 +9,24 @@ export function formatCurrency(amount: number, showPlusSign = false): string {
   return `${sign}${amount.toLocaleString("ja-JP")}円`;
 }
 
+/**
+ * 金額を「万」「億」の概数で表す。チャートの軸ラベルと、文中の概数の共通実装。
+ *
+ * - 1 億以上は小数 1 桁の「億」。末尾が .0 なら省く（`1.0億` ではなく `1億`）
+ * - それ未満は整数の「万」
+ * - 符号は保つ。絶対値で出したい場合は呼び出し側で `Math.abs` する
+ */
+export function formatManOku(value: number): string {
+  if (Math.abs(value) >= 100_000_000) {
+    const oku = Number((value / 100_000_000).toFixed(1));
+    return `${oku.toLocaleString("ja-JP")}億`;
+  }
+
+  // `-0` はそのまま整形すると「-0万」になる。0 に寄せる。
+  const man = Number((value / 10_000).toFixed(0)) + 0;
+  return `${man.toLocaleString("ja-JP")}万`;
+}
+
 export function formatNumber(num: number): string {
   return new Intl.NumberFormat("ja-JP").format(num);
 }

@@ -3,7 +3,7 @@ import { formatUpdatedAt } from "./data-builder.js";
 import { error, warn } from "./logger.js";
 import type { GroupData } from "./scraper.js";
 import { sendSnsErrorNotification, sendSnsNotification } from "./sns.js";
-import type { ScrapedData } from "./types.js";
+import type { NotificationPayload } from "./types.js";
 
 export function selectNotificationGroup(
   groupDataList: GroupData[],
@@ -14,7 +14,10 @@ export function selectNotificationGroup(
   );
 }
 
-export function buildNotificationPayload(groupData: GroupData, now = new Date()): ScrapedData {
+export function buildNotificationPayload(
+  groupData: GroupData,
+  now = new Date(),
+): NotificationPayload {
   const accountIssues = groupData.registeredAccounts.accounts
     .filter((account) => account.status === "updating" || account.status === "error")
     .map((account) => ({

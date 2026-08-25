@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { formatManOku } from "../../../lib/format";
 import { computeSummaryYear } from "./compound-simulator-utils";
 import { TAX_RATE } from "./constants";
 
@@ -25,16 +26,6 @@ export interface SummaryInput {
   expenseRatio?: number;
   withdrawalMilestones?: { year: number; annual: number }[];
   currentAge?: number;
-}
-
-function formatMan(amount: number): string {
-  const absAmount = Math.abs(amount);
-  if (absAmount >= 100_000_000) {
-    const oku = absAmount / 100_000_000;
-    return `${oku.toFixed(1)}億`;
-  }
-  const man = Math.round(absAmount / 10_000);
-  return `${man.toLocaleString("ja-JP")}万`;
 }
 
 export function generateSummary(input: SummaryInput): ReactNode {
@@ -67,7 +58,7 @@ export function generateSummary(input: SummaryInput): ReactNode {
 
   // 1. Start amount
   if (initialAmount > 0) {
-    parts.push(`現在の投資総額 ${formatMan(initialAmount)}円をスタートに、`);
+    parts.push(`現在の投資総額 ${formatManOku(initialAmount)}円をスタートに、`);
   }
 
   // 2. Monthly contribution
@@ -79,10 +70,10 @@ export function generateSummary(input: SummaryInput): ReactNode {
   if (monthlyContribution > 0 && contributionYears > 0) {
     if (idleYears > 0) {
       parts.push(
-        `毎月${formatMan(monthlyContribution)}円を${returnDesc}で${contributionYears}年間積み立て、さらに${idleYears}年間運用を続けた場合、`,
+        `毎月${formatManOku(monthlyContribution)}円を${returnDesc}で${contributionYears}年間積み立て、さらに${idleYears}年間運用を続けた場合、`,
       );
     } else {
-      parts.push(`毎月${formatMan(monthlyContribution)}円を${returnDesc}で積み立てた場合、`);
+      parts.push(`毎月${formatManOku(monthlyContribution)}円を${returnDesc}で積み立てた場合、`);
     }
   } else {
     parts.push(`${returnDesc}で運用した場合、`);
@@ -100,7 +91,7 @@ export function generateSummary(input: SummaryInput): ReactNode {
       <span key="result">
         {yearLabel}
         {taxFree ? "" : "税引後で"}
-        <strong className="font-semibold text-foreground">約{formatMan(finalTotal)}円</strong>
+        <strong className="font-semibold text-foreground">約{formatManOku(finalTotal)}円</strong>
         になる見込みです。
       </span>,
     );
@@ -110,7 +101,7 @@ export function generateSummary(input: SummaryInput): ReactNode {
     parts.push(
       <span key="result">
         初期資産
-        <strong className="font-semibold text-foreground">約{formatMan(finalTotal)}円</strong>
+        <strong className="font-semibold text-foreground">約{formatManOku(finalTotal)}円</strong>
         から運用を開始します。
       </span>,
     );
@@ -120,7 +111,7 @@ export function generateSummary(input: SummaryInput): ReactNode {
   if (finalInterest > 0 && finalPrincipal > 0) {
     const gainPct = Math.round((finalInterest / finalPrincipal) * 100);
     parts.push(
-      `そのうち約${formatMan(finalInterest)}円が${taxFree ? "" : "税引後の"}運用益で、元本に対して約${gainPct}%の利益です。`,
+      `そのうち約${formatManOku(finalInterest)}円が${taxFree ? "" : "税引後の"}運用益で、元本に対して約${gainPct}%の利益です。`,
     );
   }
 
@@ -157,13 +148,14 @@ export function generateSummary(input: SummaryInput): ReactNode {
       let monthlyDesc: string;
       if (totalIncome > 0 && gross > totalIncome) {
         const incomeParts: string[] = [];
-        if (monthlyPensionIncome > 0) incomeParts.push(`年金${formatMan(monthlyPensionIncome)}円`);
+        if (monthlyPensionIncome > 0)
+          incomeParts.push(`年金${formatManOku(monthlyPensionIncome)}円`);
         if (monthlyOtherIncome > 0)
-          incomeParts.push(`その他収入${formatMan(monthlyOtherIncome)}円`);
+          incomeParts.push(`その他収入${formatManOku(monthlyOtherIncome)}円`);
         const netWithdrawal = Math.max(gross - totalIncome, 0);
-        monthlyDesc = `毎月の生活費${formatMan(gross)}円のうち${incomeParts.join("・")}を除いた${taxFree ? "" : "手取り"}${formatMan(netWithdrawal)}円を`;
+        monthlyDesc = `毎月の生活費${formatManOku(gross)}円のうち${incomeParts.join("・")}を除いた${taxFree ? "" : "手取り"}${formatManOku(netWithdrawal)}円を`;
       } else {
-        monthlyDesc = `毎月${taxFree ? "" : "手取り"}${formatMan(monthlyWithdrawal!)}円ずつ`;
+        monthlyDesc = `毎月${taxFree ? "" : "手取り"}${formatManOku(monthlyWithdrawal!)}円ずつ`;
       }
       if (contributionYears === 0 && withdrawalStartYear === 0) {
         preamble = `${monthlyDesc}${withdrawalYears}年間取り崩した場合、`;
@@ -182,12 +174,12 @@ export function generateSummary(input: SummaryInput): ReactNode {
       const rateAnnual = rateMonthly * 12;
 
       const withdrawalText =
-        rateMonthly > 0 ? `${!taxFree ? "手取り" : ""}年額約${formatMan(rateAnnual)}円` : "";
+        rateMonthly > 0 ? `${!taxFree ? "手取り" : ""}年額約${formatManOku(rateAnnual)}円` : "";
 
       let milestonesText = "";
       if (withdrawalMilestones && withdrawalMilestones.length > 0) {
         const parts = withdrawalMilestones.map(
-          (m) => `${m.year}年後: 約${formatMan(m.annual)}円/年`,
+          (m) => `${m.year}年後: 約${formatManOku(m.annual)}円/年`,
         );
         milestonesText = `（${parts.join("、")}）`;
       }
@@ -234,12 +226,12 @@ export function generateSummary(input: SummaryInput): ReactNode {
           : diff >= -1
             ? `${returnLabel}とほぼ同水準のため、市場の変動次第で元本が目減りする可能性があります`
             : `${returnLabel}を下回るため資産を維持しやすい水準です`;
-      rateSuffix = `年間引出率は${computedWithdrawalRate.toFixed(1)}%（年間${formatMan(annualWithdrawal)}円 ÷ 資産${formatMan(finalTotal)}円）で、${rateComparison}。`;
+      rateSuffix = `年間引出率は${computedWithdrawalRate.toFixed(1)}%（年間${formatManOku(annualWithdrawal)}円 ÷ 資産${formatManOku(finalTotal)}円）で、${rateComparison}。`;
     }
 
     const boldRemaining = (
       <strong key="drawdown-remaining" className="font-semibold text-foreground">
-        約{formatMan(drawdownFinalTotal ?? 0)}円
+        約{formatManOku(drawdownFinalTotal ?? 0)}円
       </strong>
     );
 
@@ -306,12 +298,12 @@ export function generateSummary(input: SummaryInput): ReactNode {
     const contribTotal = monthlyContribution * 12 * contributionYears;
     formulaRows.push(
       <li key="principal">
-        元本: {formatMan(initialAmount)}
+        元本: {formatManOku(initialAmount)}
         {contribTotal > 0 && (
           <>
             {" "}
-            + {formatMan(monthlyContribution)} × 12 × {contributionYears}年 ={" "}
-            {formatMan(finalPrincipal)}円
+            + {formatManOku(monthlyContribution)} × 12 × {contributionYears}年 ={" "}
+            {formatManOku(finalPrincipal)}円
           </>
         )}
       </li>,
@@ -328,8 +320,8 @@ export function generateSummary(input: SummaryInput): ReactNode {
       const fvInitial = initialAmount * Math.pow(1 + monthlyRate, totalMonths);
       formulaRows.push(
         <li key="fv-initial">
-          初期投資の複利: {formatMan(initialAmount)}円 × (1 + {r}%)^{totalMonths}ヶ月 ={" "}
-          {formatMan(Math.round(fvInitial))}円
+          初期投資の複利: {formatManOku(initialAmount)}円 × (1 + {r}%)^{totalMonths}ヶ月 ={" "}
+          {formatManOku(Math.round(fvInitial))}円
         </li>,
       );
     }
@@ -346,15 +338,15 @@ export function generateSummary(input: SummaryInput): ReactNode {
       if (idleMonths > 0) {
         formulaRows.push(
           <li key="fv-contrib">
-            積立の複利: {formatMan(monthlyContribution)}円 × ((1 + {r}%)^{contribMonths} - 1) / {r}%
-            × (1 + {r}%)^{idleMonths} = {formatMan(Math.round(fvContrib))}円
+            積立の複利: {formatManOku(monthlyContribution)}円 × ((1 + {r}%)^{contribMonths} - 1) /{" "}
+            {r}% × (1 + {r}%)^{idleMonths} = {formatManOku(Math.round(fvContrib))}円
           </li>,
         );
       } else {
         formulaRows.push(
           <li key="fv-contrib">
-            積立の複利: {formatMan(monthlyContribution)}円 × ((1 + {r}%)^{contribMonths} - 1) / {r}%
-            = {formatMan(Math.round(fvContrib))}円
+            積立の複利: {formatManOku(monthlyContribution)}円 × ((1 + {r}%)^{contribMonths} - 1) /{" "}
+            {r}% = {formatManOku(Math.round(fvContrib))}円
           </li>,
         );
       }
@@ -367,15 +359,15 @@ export function generateSummary(input: SummaryInput): ReactNode {
     const grossTotal = finalPrincipal + grossInterest;
     formulaRows.push(
       <li key="compound">
-        {summaryYear}年後の税引前資産: 約{formatMan(grossTotal)}円
+        {summaryYear}年後の税引前資産: 約{formatManOku(grossTotal)}円
       </li>,
     );
     if (!taxFree && grossInterest > 0) {
       formulaRows.push(
         <li key="tax">
-          税金: {formatMan(grossInterest)}円 × {(taxRateUsed * 100).toFixed(3)}% ={" "}
-          {formatMan(Math.round(grossInterest * taxRateUsed))}円{" → "}税引後:{" "}
-          {formatMan(finalTotal)}円
+          税金: {formatManOku(grossInterest)}円 × {(taxRateUsed * 100).toFixed(3)}% ={" "}
+          {formatManOku(Math.round(grossInterest * taxRateUsed))}円{" → "}税引後:{" "}
+          {formatManOku(finalTotal)}円
         </li>,
       );
     }
@@ -403,10 +395,10 @@ export function generateSummary(input: SummaryInput): ReactNode {
         prePensionAgeStart != null ? ` (${prePensionAgeStart}〜${prePensionAgeEnd}歳)` : "";
       formulaRows.push(
         <li key="pre-pension">
-          年金受給前{ageLabel}: {formatMan(gross)}円
-          {monthlyOtherIncome > 0 && <> - その他{formatMan(monthlyOtherIncome)}円</>}
+          年金受給前{ageLabel}: {formatManOku(gross)}円
+          {monthlyOtherIncome > 0 && <> - その他{formatManOku(monthlyOtherIncome)}円</>}
           {" = "}
-          {formatMan(prePensionNet)}円/月 × {prePensionYears}年
+          {formatManOku(prePensionNet)}円/月 × {prePensionYears}年
         </li>,
       );
     }
@@ -420,21 +412,21 @@ export function generateSummary(input: SummaryInput): ReactNode {
       const ageLabel = postAgeStart != null ? ` (${postAgeStart}〜${postAgeEnd}歳)` : "";
       formulaRows.push(
         <li key="post-pension">
-          年金受給後{ageLabel}: {formatMan(gross)}円 - 年金{formatMan(monthlyPensionIncome)}円
-          {monthlyOtherIncome > 0 && <> - その他{formatMan(monthlyOtherIncome)}円</>}
+          年金受給後{ageLabel}: {formatManOku(gross)}円 - 年金{formatManOku(monthlyPensionIncome)}円
+          {monthlyOtherIncome > 0 && <> - その他{formatManOku(monthlyOtherIncome)}円</>}
           {" = "}
-          {formatMan(postPensionNet)}円/月 × {postPensionYears}年
+          {formatManOku(postPensionNet)}円/月 × {postPensionYears}年
         </li>,
       );
     } else if (!hasPension) {
       formulaRows.push(
         <li key="net-withdrawal">
-          月額手出し: {formatMan(gross)}円
+          月額手出し: {formatManOku(gross)}円
           {monthlyOtherIncome > 0 && (
             <>
               {" "}
-              - その他{formatMan(monthlyOtherIncome)}円 ={" "}
-              {formatMan(Math.max(gross - monthlyOtherIncome, 0))}円
+              - その他{formatManOku(monthlyOtherIncome)}円 ={" "}
+              {formatManOku(Math.max(gross - monthlyOtherIncome, 0))}円
             </>
           )}
         </li>,
@@ -451,7 +443,8 @@ export function generateSummary(input: SummaryInput): ReactNode {
       const wRate = (annualW / finalTotal) * 100;
       formulaRows.push(
         <li key="w-rate">
-          初年度引出率: {formatMan(annualW)}円/年 ÷ {formatMan(finalTotal)}円 = {wRate.toFixed(1)}%
+          初年度引出率: {formatManOku(annualW)}円/年 ÷ {formatManOku(finalTotal)}円 ={" "}
+          {wRate.toFixed(1)}%
         </li>,
       );
     }
@@ -460,8 +453,9 @@ export function generateSummary(input: SummaryInput): ReactNode {
     const firstYearW = Math.round((startAsset * withdrawalRate) / 100);
     formulaRows.push(
       <li key="rate-withdrawal">
-        初年度引出額: {formatMan(startAsset)}円 × {withdrawalRate}% = {formatMan(firstYearW)}円/年(
-        {formatMan(Math.round(firstYearW / 12))}円/月)
+        初年度引出額: {formatManOku(startAsset)}円 × {withdrawalRate}% = {formatManOku(firstYearW)}
+        円/年(
+        {formatManOku(Math.round(firstYearW / 12))}円/月)
       </li>,
     );
   }

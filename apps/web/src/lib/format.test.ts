@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   formatCurrency,
+  formatManOku,
   formatNumber,
   formatPercent,
   formatDate,
@@ -12,6 +13,24 @@ import {
   formatElapsedTime,
   formatLastUpdated,
 } from "./format";
+
+describe("formatManOku", () => {
+  it.each([
+    [0, "0万"],
+    [-1_000, "0万"],
+    [-5_000, "-1万"],
+    [12_345, "1万"],
+    [1_000_000, "100万"],
+    [99_999_999, "10,000万"],
+    [-99_999_999, "-10,000万"],
+    [100_000_000, "1億"],
+    [-100_000_000, "-1億"],
+    [125_000_000, "1.3億"],
+    [1_000_000_000, "10億"],
+  ])("%d を %s にする", (value, expected) => {
+    expect(formatManOku(value)).toBe(expected);
+  });
+});
 
 describe("formatCurrency", () => {
   it("正の値をフォーマットする", () => {

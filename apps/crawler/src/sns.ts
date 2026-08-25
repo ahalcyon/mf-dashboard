@@ -2,7 +2,7 @@ import { PublishCommand, SNSClient } from "@aws-sdk/client-sns";
 import { formatJstDateTimeForDisplay } from "@mf-dashboard/date-utils";
 import { getDashboardUrl } from "./dashboard-url.js";
 import { error, info, log } from "./logger.js";
-import type { ScrapedData } from "./types.js";
+import type { NotificationPayload } from "./types.js";
 
 // SNS の Subject は ASCII の印字可能文字のみ、100 文字以内という制約がある。
 // 日本語を入れると Publish が弾かれるため、件名は ASCII で組み立てる。
@@ -38,7 +38,7 @@ function toAsciiAmount(amount: string): string {
   return toSubject(amount.replace(/円/g, " JPY"));
 }
 
-export function buildSuccessMessage(data: ScrapedData): string {
+export function buildSuccessMessage(data: NotificationPayload): string {
   const { summary, items, updatedAt, groupName } = data;
 
   // 前日比は資産内訳の「合計」行が持つ。
@@ -87,7 +87,7 @@ export function buildErrorMessage(message: string, timestamp: string): string {
   );
 }
 
-export async function sendSnsNotification(data: ScrapedData): Promise<void> {
+export async function sendSnsNotification(data: NotificationPayload): Promise<void> {
   const sns = getClient();
   if (!sns) {
     log("NOTIFICATION_TOPIC_ARN is not set, skipping SNS notification");

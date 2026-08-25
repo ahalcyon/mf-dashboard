@@ -48,6 +48,16 @@ describe("resolveCashFlowDate", () => {
   ])("年跨ぎ期間の %s を %s として解釈する", (dateText, expected) => {
     expect(resolveCashFlowDate(dateText, 2027, period)).toBe(expected);
   });
+
+  // 共有の convertToIsoDate は存在しない日付を例外にする。ここで throw させると
+  // 行の不備として扱えなくなるため、元のテキストのまま返すことを固定する。
+  test.each([
+    ["02/30", "02/30"],
+    ["unknown", "unknown"],
+  ])("ISO へ変換できない %j はそのまま返す", (dateText, expected) => {
+    expect(resolveCashFlowDate(dateText, 2027, period)).toBe(expected);
+    expect(resolveCashFlowDate(dateText, 2027)).toBe(expected);
+  });
 });
 
 describe("isSupportedCashFlowAmount", () => {

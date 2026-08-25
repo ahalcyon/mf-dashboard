@@ -1,6 +1,6 @@
 import { CircleHelp } from "lucide-react";
 import type { ReactNode } from "react";
-import { formatCurrency } from "../../../lib/format";
+import { formatCurrency, formatManOku } from "../../../lib/format";
 import { MetricLabel } from "../../ui/metric-label";
 import { Tooltip as UiTooltip } from "../../ui/tooltip";
 import type { YearlyProjection } from "./calculate-compound";
@@ -284,8 +284,8 @@ function DistributionBars({
           const label = bin.isDepleted
             ? "0円(枯渇)"
             : isLastBin
-              ? `${formatBin(bin.rangeEnd)}〜`
-              : `〜${formatBin(bin.rangeEnd)}`;
+              ? `${formatManOku(bin.rangeEnd)}〜`
+              : `〜${formatManOku(bin.rangeEnd)}`;
           return (
             <div key={i} className="flex items-center gap-2 text-xs">
               <span
@@ -330,10 +330,4 @@ function findActiveDistributionBin(
     }
   }
   return bins.length > 0 ? bins.length - 1 : -1;
-}
-
-function formatBin(value: number): string {
-  return value >= 100_000_000
-    ? `${(value / 100_000_000).toFixed(1)}億`
-    : `${Math.round(value / 10_000).toLocaleString("ja-JP")}万`;
 }

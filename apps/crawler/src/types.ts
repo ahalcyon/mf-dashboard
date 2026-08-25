@@ -6,7 +6,11 @@ interface AccountIssue {
   errorMessage?: string;
 }
 
-export interface ScrapedData {
+/**
+ * 通知（メール）へ載せる 1 グループ分のペイロード。
+ * 永続化用の `ScrapedData`（@mf-dashboard/db/types）とは別物。
+ */
+export interface NotificationPayload {
   summary: AssetSummary;
   items: AssetItem[];
   updatedAt: string;

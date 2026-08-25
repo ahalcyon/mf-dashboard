@@ -109,13 +109,6 @@ export async function getOrCreate(
   return result.id;
 }
 
-/** 金額文字列をパースして整数に変換する */
-export function parseAmount(str: string): number {
-  if (!str) return 0;
-  const cleaned = str.replace(/[¥,\s円+]/g, "");
-  return parseInt(cleaned, 10) || 0;
-}
-
 /**
  * 日付文字列を ISO 8601 形式に変換する。
  *

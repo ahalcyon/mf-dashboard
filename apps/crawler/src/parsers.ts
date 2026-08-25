@@ -65,22 +65,3 @@ export function calculateChange(current: string, previous: string): string {
   const sign = diff >= 0 ? "+" : "";
   return `${sign}¥${diff.toLocaleString()}`;
 }
-
-export function convertDateToIso(dateStr: string, year: number): string {
-  if (!dateStr) return "";
-
-  // すでに ISO 形式の場合はそのまま返す
-  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-    return dateStr;
-  }
-
-  // "01/22(木)" or "01/22" パターン
-  const match = dateStr.match(/^(\d{1,2})\/(\d{1,2})/);
-  if (match) {
-    const month = match[1].padStart(2, "0");
-    const day = match[2].padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
-
-  return dateStr;
-}

@@ -1,10 +1,11 @@
 import { getJstDateParts } from "@mf-dashboard/date-utils";
 import type { CashFlowSummary, CashFlowItem } from "@mf-dashboard/db/types";
+import { convertToIsoDate } from "@mf-dashboard/db/utils";
 import { mfUrls } from "@mf-dashboard/meta/urls";
 import type { Locator, Page } from "playwright";
 import { getHistoryMonth } from "../history-months.js";
 import { log, debug } from "../logger.js";
-import { parseJapaneseNumber, convertDateToIso } from "../parsers.js";
+import { parseJapaneseNumber } from "../parsers.js";
 import type { CashFlowHistoryResult } from "../types.js";
 
 // Column indices for #cf-detail-table
@@ -203,6 +204,19 @@ export function resolveCashFlowPeriod(
   return { periodStart: range.from.replaceAll("/", "-"), periodEnd: range.to.replaceAll("/", "-") };
 }
 
+/**
+ * 共有の `convertToIsoDate` は "02/30" のような存在しない日付を例外にする。
+ * ここでは行の不備として扱い、`parseDetailRow` の妥当性判定へ渡したいので、
+ * 変換できなければ元のテキストのまま返す。
+ */
+function toIsoDateOrRaw(dateText: string, year: number): string {
+  try {
+    return convertToIsoDate(dateText, year);
+  } catch {
+    return dateText;
+  }
+}
+
 export function resolveCashFlowDate(
   dateText: string,
   fallbackYear: number,
@@ -215,11 +229,11 @@ export function resolveCashFlowDate(
       fallbackYear,
     ]);
     for (const year of candidateYears) {
-      const candidate = convertDateToIso(dateText, year);
+      const candidate = toIsoDateOrRaw(dateText, year);
       if (candidate >= period.periodStart && candidate <= period.periodEnd) return candidate;
     }
   }
-  return convertDateToIso(dateText, fallbackYear);
+  return toIsoDateOrRaw(dateText, fallbackYear);
 }
 
 async function detectMonth(

@@ -3,7 +3,6 @@ import {
   parseJapaneseNumber,
   parseDecimalNumber,
   parsePercentage,
-  convertDateToIso,
   calculateChange,
 } from "./parsers.js";
 
@@ -143,24 +142,6 @@ describe("parsePercentage", () => {
 
   test("無効な文字列は undefined を返す", () => {
     expect(parsePercentage("abc")).toBeUndefined();
-  });
-});
-
-describe("convertDateToIso", () => {
-  test("MM/DD(曜日) を ISO 形式に変換する", () => {
-    expect(convertDateToIso("04/22(火)", 2025)).toBe("2025-04-22");
-  });
-
-  test("MM/DD を ISO 形式に変換する", () => {
-    expect(convertDateToIso("4/5", 2025)).toBe("2025-04-05");
-  });
-
-  test("既に ISO 形式の場合そのまま返す", () => {
-    expect(convertDateToIso("2025-04-22", 2025)).toBe("2025-04-22");
-  });
-
-  test("空文字列は空文字列を返す", () => {
-    expect(convertDateToIso("", 2025)).toBe("");
   });
 });
 

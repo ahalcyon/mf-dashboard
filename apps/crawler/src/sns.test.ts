@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { buildErrorMessage, buildSuccessMessage, toSubject } from "./sns.js";
-import type { ScrapedData } from "./types.js";
+import type { NotificationPayload } from "./types.js";
 
-function buildData(overrides: Partial<ScrapedData> = {}): ScrapedData {
+function buildData(overrides: Partial<NotificationPayload> = {}): NotificationPayload {
   return {
     summary: {
       totalAssets: "5,259,382円",
