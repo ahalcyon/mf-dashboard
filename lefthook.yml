@@ -22,3 +22,7 @@ post-checkout:
   commands:
     clean-wal:
       run: rm -f data/*.db-shm data/*.db-wal
+    # git は .worktreeinclude を知らないので、git worktree add では
+    # ローカル設定が引き継がれない。ここで埋める。
+    worktree-includes:
+      run: node scripts/sync-worktree-includes.mjs

@@ -28,7 +28,8 @@ This repository is a monorepo built with pnpm workspaces and Turborepo.
 - Worktrees buy isolation, not concurrency. A single agent still executes one task at a time, so creating three worktrees does not make three things happen at once. What they buy is that each branch keeps its own working tree, so you can leave one mid-change, and each branch can be pushed the moment it is ready instead of waiting for the one before it.
 - What actually runs in parallel is CI. Push each branch as soon as its local work is done and let its checks run while you start the next one. This is the main reason to keep the branches separate.
 - Genuine concurrent execution needs either one agent per worktree or a backgrounded long-running command. Do not describe work as parallel unless something is running at the same time; say what is actually happening instead.
-- List local files a worktree needs in `.worktreeinclude`; they are copied in when the worktree is created. It uses `.gitignore` syntax. Keep generated files out of it — the demo database comes from `^build:demo` and provider caches come from `terraform init`, so copying either just carries a stale snapshot along.
+- List local files a worktree needs in `.worktreeinclude`. The `post-checkout` hook copies them in from the primary worktree, so `git worktree add` picks them up on its own. Write one repo-root-relative path or glob per line; `!` excludes. Only files already missing at the destination are copied, and directories are skipped.
+- Keep generated files out of `.worktreeinclude` — the demo database comes from `^build:demo` and provider caches come from `terraform init`, so copying either just carries a stale snapshot along.
 
 ## Mandatory Engineering Rules
 
