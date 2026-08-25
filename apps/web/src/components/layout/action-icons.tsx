@@ -3,23 +3,11 @@
 import { mfUrls } from "@mf-dashboard/meta/urls";
 import { Home, HelpCircle, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import type {
-  CrawlerRunStepDetails,
-  CrawlerRunStepStatus,
-  CrawlerRunTimelineItem,
-} from "../../../../crawler/src/crawler-run-state";
+import { useState, type ReactNode } from "react";
 import { withBasePath } from "../../lib/base-path";
-import {
-  parseCrawlerRefreshStatus,
-  unavailableCrawlerRefreshStatus,
-  type CrawlerRefreshStatus,
-} from "../../lib/crawler-refresh-status";
-import { formatDateTime, formatElapsedTime, formatTime } from "../../lib/format";
-import { Button } from "../ui/button";
+import { formatDateTime } from "../../lib/format";
 import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogDescription } from "../ui/dialog";
 import { IconButton } from "../ui/icon-button";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 interface ActionIconsProps {
   variant: "header" | "sidebar";
@@ -27,8 +15,8 @@ interface ActionIconsProps {
   lastScrapedAt?: string | null;
 }
 
-interface CrawlerRefreshButtonState extends CrawlerRefreshStatus {
-  isPending: boolean;
+interface LastUpdatedAtProps {
+  lastScrapedAt: string | null;
 }
 
 export function ActionIcons({ variant, notifications, lastScrapedAt }: ActionIconsProps) {
@@ -55,314 +43,84 @@ export function ActionIcons({ variant, notifications, lastScrapedAt }: ActionIco
 
 function RefreshControl({ iconSize }: { iconSize: string }) {
   const router = useRouter();
-  const wasRunningRef = useRef(false);
-  const startRefreshInFlightRef = useRef(false);
-  const pendingStatusRef = useRef<CrawlerRefreshStatus | null>(null);
-  const pendingWasRunningRef = useRef(false);
-  const previousRunIdRef = useRef<string | null>(null);
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const [state, setState] = useState<CrawlerRefreshButtonState>({
-    ...unavailableCrawlerRefreshStatus,
-    isPending: true,
-  });
-
-  const applyStatus = useCallback(
-    (nextStatus: CrawlerRefreshStatus) => {
-      setState({ ...nextStatus, isPending: false });
-      if (!nextStatus.running && nextStatus.latestRun?.runStatus !== "failed") {
-        setPopoverOpen(false);
-      }
-      if (nextStatus.available && wasRunningRef.current && !nextStatus.running) {
-        router.refresh();
-      }
-      if (nextStatus.available) {
-        wasRunningRef.current = nextStatus.running;
-      }
-    },
-    [router],
-  );
-
-  useEffect(() => {
-    const events = new EventSource(withBasePath("/api/crawler/refresh/"));
-
-    function setUnavailable() {
-      setState({ ...unavailableCrawlerRefreshStatus, isPending: false });
-      setPopoverOpen(false);
-      wasRunningRef.current = false;
-    }
-
-    events.onmessage = (event) => {
-      try {
-        const nextStatus = parseCrawlerRefreshStatus(JSON.parse(event.data) as unknown, true);
-        if (startRefreshInFlightRef.current) {
-          pendingStatusRef.current = nextStatus;
-          pendingWasRunningRef.current ||= nextStatus.running;
-          return;
-        }
-        applyStatus(nextStatus);
-      } catch {
-        setUnavailable();
-      }
-    };
-    events.onerror = () => {
-      if (startRefreshInFlightRef.current) return;
-      setState({ ...unavailableCrawlerRefreshStatus, isPending: false });
-      setPopoverOpen(false);
-    };
-
-    return () => {
-      events.close();
-    };
-  }, [applyStatus]);
+  const [state, setState] = useState<RefreshState>({ kind: "idle" });
 
   async function startRefresh() {
-    if (!state.available || state.isPending || startRefreshInFlightRef.current) {
-      return;
-    }
+    if (state.kind === "starting") return;
 
-    const statusBeforeRefresh = state;
-    startRefreshInFlightRef.current = true;
-    pendingStatusRef.current = null;
-    pendingWasRunningRef.current = false;
-    previousRunIdRef.current = state.latestRun?.runId ?? null;
-    wasRunningRef.current = true;
-    setPopoverOpen(false);
-    setState((prev) => ({
-      ...prev,
-      running: true,
-      latestRun: null,
-      isPending: true,
-    }));
-
+    setState({ kind: "starting" });
     try {
-      const res = await fetch(withBasePath("/api/crawler/refresh/"), { method: "POST" });
-      const body: unknown = await res.json().catch(() => null);
+      const response = await fetch(withBasePath("/api/refresh/"), {
+        method: "POST",
+        headers: { "x-amz-content-sha256": EMPTY_BODY_SHA256 },
+      });
 
-      if (!res.ok && res.status !== 409) {
-        setState({ ...statusBeforeRefresh, isPending: false });
+      if (response.status === 409) {
+        setState({ kind: "already-running" });
+        return;
+      }
+      if (!response.ok) {
+        setState({ kind: "failed" });
         return;
       }
 
-      const nextStatus = parseCrawlerRefreshStatus(body, true);
-      const runningStatus = nextStatus.running ? nextStatus : { ...nextStatus, running: true };
-      wasRunningRef.current = true;
-      setState({
-        ...runningStatus,
-        isPending: false,
-      });
+      setState({ kind: "started" });
+      // クロールが終わるとサイトが焼き直されるので、最終更新の表示を取り直す
+      router.refresh();
     } catch {
-      setState({ ...statusBeforeRefresh, isPending: false });
-    } finally {
-      startRefreshInFlightRef.current = false;
-      const pendingStatus = pendingStatusRef.current as CrawlerRefreshStatus | null;
-      const pendingRun = pendingStatus?.latestRun;
-      const isNewTerminalRun =
-        pendingRun !== null &&
-        pendingRun !== undefined &&
-        pendingRun.runStatus !== "running" &&
-        pendingRun.runId !== previousRunIdRef.current;
-      const shouldApplyPendingStatus = pendingWasRunningRef.current || isNewTerminalRun;
-      pendingStatusRef.current = null;
-      pendingWasRunningRef.current = false;
-      previousRunIdRef.current = null;
-      if (pendingStatus && shouldApplyPendingStatus) {
-        applyStatus(pendingStatus);
-      }
+      setState({ kind: "failed" });
     }
   }
 
-  const isFailed = !state.running && state.latestRun?.runStatus === "failed";
-  const showsTimeline = state.running || isFailed;
-  const isDisabled = state.isPending || !state.available;
-
-  function handlePopoverOpenChange(open: boolean) {
-    if (!open || showsTimeline) {
-      setPopoverOpen(open);
-      return;
-    }
-    void startRefresh();
-  }
-
-  let title = state.available ? "金融機関データを更新" : "更新サービス未接続";
-  let ariaLabel = title;
-  if (state.running) {
-    title = state.startedAt
-      ? `同期タイムラインを表示（開始 ${formatDateTime(state.startedAt)}）`
-      : "同期タイムラインを表示";
-    ariaLabel = "同期タイムラインを表示";
-  } else if (isFailed) {
-    title = "同期失敗の詳細を表示";
-    ariaLabel = title;
-  }
+  const presentation = refreshPresentation[state.kind];
 
   return (
     <>
-      <Popover open={popoverOpen && showsTimeline} onOpenChange={handlePopoverOpenChange}>
-        <PopoverTrigger>
-          <IconButton
-            icon={
-              <span className="relative block">
-                <RefreshCw
-                  className={`${iconSize} ${state.running ? "animate-spin text-primary/90" : ""}`}
-                />
-                {isFailed && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background"
-                  />
-                )}
-              </span>
-            }
-            ariaLabel={ariaLabel}
-            disabled={isDisabled}
-            title={title}
+      <IconButton
+        icon={
+          <RefreshCw
+            className={`${iconSize} ${state.kind === "starting" ? "animate-spin text-primary/90" : ""}`}
           />
-        </PopoverTrigger>
-        <PopoverContent
-          ariaLabel={isFailed ? "同期失敗の詳細" : "同期タイムライン"}
-          align="end"
-          className="h-[min(32rem,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto"
-        >
-          <SyncTimelinePopover state={state} onRetry={() => void startRefresh()} />
-        </PopoverContent>
-      </Popover>
+        }
+        ariaLabel={presentation.label}
+        disabled={state.kind === "starting"}
+        title={presentation.label}
+        onClick={() => void startRefresh()}
+      />
+      <output aria-live="polite" className="sr-only">
+        {presentation.status}
+      </output>
     </>
   );
 }
 
-const stepStatusPresentation: Record<CrawlerRunStepStatus, { label: string; className: string }> = {
-  pending: { label: "待機中", className: "font-semibold text-warning-foreground" },
-  running: { label: "実行中", className: "font-semibold text-primary" },
-  done: { label: "完了", className: "font-semibold text-success" },
-  warning: { label: "警告", className: "font-semibold text-warning-foreground" },
-  failed: { label: "失敗", className: "font-semibold text-destructive" },
-  skipped: { label: "スキップ", className: "font-semibold text-transfer" },
+/**
+ * CloudFront が OAC で Lambda を呼ぶとき、Lambda は署名されていない本文を
+ * 受け付けない。本文が空でもそのハッシュを送る必要がある。
+ */
+const EMPTY_BODY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+type RefreshState =
+  | { kind: "idle" }
+  | { kind: "starting" }
+  | { kind: "started" }
+  | { kind: "already-running" }
+  | { kind: "failed" };
+
+/**
+ * 起動までしか分からない。クロールの完了はサイトが焼き直されて
+ * 最終更新の表示が進むことで分かる。
+ */
+const refreshPresentation: Record<RefreshState["kind"], { label: string; status: string }> = {
+  idle: { label: "金融機関データを更新", status: "" },
+  starting: { label: "更新を開始しています", status: "更新を開始しています" },
+  started: {
+    label: "更新を開始しました",
+    status: "更新を開始しました。完了までしばらくかかります",
+  },
+  "already-running": { label: "すでに更新中です", status: "すでに更新中です" },
+  failed: { label: "更新を開始できませんでした", status: "更新を開始できませんでした" },
 };
-
-function SyncTimelinePopover({
-  state,
-  onRetry,
-}: {
-  state: CrawlerRefreshStatus;
-  onRetry: () => void;
-}) {
-  const run = state.running && state.latestRun?.runStatus !== "running" ? null : state.latestRun;
-  const failed = run?.runStatus === "failed";
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!state.running) return;
-
-    setNow(Date.now());
-    const intervalId = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(intervalId);
-  }, [state.running]);
-
-  const elapsedTime = state.startedAt
-    ? formatElapsedTime(state.startedAt, run?.finishedAt ?? null, now)
-    : null;
-
-  return (
-    <>
-      {failed && <h2 className="font-semibold">同期に失敗しました</h2>}
-      <div
-        className={`${failed ? "mt-1" : ""} flex items-center justify-between gap-4 text-sm text-muted-foreground`}
-      >
-        <p className="ml-auto tabular-nums">
-          {state.startedAt ? `開始 ${formatTime(state.startedAt)}` : "最新の同期状況です。"}
-          {elapsedTime && ` (${elapsedTime})`}
-        </p>
-      </div>
-
-      <div className="mt-5 space-y-5 text-sm">
-        <section aria-label="タイムライン">
-          {run && run.timeline.length > 0 ? (
-            <TimelineList
-              items={run.timeline}
-              currentTimelineItemId={run.current?.timelineItemId ?? null}
-            />
-          ) : (
-            <p className="mt-2 text-muted-foreground">タイムラインはまだありません。</p>
-          )}
-        </section>
-
-        {run?.runStatus === "failed" && (
-          <div className="flex justify-end border-t pt-4">
-            <Button onClick={onRetry}>再度更新</Button>
-          </div>
-        )}
-      </div>
-    </>
-  );
-}
-
-function TimelineList({
-  items,
-  currentTimelineItemId,
-}: {
-  items: CrawlerRunTimelineItem[];
-  currentTimelineItemId: string | null;
-}) {
-  return (
-    <ol className="mt-2 space-y-2">
-      {[...items].reverse().map((item) => (
-        <TimelineListItem
-          key={item.id}
-          item={item}
-          isCurrent={item.id === currentTimelineItemId}
-          hideStatus={item.status === "running" && item.id !== currentTimelineItemId}
-        />
-      ))}
-    </ol>
-  );
-}
-
-function TimelineListItem({
-  item,
-  isCurrent = false,
-  hideStatus = false,
-}: {
-  item: CrawlerRunTimelineItem;
-  isCurrent?: boolean;
-  hideStatus?: boolean;
-}) {
-  const detail = formatStepMetadata(item);
-  const status = stepStatusPresentation[item.status];
-
-  return (
-    <li className={`min-w-0 rounded-md border p-3 ${isCurrent ? "bg-muted/40" : ""}`}>
-      <div className="flex min-w-0 items-start justify-between gap-3">
-        <span className="min-w-0 break-words font-medium">{item.label}</span>
-        {!hideStatus && (
-          <span className={`shrink-0 text-xs ${status.className}`}>{status.label}</span>
-        )}
-      </div>
-      {detail && <p className="mt-1 break-words text-muted-foreground">{detail}</p>}
-      {item.reason && <p className="mt-1 break-words text-destructive">{item.reason.message}</p>}
-    </li>
-  );
-}
-
-function formatStepMetadata(item: CrawlerRunStepDetails): string | null {
-  switch (item.metadata?.kind) {
-    case "group":
-      return item.metadata.groupName;
-    case "month":
-      return item.metadata.month;
-    case "refresh": {
-      const accounts = item.metadata.incompleteAccounts.join("、");
-      return accounts
-        ? `残り ${item.metadata.remainingAccounts}件: ${accounts}`
-        : `残り ${item.metadata.remainingAccounts}件`;
-    }
-    default:
-      return null;
-  }
-}
-
-interface LastUpdatedAtProps {
-  lastScrapedAt: string | null;
-}
 
 function LastUpdatedAt({ lastScrapedAt }: LastUpdatedAtProps) {
   const formattedLastScrapedAt = lastScrapedAt ? formatDateTime(lastScrapedAt) : null;
@@ -426,21 +184,15 @@ function HelpButton({ iconSize, className }: { iconSize: string; className?: str
                   <span className="block ml-5 mt-1">前日との差分を Slack へ自動投稿できます。</span>
                 </li>
                 <li>
-                  <span className="font-medium text-foreground">未分類取引の自動分類</span>
-                  <span className="block ml-5 mt-1">
-                    固定ルールと任意の LLM 推論で、未分類の取引を自動分類できます。
-                  </span>
-                </li>
-                <li>
                   <span className="font-medium text-foreground">カスタム処理（Hooks）</span>
                   <span className="block ml-5 mt-1">
                     スクレイピング時に独自のスクリプトを実行できます。
                   </span>
                 </li>
                 <li>
-                  <span className="font-medium text-foreground">AI アシスタント</span>
+                  <span className="font-medium text-foreground">資産データのエクスポート</span>
                   <span className="block ml-5 mt-1">
-                    Webアプリ内で家計・資産・投資データを自然言語で照会できます。
+                    日次の資産推移や保有銘柄を JSON と Markdown で書き出せます。
                   </span>
                 </li>
               </ul>

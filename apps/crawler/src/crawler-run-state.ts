@@ -7,14 +7,6 @@ const DEFAULT_STATE_PATH = path.resolve(
   "../../../data/crawler-run-state.json",
 );
 
-export type CrawlerRunStepStatus =
-  | "pending"
-  | "running"
-  | "done"
-  | "warning"
-  | "failed"
-  | "skipped";
-
 export type CrawlerRunReason =
   | { code: "auth_failed"; message: string }
   | {
@@ -84,7 +76,7 @@ export type CrawlerRunCurrent = {
   label: string;
 } & CrawlerRunStepDetails;
 
-export interface CrawlerRunProgress {
+interface CrawlerRunProgress {
   completed: number;
   total: number;
 }

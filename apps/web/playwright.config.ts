@@ -1,8 +1,6 @@
 import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
-const mockCrawlerUrl = "http://127.0.0.1:18766";
-const mockCrawlerToken = "e2e-refresh-token";
 const demoDbPath = resolve(__dirname, "../../data/demo.db");
 const webServerCommand = process.env.CI ? "node .next/standalone/apps/web/server.js" : "pnpm dev";
 
@@ -29,24 +27,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "pnpm exec tsx e2e/mock-crawler-server.ts",
-      url: `${mockCrawlerUrl}/__test/health`,
-      env: {
-        MOCK_CRAWLER_PORT: "18766",
-        MOCK_CRAWLER_TOKEN: mockCrawlerToken,
-      },
-      reuseExistingServer: false,
-    },
-    {
       command: webServerCommand,
       url: "http://localhost:3000",
       env: {
-        CRAWLER_URL: mockCrawlerUrl,
         DB_PATH: demoDbPath,
         DEMO_MODE: "true",
         HOSTNAME: "127.0.0.1",
         PORT: "3000",
-        REFRESH_TOKEN: mockCrawlerToken,
       },
       reuseExistingServer: false,
     },
