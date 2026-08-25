@@ -40,7 +40,14 @@ describe("ActionIcons の更新ボタン", () => {
     fireEvent.click(refreshButton());
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith("/api/refresh/", { method: "POST" });
+      expect(global.fetch).toHaveBeenCalledWith("/api/refresh/", {
+        method: "POST",
+        // Lambda は署名されていない本文を受け付けないため、空でもハッシュを送る
+        headers: {
+          "x-amz-content-sha256":
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        },
+      });
     });
   });
 

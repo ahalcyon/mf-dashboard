@@ -125,13 +125,24 @@ resource "aws_lambda_function_url" "refresh_trigger" {
   authorization_type = "AWS_IAM"
 }
 
-resource "aws_lambda_permission" "refresh_trigger_from_cloudfront" {
-  statement_id           = "AllowCloudFrontInvoke"
+# OAC は 2 つの権限を必要とする。InvokeFunctionUrl だけでは
+# 署名付きの要求でも 403 になる。
+resource "aws_lambda_permission" "refresh_trigger_url_from_cloudfront" {
+  statement_id           = "AllowCloudFrontInvokeFunctionUrl"
   action                 = "lambda:InvokeFunctionUrl"
   function_name          = aws_lambda_function.refresh_trigger.function_name
   principal              = "cloudfront.amazonaws.com"
   source_arn             = aws_cloudfront_distribution.site.arn
   function_url_auth_type = "AWS_IAM"
+}
+
+# function_url_auth_type は InvokeFunctionUrl にしか指定できない
+resource "aws_lambda_permission" "refresh_trigger_from_cloudfront" {
+  statement_id  = "AllowCloudFrontInvokeFunction"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.refresh_trigger.function_name
+  principal     = "cloudfront.amazonaws.com"
+  source_arn    = aws_cloudfront_distribution.site.arn
 }
 
 resource "aws_cloudfront_origin_access_control" "refresh_trigger" {

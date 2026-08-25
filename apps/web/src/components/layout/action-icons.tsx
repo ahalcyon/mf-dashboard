@@ -50,7 +50,10 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
 
     setState({ kind: "starting" });
     try {
-      const response = await fetch(withBasePath("/api/refresh/"), { method: "POST" });
+      const response = await fetch(withBasePath("/api/refresh/"), {
+        method: "POST",
+        headers: { "x-amz-content-sha256": EMPTY_BODY_SHA256 },
+      });
 
       if (response.status === 409) {
         setState({ kind: "already-running" });
@@ -90,6 +93,12 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
     </>
   );
 }
+
+/**
+ * CloudFront が OAC で Lambda を呼ぶとき、Lambda は署名されていない本文を
+ * 受け付けない。本文が空でもそのハッシュを送る必要がある。
+ */
+const EMPTY_BODY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
 type RefreshState =
   | { kind: "idle" }
