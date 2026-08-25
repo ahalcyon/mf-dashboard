@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } fro
 import { sortByAmountDescending } from "../../lib/amount-order";
 import { CHART_INITIAL_DIMENSION } from "../../lib/chart";
 import { getAssetCategoryColor, semanticColors } from "../../lib/colors";
+import { formatAxisAmount } from "../../lib/format";
 import { ChartTooltipContent } from "../charts/chart-tooltip";
 import { AmountDisplay } from "../ui/amount-display";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
@@ -165,7 +166,7 @@ export function BalanceSheetChartClient({
               tickLine={false}
             />
             <YAxis
-              tickFormatter={(value) => `${(value / 10000).toFixed(0)}万`}
+              tickFormatter={formatAxisAmount}
               tick={{ fontSize: 12, fill: "#4B5563" }}
               axisLine={{ stroke: "#E2E8F0" }}
               tickLine={false}

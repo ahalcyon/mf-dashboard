@@ -19,7 +19,7 @@ import {
   type Period,
 } from "../../lib/chart";
 import { getAssetCategoryColor, semanticColors } from "../../lib/colors";
-import { formatCurrency } from "../../lib/format";
+import { formatAxisAmount, formatCurrency } from "../../lib/format";
 import { cn } from "../../lib/utils";
 import { ChartTooltipContent } from "../charts/chart-tooltip";
 import { AmountDisplay } from "../ui/amount-display";
@@ -244,7 +244,7 @@ export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChar
               tick={{ fontSize: 11 }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(value) => `${(value / 10000).toFixed(0)}万`}
+              tickFormatter={formatAxisAmount}
             />
             <Tooltip content={<AssetHistoryTooltip period={period} />} />
             {categoryLines

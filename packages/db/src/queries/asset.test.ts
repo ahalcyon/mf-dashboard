@@ -8,8 +8,6 @@ import {
   createTestGroup,
 } from "../test-helpers";
 import {
-  parseDateString,
-  toDateString,
   calculateTargetDate,
   getAssetBreakdownByCategory,
   getLiabilityBreakdownByCategory,
@@ -153,30 +151,6 @@ async function createHoldingValue(data: { holdingId: number; snapshotId: number;
 // ============================================================
 // 内部関数のユニットテスト
 // ============================================================
-
-describe("parseDateString", () => {
-  it("日付文字列をパースする", async () => {
-    const result = parseDateString("2025-04-15");
-    expect(result).toEqual({ year: 2025, month: 4, day: 15 });
-  });
-
-  it("月と日が2桁の場合", async () => {
-    const result = parseDateString("2025-12-31");
-    expect(result).toEqual({ year: 2025, month: 12, day: 31 });
-  });
-});
-
-describe("toDateString", () => {
-  it("日付文字列を生成する", async () => {
-    const result = toDateString(2025, 4, 15);
-    expect(result).toBe("2025-04-15");
-  });
-
-  it("月と日を0埋めする", async () => {
-    const result = toDateString(2025, 4, 5);
-    expect(result).toBe("2025-04-05");
-  });
-});
 
 describe("calculateTargetDate", () => {
   it("daily: 1日前の日付を返す", async () => {

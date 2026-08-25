@@ -13,6 +13,21 @@ export function formatNumber(num: number): string {
   return new Intl.NumberFormat("ja-JP").format(num);
 }
 
+/**
+ * 軸ラベル向けに万・億で丸める。
+ *
+ * 億の分岐が無いと 2 億円の軸が "20000万" になり読めない。
+ */
+export function formatAxisAmount(value: number): string {
+  if (Math.abs(value) >= 100_000_000) {
+    const oku = Number((value / 100_000_000).toFixed(1));
+    return `${oku.toLocaleString("ja-JP")}億`;
+  }
+
+  const man = Number((value / 10_000).toFixed(0));
+  return `${man}万`;
+}
+
 export function formatPercent(value: number, decimals: number = 1): string {
   const sign = value < 0 ? "-" : "";
   return `${sign}${Math.abs(value).toFixed(decimals)}%`;

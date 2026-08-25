@@ -1,3 +1,5 @@
+import { convertToIsoDate } from "@mf-dashboard/db/utils";
+
 export function parseJapaneseNumber(str: string): number {
   if (!str) return 0;
 
@@ -67,20 +69,18 @@ export function calculateChange(current: string, previous: string): string {
 }
 
 export function convertDateToIso(dateStr: string, year: number): string {
-  if (!dateStr) return "";
-
-  // すでに ISO 形式の場合はそのまま返す
-  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+  let iso: string;
+  try {
+    iso = convertToIsoDate(dateStr, year);
+  } catch {
+    // 共有側は "02/30" のような日付を例外にするが、ここでは素通しする。
+    // cash flow の行は「日付を取れない行がある」ことを行単位の文脈付き
+    // エラーとして報告する必要があり、その判断は呼び出し側にある。
     return dateStr;
   }
 
-  // "01/22(木)" or "01/22" パターン
-  const match = dateStr.match(/^(\d{1,2})\/(\d{1,2})/);
-  if (match) {
-    const month = match[1].padStart(2, "0");
-    const day = match[2].padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
-
-  return dateStr;
+  // 時刻は落として日付だけを返す。resolveCashFlowDate が期間の範囲判定を
+  // 文字列比較で行っており、"2025-04-30T08:51:00" は "2025-04-30" より
+  // 大きいと判定される。時刻を残すと期間末日のセルが範囲外に落ちる。
+  return /^\d{4}-\d{2}-\d{2}T/.test(iso) ? iso.slice(0, 10) : iso;
 }
