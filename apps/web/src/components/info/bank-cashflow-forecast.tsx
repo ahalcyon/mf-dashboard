@@ -144,7 +144,7 @@ export async function BankCashFlowForecast({ groupId }: BankCashFlowForecastProp
       manualEvents={manualEvents}
       manualEventMinDate={manualEventMinDate}
       groupId={groupId}
-      allowForecastChanges={process.env.VERCEL !== "1"}
+      allowForecastChanges={process.env.STATIC_EXPORT !== "true"}
     />
   );
 }
