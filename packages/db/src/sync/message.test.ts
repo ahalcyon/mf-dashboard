@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, test } from "vitest";
 import {
   buildPayloadKey,
@@ -148,7 +150,24 @@ describe("encodeScrapedDataPayload / decodeScrapedDataPayload", () => {
 });
 
 describe("SYNC_MESSAGE_GROUP_ID", () => {
+  // 定数を再掲するだけでは、Terraform 側を書き換えたときに何も起きない。
+  // 送信側と受信側で MessageGroupId がずれると SQS が直列化をやめ、
+  // writer が 2 本同時にファイル全体を上書きして 1 回分のクロールが消える。
+  // だから実物の .tf を読んで突き合わせる。
+  const queueTfPath = path.resolve(import.meta.dirname, "../../../../terraform/aws/queue.tf");
+
   test("Terraform の write_message_group_id と一致する", () => {
-    expect(SYNC_MESSAGE_GROUP_ID).toBe("sqlite-write");
+    const queueTf = readFileSync(queueTfPath, "utf8");
+    const match = queueTf.match(/write_message_group_id\s*=\s*"([^"]+)"/);
+
+    // 定義が見つからないなら、突き合わせが成立していないので落とす
+    expect(match?.[1]).toBeTypeOf("string");
+    expect(SYNC_MESSAGE_GROUP_ID).toBe(match?.[1]);
+  });
+
+  test("キューが FIFO でなければ直列化が成立しない", () => {
+    const queueTf = readFileSync(queueTfPath, "utf8");
+
+    expect(queueTf).toMatch(/resource\s+"aws_sqs_queue"\s+"writes"[\s\S]*?fifo_queue\s*=\s*true/);
   });
 });

@@ -5,7 +5,7 @@ import type { ScrapedData } from "../types";
  * crawler（producer）と writer（consumer）の間の契約。
  *
  * S3 上の SQLite はファイル全体を書き換えるしかないため、書き込みは
- * FIFO キュー・単一 MessageGroupId・予約同時実行数 1 の writer で直列化する。
+ * FIFO キューと単一 MessageGroupId で直列化する。
  * このモジュールはその経路を流れるメッセージの形だけを定義する。
  */
 
