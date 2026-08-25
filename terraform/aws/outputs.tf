@@ -63,3 +63,19 @@ output "ecs_cluster_name" {
   description = "ECS cluster running the crawler task"
   value       = aws_ecs_cluster.this.name
 }
+
+output "notification_topic_arn" {
+  description = "SNS topic the crawler publishes its result to"
+  value       = aws_sns_topic.notifications.arn
+}
+
+output "notification_subscription_status" {
+  description = "Whether the email subscription still needs to be confirmed by hand"
+  value = (
+    var.notification_email == ""
+    ? "no subscriber configured"
+    : one(aws_sns_topic_subscription.email[*].confirmation_was_authenticated) == true
+    ? "confirmed"
+    : "pending confirmation - accept the mail AWS sent to ${var.notification_email}"
+  )
+}

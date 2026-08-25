@@ -115,6 +115,12 @@ data "aws_iam_policy_document" "crawler_task" {
   }
 
   statement {
+    sid       = "PublishNotifications"
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.notifications.arn]
+  }
+
+  statement {
     sid       = "ReadCredentialsAtRuntime"
     actions   = ["ssm:GetParameters", "ssm:GetParameter"]
     resources = values(local.ssm_parameter_arns)
@@ -161,6 +167,7 @@ resource "aws_ecs_task_definition" "crawler" {
       { name = "DATABASE_OBJECT_KEY", value = var.database_object_key },
       { name = "DB_PATH", value = "/tmp/moneyforward.db" },
       { name = "AWS_REGION", value = var.region },
+      { name = "NOTIFICATION_TOPIC_ARN", value = aws_sns_topic.notifications.arn },
     ]
 
     secrets = [
