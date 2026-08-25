@@ -131,10 +131,29 @@ URL セーフな文字だけを受け付ける。
 
 ## state について
 
-現状はローカル state。`terraform/aws/.gitignore` で `*.tfstate` と `*.tfvars` を除外している。
-S3 バックエンド（Terraform 1.10 以降は `use_lockfile = true` で DynamoDB 不要）への移行は
-未実施。state バケット自体をこのモジュールで作ると循環するため、移行する場合は
-bootstrap 用の小さなモジュールを別に切る。
+state には Basic 認証のパスワードやセッショントークンが**平文で入る**ため、
+git へは置かず S3 に暗号化して保管する。
+
+- バージョニング有効。apply ごとに版が残り、任意の時点へ戻せる
+- SSE 暗号化、パブリックアクセス全遮断
+- Terraform 1.10 以降の `use_lockfile` によるロック。DynamoDB は使わない
+
+state バケット自体を本体のモジュールで作ると循環するため、`bootstrap/` を
+別に切っている。bootstrap の state はローカルに残るが、作るのはバケット 1 つ
+だけなので失っても import で復旧できる。
+
+初回のみ次の順で実行する。
+
+```sh
+# 1. state バケットを作る
+terraform -chdir=terraform/aws/bootstrap init
+terraform -chdir=terraform/aws/bootstrap apply
+
+# 2. 本体の state を S3 へ移す
+terraform -chdir=terraform/aws init -migrate-state
+```
+
+移行後は `terraform/aws/terraform.tfstate` を削除してよい。
 
 ## 未実装（アプリ側の対応が必要）
 

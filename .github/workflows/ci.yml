@@ -40,6 +40,8 @@ jobs:
       - run: terraform -chdir=terraform validate
       - run: terraform -chdir=terraform/aws init -backend=false -input=false
       - run: terraform -chdir=terraform/aws validate
+      - run: terraform -chdir=terraform/aws/bootstrap init -backend=false -input=false
+      - run: terraform -chdir=terraform/aws/bootstrap validate
   build-demo:
     runs-on: ubuntu-latest
     steps:
