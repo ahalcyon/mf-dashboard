@@ -207,14 +207,44 @@ describe("runSavePhase", () => {
     });
   });
 
-  test("同期経路が無効なら発行しない", async () => {
-    vi.mocked(saveScrapedDataBatch).mockResolvedValue([]);
+  // ローカルへ先に適用してから発行する、という順序が要点。逆にすると
+  // 後続の分析フェーズが古い複製を読む。publisher を渡さない形では
+  // 「発行しない」ことを観測できないので、順序はここで見る。
+  test("ローカルへ適用してから同期キューへ発行する", async () => {
+    const order: string[] = [];
+    vi.mocked(saveScrapedDataBatch).mockImplementation(async () => {
+      order.push("save");
+      return [1];
+    });
+    const publisher = {
+      publish: vi.fn<() => Promise<void>>(async () => {
+        order.push("publish");
+      }),
+    };
 
     await runSavePhase(
       {} as Parameters<typeof runSavePhase>[0],
       {} as Parameters<typeof runSavePhase>[1],
       scrapeResultWithNoGroup(),
+      [],
+      undefined,
+      undefined,
+      publisher as unknown as Parameters<typeof runSavePhase>[6],
     );
+
+    expect(order).toEqual(["save", "publish"]);
+  });
+
+  test("同期経路が無効でもローカルへの保存は行う", async () => {
+    vi.mocked(saveScrapedDataBatch).mockResolvedValue([]);
+
+    await expect(
+      runSavePhase(
+        {} as Parameters<typeof runSavePhase>[0],
+        {} as Parameters<typeof runSavePhase>[1],
+        scrapeResultWithNoGroup(),
+      ),
+    ).resolves.toEqual([]);
 
     expect(saveScrapedDataBatch).toHaveBeenCalledOnce();
   });

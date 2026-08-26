@@ -88,4 +88,44 @@ describe("POST /api/bank-forecast/dismiss", () => {
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/", "layout");
   });
+
+  // 保存できなかったのに 200 を返すと、消えていない予測が消えたように見える。
+  // ここまで成功経路しか無く、404 分岐を外しても誰も気づけなかった。
+  it("returns 404 when the account does not exist", async () => {
+    dismissMock.mockResolvedValue(false);
+
+    const response = await POST(
+      new Request("http://localhost/api/bank-forecast/dismiss", {
+        method: "POST",
+        body: JSON.stringify({
+          accountId: 999,
+          direction: "expense",
+          recurringIdentity: "investment transfer",
+          dismissedThroughDate: "2026-07-20",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "account not found" });
+  });
+
+  // 保存に失敗した以上、他のページのキャッシュを捨てる理由が無い。
+  it("does not revalidate when nothing was saved", async () => {
+    dismissMock.mockResolvedValue(false);
+
+    await POST(
+      new Request("http://localhost/api/bank-forecast/dismiss", {
+        method: "POST",
+        body: JSON.stringify({
+          accountId: 999,
+          direction: "expense",
+          recurringIdentity: "investment transfer",
+          dismissedThroughDate: "2026-07-20",
+        }),
+      }),
+    );
+
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
 });

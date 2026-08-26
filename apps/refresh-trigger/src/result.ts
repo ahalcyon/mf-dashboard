@@ -67,3 +67,20 @@ const ACTIVE_TASK_STATUSES = new Set(["PROVISIONING", "PENDING", "ACTIVATING", "
 export function hasActiveTask(lastStatuses: readonly (string | undefined)[]): boolean {
   return lastStatuses.some((status) => status !== undefined && ACTIVE_TASK_STATUSES.has(status));
 }
+
+/**
+ * タスク定義からファミリー名を取り出す。
+ *
+ * ListTasks の family はこれで絞り込むため、外すと候補が空になり
+ * 実行中のクロールを見落として二重起動する。hasActiveTask がどれだけ
+ * 正確でも、ここで空振りすると呼ばれもしない。
+ *
+ * 受け取る形は 3 通りある。完全な ARN、`family:revision`、ファミリー名のみ。
+ */
+export function taskFamilyFromDefinition(taskDefinition: string): string | undefined {
+  const lastSegment = taskDefinition.split("/").pop();
+  if (!lastSegment) return undefined;
+
+  const family = lastSegment.split(":")[0];
+  return family === "" ? undefined : family;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { hasActiveTask, isRefreshPath, toResponse } from "./result.js";
+import { hasActiveTask, isRefreshPath, taskFamilyFromDefinition, toResponse } from "./result.js";
 
 describe("toResponse", () => {
   test("起動できたら 202 とタスク ARN を返す", () => {
@@ -64,6 +64,31 @@ describe("hasActiveTask", () => {
 
   test("1 つでも実行中なら起動しない", () => {
     expect(hasActiveTask(["STOPPED", "RUNNING"])).toBe(true);
+  });
+});
+
+describe("taskFamilyFromDefinition", () => {
+  // ここが空振りすると ListTasks が何も返さず、実行中のクロールを
+  // 見落として二重起動する。hasActiveTask はそもそも呼ばれない。
+  test.for([
+    [
+      "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/mf-dashboard-crawler:12",
+      "mf-dashboard-crawler",
+    ],
+    [
+      "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/mf-dashboard-crawler",
+      "mf-dashboard-crawler",
+    ],
+    ["mf-dashboard-crawler:12", "mf-dashboard-crawler"],
+    ["mf-dashboard-crawler", "mf-dashboard-crawler"],
+  ] as const)("%s からファミリーを取り出す", ([taskDefinition, expected]) => {
+    expect(taskFamilyFromDefinition(taskDefinition)).toBe(expected);
+  });
+
+  // 空を返すほうが安全。undefined なら ListTasks はファミリーで絞らず、
+  // 誤ったファミリー名で空振りするより実行中のタスクを拾える見込みがある。
+  test.for(["", "/", "task-definition/", ":12"])("%s はファミリーとして扱わない", (input) => {
+    expect(taskFamilyFromDefinition(input)).toBeUndefined();
   });
 });
 
