@@ -50,18 +50,27 @@ describe("scrapeAllGroups", () => {
   describe("ScrapeResult構造", () => {
     test("globalData, groupDataList, defaultGroupを返す", () => {
       expect(result.globalData).toBeDefined();
-      expect(result.groupDataList).toBeDefined();
-      expect(Array.isArray(result.groupDataList)).toBe(true);
+      // Array.isArray は空配列でも真になる。セレクタが外れて 0 件になる
+      // のがまさに検知したい失敗なので、下限を置く。
+      expect(result.groupDataList.length).toBeGreaterThan(0);
     });
 
-    test("defaultGroupがnullまたは有効なGroupオブジェクト", () => {
-      const isValidDefaultGroup =
-        result.defaultGroup === null ||
-        (Boolean(result.defaultGroup.id) &&
-          Boolean(result.defaultGroup.name) &&
-          typeof result.defaultGroup.isCurrent === "boolean");
+    // 「null または有効」を 1 つの表明にまとめると、既定グループの検出が
+    // 完全に壊れて常に null になったときに無条件で通る。検出できていること
+    // 自体を分けて見る。
+    test("defaultGroupを検出できる", () => {
+      expect(result.defaultGroup).not.toBeNull();
+    });
 
-      expect(isValidDefaultGroup).toBe(true);
+    test("defaultGroupが有効なGroupオブジェクトである", () => {
+      const defaultGroup = result.defaultGroup;
+      if (defaultGroup === null) throw new Error("defaultGroup was not detected");
+
+      expect(typeof defaultGroup.id).toBe("string");
+      expect(defaultGroup.id.length).toBeGreaterThan(0);
+      expect(typeof defaultGroup.name).toBe("string");
+      expect(defaultGroup.name.length).toBeGreaterThan(0);
+      expect(typeof defaultGroup.isCurrent).toBe("boolean");
     });
   });
 
@@ -127,8 +136,22 @@ describe("scrapeAllGroups", () => {
     test("各グループにsummaryがある", () => {
       for (const groupData of result.groupDataList) {
         expect(groupData.summary).toBeDefined();
-        expect(groupData.summary.totalAssets !== undefined).toBe(true);
+        // !== undefined は null でも真になる。取得できなかった状態を通す。
+        expect(typeof groupData.summary.totalAssets).toBe("number");
       }
+    });
+
+    // 個々のカスタムグループは空でも不思議はないが、「グループ選択なし」は
+    // 全体の集計なので空にならない。Array.isArray だけだとセレクタが外れて
+    // 全部 0 件になっても通るため、ここに下限を置く。
+    test("「グループ選択なし」の各構造が空でない", () => {
+      const noGroupData = result.groupDataList.find((gd) => isNoGroup(gd.group.id));
+      expect(noGroupData).toBeDefined();
+      if (!noGroupData) return;
+
+      expect(noGroupData.registeredAccounts.accounts.length).toBeGreaterThan(0);
+      expect(noGroupData.assetHistory.points.length).toBeGreaterThan(0);
+      expect(noGroupData.items.length).toBeGreaterThan(0);
     });
 
     test("各グループにitemsがある", () => {
@@ -145,12 +168,15 @@ describe("scrapeAllGroups", () => {
       expect(currentGroups.length).toBe(1);
     });
 
+    // defaultGroup === null を許すと、既定グループの検出が壊れたときに
+    // 無条件で通る。上で非 null を確かめているのでここでは素直に比べる。
     test("isCurrent=trueのグループはdefaultGroupと一致する", () => {
       const currentGroup = result.groupDataList.find((gd) => gd.group.isCurrent);
-      const matchesDefaultGroup =
-        result.defaultGroup === null || currentGroup?.group.id === result.defaultGroup.id;
 
-      expect(matchesDefaultGroup).toBe(true);
+      // 両方 undefined でも通る比較にならないよう、先に存在を確かめる。
+      expect(currentGroup).toBeDefined();
+      expect(result.defaultGroup).not.toBeNull();
+      expect(currentGroup?.group.id).toBe(result.defaultGroup?.id);
     });
   });
 
@@ -164,7 +190,12 @@ describe("scrapeAllGroups", () => {
 
     test("各グループのアカウント数は「グループ選択なし」以下である", () => {
       const noGroupData = result.groupDataList.find((gd) => isNoGroup(gd.group.id));
-      const maxAccounts = noGroupData?.registeredAccounts.accounts.length ?? 0;
+
+      // ?? 0 で既定値を置くと、擬似グループを取りこぼしたときに
+      // 「全グループが 0 件以下」という別の意味の表明にすり替わる。
+      expect(noGroupData).toBeDefined();
+      if (!noGroupData) return;
+      const maxAccounts = noGroupData.registeredAccounts.accounts.length;
 
       for (const groupData of result.groupDataList) {
         expect(groupData.registeredAccounts.accounts.length).toBeLessThanOrEqual(maxAccounts);

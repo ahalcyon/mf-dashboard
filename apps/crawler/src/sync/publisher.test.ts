@@ -1,0 +1,189 @@
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { Readable } from "node:stream";
+import { NoSuchKey } from "@aws-sdk/client-s3";
+import {
+  SYNC_MESSAGE_GROUP_ID,
+  type SyncMessage,
+  type SyncPayload,
+} from "@mf-dashboard/db/sync/message";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import type { SyncConfig } from "./config.js";
+
+/**
+ * publisher は run.test.ts の対象外になっている。loadSyncConfig がテスト環境で
+ * null を返すため、この経路が一度も実行されない。
+ *
+ * 壊れても静かなので、ここで直接押さえる。S3 の put と SQS の send を
+ * 入れ替えると、writer が payload の無いキーを読みに行って DLQ へ落ちる。
+ */
+
+const { s3Send, sqsSend } = vi.hoisted(() => ({
+  s3Send: vi.fn<(command: unknown) => Promise<unknown>>(),
+  sqsSend: vi.fn<(command: unknown) => Promise<unknown>>(),
+}));
+
+vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@aws-sdk/client-s3")>();
+  return {
+    ...actual,
+    S3Client: class {
+      send = s3Send;
+      destroy = vi.fn<() => void>();
+    },
+  };
+});
+
+vi.mock("@aws-sdk/client-sqs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@aws-sdk/client-sqs")>();
+  return {
+    ...actual,
+    SQSClient: class {
+      send = sqsSend;
+      destroy = vi.fn<() => void>();
+    },
+  };
+});
+
+vi.mock("../logger.js", () => ({ info: vi.fn<() => void>(), warn: vi.fn<() => void>() }));
+
+const { SyncPublisher } = await import("./publisher.js");
+
+const config: SyncConfig = {
+  bucket: "test-bucket",
+  queueUrl: "https://sqs.example.invalid/queue.fifo",
+  messageGroupId: SYNC_MESSAGE_GROUP_ID,
+  databaseObjectKey: "db/moneyforward.db",
+};
+
+let workDir: string;
+
+beforeEach(async () => {
+  s3Send.mockReset();
+  sqsSend.mockReset();
+  workDir = await mkdtemp(path.join(tmpdir(), "publisher-test-"));
+});
+
+afterEach(async () => {
+  await rm(workDir, { recursive: true, force: true });
+});
+
+describe("downloadDatabase", () => {
+  test("S3 に複製があれば書き出して true を返す", async () => {
+    s3Send.mockResolvedValue({ Body: Readable.from([Buffer.from("sqlite-bytes")]) });
+    const localPath = path.join(workDir, "nested", "moneyforward.db");
+
+    const publisher = new SyncPublisher(config, "run-1");
+
+    expect(await publisher.downloadDatabase(localPath)).toBe(true);
+    expect(await readFile(localPath, "utf8")).toBe("sqlite-bytes");
+  });
+
+  // false はそのまま history モードを意味する。ここで true を返すと
+  // 初回クロールが空の DB を「既存」とみなし、履歴を取り込まない。
+  test("S3 に複製が無ければ false を返す", async () => {
+    s3Send.mockRejectedValue(new NoSuchKey({ message: "missing", $metadata: {} }));
+
+    const publisher = new SyncPublisher(config, "run-1");
+
+    expect(await publisher.downloadDatabase(path.join(workDir, "moneyforward.db"))).toBe(false);
+  });
+
+  // 権限不足や通信断まで false にすると、既存の履歴がある状態で
+  // history モードに落ちて全期間を取り直す。区別して投げる。
+  test("NoSuchKey 以外の失敗は握りつぶさない", async () => {
+    s3Send.mockRejectedValue(new Error("AccessDenied"));
+
+    const publisher = new SyncPublisher(config, "run-1");
+
+    await expect(publisher.downloadDatabase(path.join(workDir, "moneyforward.db"))).rejects.toThrow(
+      "AccessDenied",
+    );
+  });
+
+  test("本文が空なら失敗として扱う", async () => {
+    s3Send.mockResolvedValue({ Body: undefined });
+
+    const publisher = new SyncPublisher(config, "run-1");
+
+    await expect(publisher.downloadDatabase(path.join(workDir, "moneyforward.db"))).rejects.toThrow(
+      /empty database body/,
+    );
+  });
+
+  // 前回のクロールが残した複製を消さないまま書き足すと、壊れた SQLite になる。
+  test("既にファイルがあっても取り直した内容で置き換える", async () => {
+    const localPath = path.join(workDir, "moneyforward.db");
+    await writeFile(localPath, "stale-and-longer-than-the-new-body");
+    s3Send.mockResolvedValue({ Body: Readable.from([Buffer.from("fresh")]) });
+
+    const publisher = new SyncPublisher(config, "run-1");
+    await publisher.downloadDatabase(localPath);
+
+    expect(await readFile(localPath, "utf8")).toBe("fresh");
+  });
+});
+
+describe("publish", () => {
+  const payload: SyncPayload = { kind: "scraped-data", groupOnlyData: [] };
+
+  test("ペイロードを S3 へ置いてからキューへ送る", async () => {
+    const order: string[] = [];
+    s3Send.mockImplementation(async () => {
+      order.push("s3");
+    });
+    sqsSend.mockImplementation(async () => {
+      order.push("sqs");
+    });
+
+    await new SyncPublisher(config, "run-1").publish("scraped-data", payload);
+
+    expect(order).toEqual(["s3", "sqs"]);
+  });
+
+  test("S3 が失敗したらキューへ送らない", async () => {
+    s3Send.mockRejectedValue(new Error("PutObject denied"));
+    sqsSend.mockResolvedValue({});
+
+    await expect(
+      new SyncPublisher(config, "run-1").publish("scraped-data", payload),
+    ).rejects.toThrow("PutObject denied");
+
+    expect(sqsSend).not.toHaveBeenCalled();
+  });
+
+  // 分けると writer が並行して走り、S3 上の SQLite が read-modify-write で競合する。
+  test("設定された MessageGroupId で送る", async () => {
+    s3Send.mockResolvedValue({});
+    sqsSend.mockResolvedValue({});
+
+    await new SyncPublisher(config, "run-1").publish("scraped-data", payload);
+
+    const [command] = sqsSend.mock.calls[0] as [{ input: { MessageGroupId: string } }];
+    expect(command.input.MessageGroupId).toBe(SYNC_MESSAGE_GROUP_ID);
+  });
+
+  test("キューへ送る位置と S3 へ置いた位置が一致する", async () => {
+    s3Send.mockResolvedValue({});
+    sqsSend.mockResolvedValue({});
+
+    await new SyncPublisher(config, "run-1").publish("scraped-data", payload);
+
+    const [putCommand] = s3Send.mock.calls[0] as [{ input: { Bucket: string; Key: string } }];
+    const [sendCommand] = sqsSend.mock.calls[0] as [{ input: { MessageBody: string } }];
+    const message = JSON.parse(sendCommand.input.MessageBody) as SyncMessage;
+
+    expect(message.payload).toEqual({ bucket: putCommand.input.Bucket, key: putCommand.input.Key });
+  });
+
+  test("S3 へ置く本文は渡したペイロードそのもの", async () => {
+    s3Send.mockResolvedValue({});
+    sqsSend.mockResolvedValue({});
+
+    await new SyncPublisher(config, "run-1").publish("scraped-data", payload);
+
+    const [putCommand] = s3Send.mock.calls[0] as [{ input: { Body: string } }];
+    expect(JSON.parse(putCommand.input.Body)).toEqual(payload);
+  });
+});

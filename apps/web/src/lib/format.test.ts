@@ -97,11 +97,14 @@ describe("formatDateShort", () => {
 describe("formatDateTime", () => {
   it("日付と時刻をフォーマットする", () => {
     // UTCで01:30 → JSTで10:30
-    const result = formatDateTime("2025-04-30T01:30:00Z");
-    expect(result).toMatch(/4/);
-    expect(result).toMatch(/30/);
-    expect(result).toMatch(/10/);
-    expect(result).toMatch(/30/);
+    // 部分一致だと月日を入れ替えても分を落としても通ってしまうため、
+    // 表示文字列をそのまま比較する。
+    expect(formatDateTime("2025-04-30T01:30:00Z")).toBe("4/30 10:30");
+  });
+
+  it("JSTの日付境界をまたぐ", () => {
+    expect(formatDateTime("2025-04-29T14:59:00Z")).toBe("4/29 23:59");
+    expect(formatDateTime("2025-04-29T15:00:00Z")).toBe("4/30 00:00");
   });
 });
 

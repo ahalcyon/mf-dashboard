@@ -149,27 +149,56 @@ async function createHoldingValue(data: {
 // 内部関数のユニットテスト
 // ============================================================
 
+// drizzle の and(...) は引数が何であれ真値のオブジェクトを返すため、
+// toBeDefined() では eq を消しても inArray を反転させても気づけない。
+// 生成される SQL とパラメーターで見る。
 describe("buildHoldingWhereCondition", () => {
-  it("snapshotIdのみで条件を構築する", async () => {
-    const condition = buildHoldingWhereCondition(1, []);
-    expect(condition).toBeDefined();
+  function compile(condition: ReturnType<typeof buildHoldingWhereCondition>) {
+    const { sql, params } = db.select().from(schema.holdingValues).where(condition).toSQL();
+    return { where: sql.slice(sql.indexOf("where")), params };
+  }
+
+  it("snapshotIdで絞る", () => {
+    const { where, params } = compile(buildHoldingWhereCondition(7, [1]));
+
+    expect(where).toContain('"holding_values"."snapshot_id" = ?');
+    expect(params[0]).toBe(7);
   });
 
-  it("accountIdsがある場合はinArray条件を追加する", async () => {
-    const condition = buildHoldingWhereCondition(1, [1, 2, 3]);
-    expect(condition).toBeDefined();
+  it("accountIdsがある場合はinArray条件を追加する", () => {
+    const { where, params } = compile(buildHoldingWhereCondition(1, [1, 2, 3]));
+
+    expect(where).toContain('"holdings"."account_id" in (?, ?, ?)');
+    expect(params).toEqual([1, 1, 2, 3]);
   });
 
-  it("追加条件がある場合はそれも含める", async () => {
-    const additionalCondition = eq(schema.holdingValues.amount, 100);
-    const condition = buildHoldingWhereCondition(1, [], additionalCondition);
-    expect(condition).toBeDefined();
+  // accountIds が空のときは inArray が false に畳まれ、条件全体が
+  // 何にも一致しなくなる。グループが無い、または口座が 0 件のときに
+  // 全件返さないための挙動なので、意図として固定しておく。
+  it("accountIdsが空なら何にも一致しない条件になる", () => {
+    const { where } = compile(buildHoldingWhereCondition(1, []));
+
+    expect(where).toContain("false");
+    expect(where).not.toContain('"holdings"."account_id" in');
   });
 
-  it("accountIdsと追加条件の両方がある場合", async () => {
-    const additionalCondition = eq(schema.holdingValues.amount, 100);
-    const condition = buildHoldingWhereCondition(1, [1, 2], additionalCondition);
-    expect(condition).toBeDefined();
+  it("追加条件がある場合はそれも含める", () => {
+    const { where, params } = compile(
+      buildHoldingWhereCondition(1, [], eq(schema.holdingValues.amount, 100)),
+    );
+
+    expect(where).toContain('"holding_values"."amount" = ?');
+    expect(params).toEqual([1, 100]);
+  });
+
+  it("accountIdsと追加条件の両方がある場合", () => {
+    const { where, params } = compile(
+      buildHoldingWhereCondition(1, [1, 2], eq(schema.holdingValues.amount, 100)),
+    );
+
+    expect(where).toContain('"holdings"."account_id" in (?, ?)');
+    expect(where).toContain('"holding_values"."amount" = ?');
+    expect(params).toEqual([1, 1, 2, 100]);
   });
 });
 

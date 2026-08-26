@@ -6,7 +6,13 @@ import {
 } from "@aws-sdk/client-ecs";
 import type { LambdaFunctionURLEvent, LambdaFunctionURLResult } from "aws-lambda";
 import { loadConfig } from "./config.js";
-import { hasActiveTask, isRefreshPath, toResponse, type RefreshOutcome } from "./result.js";
+import {
+  hasActiveTask,
+  isRefreshPath,
+  taskFamilyFromDefinition,
+  toResponse,
+  type RefreshOutcome,
+} from "./result.js";
 
 /**
  * ダッシュボードから当日分のクロールを起動する。
@@ -88,7 +94,7 @@ async function isCrawlInProgress(
   client: ECSClient,
   config: ReturnType<typeof loadConfig>,
 ): Promise<boolean> {
-  const family = config.taskDefinition.split("/").pop()?.split(":")[0];
+  const family = taskFamilyFromDefinition(config.taskDefinition);
   const listed = await client.send(
     new ListTasksCommand({
       cluster: config.cluster,
