@@ -62,8 +62,15 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
         setState({ kind: "already-running" });
         return;
       }
+      // エッジの認証で弾かれた場合。fetch は Basic 認証の資格情報を送らないので、
+      // セッションクッキーが無くなると何度押しても復帰しない。待っても直らない
+      // 相手に「しばらく待って」と言わないよう、再読み込みへ誘導する。
+      if (response.status === 401 || response.status === 403) {
+        setState({ kind: "session-expired" });
+        return;
+      }
       if (!response.ok) {
-        setState({ kind: "failed" });
+        setState({ kind: "failed", status: response.status });
         return;
       }
 
@@ -71,7 +78,9 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
       // クロールが終わるとサイトが焼き直されるので、最終更新の表示を取り直す
       router.refresh();
     } catch {
-      setState({ kind: "failed" });
+      // ここに来るのは要求そのものが出せなかったとき。サーバーには痕跡が残らない
+      // ので、応答が返った上での失敗と混ぜると原因を切り分けられなくなる。
+      setState({ kind: "unreachable" });
     }
   }
 
@@ -132,12 +141,21 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
         <DialogContent className="max-w-md">
           <DialogTitle>{presentation.label}</DialogTitle>
           <DialogDescription asChild>
-            <p className="mt-2 text-sm text-muted-foreground">{presentation.detail}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{detailFor(state)}</p>
           </DialogDescription>
-          <div className="mt-6 flex justify-end">
-            <Button type="button" onClick={() => setState({ kind: "idle" })}>
+          <div className="mt-6 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant={state.kind === "session-expired" ? "outline" : "default"}
+              onClick={() => setState({ kind: "idle" })}
+            >
               閉じる
             </Button>
+            {state.kind === "session-expired" && (
+              <Button type="button" onClick={() => window.location.reload()}>
+                再読み込み
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -156,7 +174,9 @@ type RefreshState =
   | { kind: "starting" }
   | { kind: "started" }
   | { kind: "already-running" }
-  | { kind: "failed" };
+  | { kind: "session-expired" }
+  | { kind: "unreachable" }
+  | { kind: "failed"; status: number };
 
 /**
  * 起動までしか分からない。クロールの完了はサイトが焼き直されて
@@ -183,12 +203,30 @@ const refreshPresentation: Record<
     status: "すでに更新中です",
     detail: "前回の更新がまだ実行中です。二重に起動しないよう、今回の要求は見送りました。",
   },
+  "session-expired": {
+    label: "認証の期限が切れました",
+    status: "認証の期限が切れました。ページを再読み込みしてください",
+    detail:
+      "ページを開いたままにしている間に認証が切れました。このまま押し直しても開始できません。再読み込みすると復帰します。",
+  },
+  unreachable: {
+    label: "サーバーに接続できませんでした",
+    status: "サーバーに接続できませんでした",
+    detail:
+      "要求を送れませんでした。サーバーには届いていません。通信状況を確かめて、もう一度試してください。",
+  },
   failed: {
     label: "更新を開始できませんでした",
     status: "更新を開始できませんでした",
     detail: "更新を開始できませんでした。しばらく待ってからもう一度試してください。",
   },
 };
+
+/** 失敗時は応答コードを添える。次に同じ報告を受けたとき原因を絞れるようにする。 */
+function detailFor(state: RefreshState): string {
+  const base = refreshPresentation[state.kind].detail;
+  return state.kind === "failed" ? `${base}（応答コード ${state.status}）` : base;
+}
 
 function LastUpdatedAt({ lastScrapedAt }: LastUpdatedAtProps) {
   const formattedLastScrapedAt = lastScrapedAt ? formatDateTime(lastScrapedAt) : null;

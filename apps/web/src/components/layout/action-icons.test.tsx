@@ -98,15 +98,60 @@ describe("ActionIcons の更新ボタン", () => {
     ).not.toBeNull();
   });
 
-  it("通信そのものが失敗しても状態を残さない", async () => {
+  // #80。エッジの認証で弾かれると 401 が返る。fetch は Basic 認証の資格情報を
+  // 送らないので、押し直しても待っても復帰しない。再読み込みへ誘導する。
+  it.for([401, 403])("%d なら認証切れとして扱い、待つよう案内しない", async (status) => {
+    respondWith(status);
+    render(<ActionIcons variant="header" />);
+
+    await confirmRefresh();
+
+    expect(await screen.findByRole("heading", { name: "認証の期限が切れました" })).not.toBeNull();
+    expect(screen.queryByText(/しばらく待って/)).toBeNull();
+  });
+
+  it("認証切れのときは再読み込みの手段を出す", async () => {
+    respondWith(401);
+    render(<ActionIcons variant="header" />);
+
+    await confirmRefresh();
+
+    expect(await screen.findByRole("button", { name: "再読み込み" })).not.toBeNull();
+  });
+
+  it("認証切れ以外では再読み込みを出さない", async () => {
+    respondWith(502);
+    render(<ActionIcons variant="header" />);
+
+    await confirmRefresh();
+
+    await screen.findByRole("heading", { name: "更新を開始できませんでした" });
+    expect(screen.queryByRole("button", { name: "再読み込み" })).toBeNull();
+  });
+
+  // 要求が出せなかった場合はサーバーに痕跡が残らない。応答が返った上での
+  // 失敗と同じ文言にすると、報告を受けても切り分けられない（#80）。
+  it("要求を送れなかった場合は応答を得た失敗と区別する", async () => {
     global.fetch = vi.fn<typeof fetch>(() => Promise.reject(new Error("offline")));
     render(<ActionIcons variant="header" />);
 
     await confirmRefresh();
 
     expect(
-      await screen.findByRole("heading", { name: "更新を開始できませんでした" }),
+      await screen.findByRole("heading", { name: "サーバーに接続できませんでした" }),
     ).not.toBeNull();
+    expect(screen.queryByRole("heading", { name: "更新を開始できませんでした" })).toBeNull();
+  });
+
+  // 次に同じ報告を受けたとき、どこで落ちたかを問い合わせずに済むようにする。
+  it("応答を得た失敗では応答コードを添える", async () => {
+    respondWith(502);
+    render(<ActionIcons variant="header" />);
+
+    await confirmRefresh();
+
+    await screen.findByRole("heading", { name: "更新を開始できませんでした" });
+    expect(screen.getByText(/応答コード 502/)).not.toBeNull();
   });
 
   // 押しても画面が変わらないと、走ったかどうか分からず何度も押すことになる
