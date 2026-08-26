@@ -1,14 +1,7 @@
 import { formatCurrency } from "../../../lib/format";
 import { MetricLabel } from "../../ui/metric-label";
-import { getSecurityLabel, type SecurityLevel } from "./compound-simulator-utils";
+import { getSecurityLabel, securityLevelStyles } from "./compound-simulator-utils";
 import type { SensitivityRow } from "./simulate-monte-carlo";
-
-const levelStyles: Record<SecurityLevel, string> = {
-  safe: "text-balance-positive",
-  caution: "text-amber-800",
-  warning: "text-amber-800",
-  danger: "text-expense",
-};
 
 const SAFE_THRESHOLD = 80;
 
@@ -30,7 +23,7 @@ export function SecurityScore({
   onApplyRate,
 }: SecurityScoreProps) {
   const { label, level } = getSecurityLabel(score);
-  const colorClass = levelStyles[level];
+  const colorClass = securityLevelStyles[level];
 
   const isRateMode = sensitivityRows.length > 0 && sensitivityRows[0].withdrawalRate != null;
 

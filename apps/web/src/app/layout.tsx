@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { AccountNotifications } from "../components/info/account-notifications";
 import { DEFAULT_NOTIFICATIONS_KEY, Header } from "../components/layout/header";
 import { Sidebar } from "../components/layout/sidebar";
-import { SidebarProvider } from "../components/layout/sidebar-context";
+import { SidebarProvider } from "../contexts/sidebar-context";
 import { createRootMetadata } from "../lib/metadata";
 import { waitForRuntimeData } from "../lib/runtime-rendering";
 

@@ -1,8 +1,9 @@
 import { getAccountByMfId } from "@mf-dashboard/db";
 import { getHoldingsByAccountId, getHoldingsWithLatestValues } from "@mf-dashboard/db";
 import { TrendingUp } from "lucide-react";
+import { HoldingsFilterReset } from "../../contexts/holdings-filter-context";
 import { EmptyState } from "../ui/empty-state";
-import { HoldingsFilterReset, UnrealizedGainCardClient } from "./unrealized-gain-card.client";
+import { UnrealizedGainCardClient } from "./unrealized-gain-card.client";
 
 interface UnrealizedGainCardProps {
   className?: string;

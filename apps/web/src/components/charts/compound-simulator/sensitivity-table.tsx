@@ -1,13 +1,6 @@
 import { formatCurrency } from "../../../lib/format";
-import { getSecurityLabel, type SecurityLevel } from "./compound-simulator-utils";
+import { getSecurityLabel, securityLevelStyles } from "./compound-simulator-utils";
 import type { SensitivityRow } from "./simulate-monte-carlo";
-
-const levelStyles: Record<SecurityLevel, string> = {
-  safe: "text-balance-positive",
-  caution: "text-amber-800",
-  warning: "text-amber-800",
-  danger: "text-expense",
-};
 
 interface SensitivityTableProps {
   rows: SensitivityRow[];
@@ -55,7 +48,7 @@ export function SensitivityTable({ rows, currentMonthly, currentRate }: Sensitiv
                       <span className="ml-1 text-xs text-muted-foreground font-normal">(現在)</span>
                     )}
                   </td>
-                  <td className={`py-1 text-right whitespace-nowrap ${levelStyles[level]}`}>
+                  <td className={`py-1 text-right whitespace-nowrap ${securityLevelStyles[level]}`}>
                     <span className="inline-block w-10 text-right">{row.securityScore}%</span>
                     <span className="ml-1 text-xs">{label}</span>
                   </td>

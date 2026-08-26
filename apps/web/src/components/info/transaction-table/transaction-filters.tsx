@@ -85,6 +85,8 @@ export function TransactionFilters({
             <button
               type="button"
               onClick={() => onSearchChange("")}
+              // アイコンだけなので、名前を付けないと読み上げに何も出ない
+              aria-label="検索キーワードを消去"
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <X className="h-4 w-4" />

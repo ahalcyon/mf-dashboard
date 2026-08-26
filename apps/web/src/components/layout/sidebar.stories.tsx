@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { ReactNode } from "react";
+import { SidebarProvider } from "../../contexts/sidebar-context";
 import { Sidebar } from "./sidebar";
-import { SidebarProvider } from "./sidebar-context";
 
 const meta = {
   title: "Layout/Sidebar",

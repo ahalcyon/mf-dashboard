@@ -162,9 +162,9 @@ export function SummaryPanel({
                 <div
                   className={`text-lg font-semibold ${
                     monteCarlo.failureProbability > 0.2
-                      ? "text-expense"
+                      ? "text-balance-negative"
                       : monteCarlo.failureProbability > 0.05
-                        ? "text-amber-800"
+                        ? "text-warning-foreground"
                         : "text-balance-positive"
                   }`}
                 >
@@ -198,9 +198,9 @@ export function SummaryPanel({
                 <div
                   className={`text-lg font-semibold ${
                     monteCarlo.depletionProbability > 0.2
-                      ? "text-expense"
+                      ? "text-balance-negative"
                       : monteCarlo.depletionProbability > 0.05
-                        ? "text-amber-800"
+                        ? "text-warning-foreground"
                         : "text-balance-positive"
                   }`}
                 >

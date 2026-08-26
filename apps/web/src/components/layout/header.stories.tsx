@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { ReactNode } from "react";
+import { SidebarProvider } from "../../contexts/sidebar-context";
 import { AccountNotificationsClient } from "../info/account-notifications.client";
 import { DEFAULT_NOTIFICATIONS_KEY, Header } from "./header";
-import { SidebarProvider } from "./sidebar-context";
 
 const mockGroups = [
   { id: "1", name: "個人資産", isCurrent: true, lastScrapedAt: "2025-04-30T10:30:00" },

@@ -3,6 +3,7 @@
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { type GainFilter, useHoldingsFilter } from "../../contexts/holdings-filter-context";
 import { sortByAmountDescending } from "../../lib/amount-order";
 import { CHART_INITIAL_DIMENSION } from "../../lib/chart";
 import { getChartColorArray } from "../../lib/colors";
@@ -12,11 +13,7 @@ import { chartTooltipStyle } from "../charts/chart-tooltip";
 import { AmountDisplay, getAmountColorClass } from "../ui/amount-display";
 import { CardContent } from "../ui/card";
 import { Pagination } from "../ui/pagination";
-import {
-  type GainFilter,
-  matchesGainFilter,
-  useHoldingsFilter,
-} from "./unrealized-gain-card.client";
+import { matchesGainFilter } from "./unrealized-gain-card.client";
 
 const PAGE_SIZE = 10;
 

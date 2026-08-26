@@ -170,3 +170,17 @@ export function getSecurityLabel(score: number): { label: string; level: Securit
   if (score >= 40) return { label: "注意", level: "warning" };
   return { label: "要見直し", level: "danger" };
 }
+
+/**
+ * 安心度の段階に対応する文字色。
+ *
+ * これは評価であって、お金が動いた金額ではない。よって income/expense では
+ * なく balance-positive/negative を使う。中間段階の amber は globals.css の
+ * --color-warning-foreground と同じ値なので、直書きせずトークンを参照する。
+ */
+export const securityLevelStyles: Record<SecurityLevel, string> = {
+  safe: "text-balance-positive",
+  caution: "text-warning-foreground",
+  warning: "text-warning-foreground",
+  danger: "text-balance-negative",
+};
