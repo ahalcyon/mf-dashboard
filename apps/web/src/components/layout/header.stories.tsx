@@ -72,14 +72,16 @@ export const OnlyNoGroupPseudoGroup: Story = {
   args: {
     groups: [{ id: "0", name: "グループ選択なし", isCurrent: true, lastScrapedAt: null }],
     defaultGroupId: "0",
-    notifications: (
-      <AccountNotificationsClient
-        errorAccounts={[]}
-        updatingAccounts={[]}
-        balanceAlerts={[]}
-        totalIssues={0}
-      />
-    ),
+    notifications: {
+      [DEFAULT_NOTIFICATIONS_KEY]: (
+        <AccountNotificationsClient
+          errorAccounts={[]}
+          updatingAccounts={[]}
+          balanceAlerts={[]}
+          totalIssues={0}
+        />
+      ),
+    },
   },
 };
 
