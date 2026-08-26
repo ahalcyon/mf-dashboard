@@ -98,6 +98,37 @@ describe("ActionIcons の更新ボタン", () => {
     ).not.toBeNull();
   });
 
+  // #80。エッジの認証で弾かれると 401 が返る。fetch は Basic 認証の資格情報を
+  // 送らないので、押し直しても待っても復帰しない。再読み込みへ誘導する。
+  it.for([401, 403])("%d なら認証切れとして扱い、待つよう案内しない", async (status) => {
+    respondWith(status);
+    render(<ActionIcons variant="header" />);
+
+    await confirmRefresh();
+
+    expect(await screen.findByRole("heading", { name: "認証の期限が切れました" })).not.toBeNull();
+    expect(screen.queryByText(/しばらく待って/)).toBeNull();
+  });
+
+  it("認証切れのときは再読み込みの手段を出す", async () => {
+    respondWith(401);
+    render(<ActionIcons variant="header" />);
+
+    await confirmRefresh();
+
+    expect(await screen.findByRole("button", { name: "再読み込み" })).not.toBeNull();
+  });
+
+  it("認証切れ以外では再読み込みを出さない", async () => {
+    respondWith(502);
+    render(<ActionIcons variant="header" />);
+
+    await confirmRefresh();
+
+    await screen.findByRole("heading", { name: "更新を開始できませんでした" });
+    expect(screen.queryByRole("button", { name: "再読み込み" })).toBeNull();
+  });
+
   it("通信そのものが失敗しても状態を残さない", async () => {
     global.fetch = vi.fn<typeof fetch>(() => Promise.reject(new Error("offline")));
     render(<ActionIcons variant="header" />);

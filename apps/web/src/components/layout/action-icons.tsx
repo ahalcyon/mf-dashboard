@@ -62,6 +62,13 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
         setState({ kind: "already-running" });
         return;
       }
+      // エッジの認証で弾かれた場合。fetch は Basic 認証の資格情報を送らないので、
+      // セッションクッキーが無くなると何度押しても復帰しない。待っても直らない
+      // 相手に「しばらく待って」と言わないよう、再読み込みへ誘導する。
+      if (response.status === 401 || response.status === 403) {
+        setState({ kind: "session-expired" });
+        return;
+      }
       if (!response.ok) {
         setState({ kind: "failed" });
         return;
@@ -134,10 +141,19 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
           <DialogDescription asChild>
             <p className="mt-2 text-sm text-muted-foreground">{presentation.detail}</p>
           </DialogDescription>
-          <div className="mt-6 flex justify-end">
-            <Button type="button" onClick={() => setState({ kind: "idle" })}>
+          <div className="mt-6 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant={state.kind === "session-expired" ? "outline" : "default"}
+              onClick={() => setState({ kind: "idle" })}
+            >
               閉じる
             </Button>
+            {state.kind === "session-expired" && (
+              <Button type="button" onClick={() => window.location.reload()}>
+                再読み込み
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -156,6 +172,7 @@ type RefreshState =
   | { kind: "starting" }
   | { kind: "started" }
   | { kind: "already-running" }
+  | { kind: "session-expired" }
   | { kind: "failed" };
 
 /**
@@ -182,6 +199,12 @@ const refreshPresentation: Record<
     label: "すでに更新中です",
     status: "すでに更新中です",
     detail: "前回の更新がまだ実行中です。二重に起動しないよう、今回の要求は見送りました。",
+  },
+  "session-expired": {
+    label: "認証の期限が切れました",
+    status: "認証の期限が切れました。ページを再読み込みしてください",
+    detail:
+      "ページを開いたままにしている間に認証が切れました。このまま押し直しても開始できません。再読み込みすると復帰します。",
   },
   failed: {
     label: "更新を開始できませんでした",

@@ -109,6 +109,31 @@ export const RefreshAlreadyRunning: Story = {
   },
 };
 
+/**
+ * ページを開いたまま認証が切れた状態（#80）。fetch は Basic 認証の資格情報を
+ * 送らないので、押し直しても待っても復帰しない。再読み込みへ誘導する。
+ */
+export const RefreshSessionExpired: Story = {
+  args: { variant: "header" },
+  play: async ({ canvasElement }) => {
+    const restore = mockRefreshResponse(401);
+    try {
+      const canvas = within(canvasElement);
+      await userEvent.click(canvas.getByRole("button", { name: "金融機関データを更新" }));
+      await userEvent.click(await screen.findByRole("button", { name: "更新を開始" }));
+
+      await waitFor(async () => {
+        await expect(
+          screen.getByRole("heading", { name: "認証の期限が切れました" }),
+        ).toBeInTheDocument();
+      });
+      await expect(screen.getByRole("button", { name: "再読み込み" })).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  },
+};
+
 /** 押しただけではクロールを起動せず、まず確認を出す。 */
 export const RefreshConfirmation: Story = {
   args: { variant: "header" },
