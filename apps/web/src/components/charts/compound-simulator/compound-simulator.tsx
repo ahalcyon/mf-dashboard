@@ -37,7 +37,9 @@ interface CompoundSimulatorProps {
 }
 
 export function CompoundSimulator({
-  defaultInitialAmount = envNum(process.env.NEXT_PUBLIC_SIMULATOR_INITIAL_AMOUNT) ?? 0,
+  // 初期投資額だけは環境変数を見ない。シミュレーターのページが保有資産から
+  // 計算した値を必ず渡すため、環境変数を置いても到達しなかった（#72）。
+  defaultInitialAmount = 0,
   defaultMonthlyContribution = envNum(process.env.NEXT_PUBLIC_SIMULATOR_MONTHLY_CONTRIBUTION) ?? 0,
   defaultAnnualReturnRate = envNum(process.env.NEXT_PUBLIC_SIMULATOR_ANNUAL_RETURN_RATE) ?? 5,
   defaultInflationRate = envNum(process.env.NEXT_PUBLIC_SIMULATOR_INFLATION_RATE) ?? 2,
