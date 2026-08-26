@@ -13,11 +13,11 @@ import {
   YAxis,
 } from "recharts";
 import { CHART_INITIAL_DIMENSION } from "../../../lib/chart";
-import { formatCurrency } from "../../../lib/format";
+import { formatAxisAmount, formatCurrency } from "../../../lib/format";
 import { MetricLabel } from "../../ui/metric-label";
 import { Slider } from "../../ui/slider";
 import { chartTooltipStyle } from "../chart-tooltip";
-import { formatYAxisAmount, type FanChartDataPoint } from "./compound-simulator-utils";
+import { type FanChartDataPoint } from "./compound-simulator-utils";
 
 export interface MonteCarloChartProps {
   fanChartData: FanChartDataPoint[];
@@ -188,7 +188,7 @@ export function MonteCarloChart({
             tick={{ fontSize: 12 }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={formatYAxisAmount}
+            tickFormatter={formatAxisAmount}
           />
           <Tooltip content={<FanChartTooltip currentAge={currentAge} />} />
           <Area type="monotone" dataKey="base" stackId="fan" fill="transparent" stroke="none" />

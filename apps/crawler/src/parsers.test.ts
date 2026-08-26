@@ -162,6 +162,22 @@ describe("convertDateToIso", () => {
   test("空文字列は空文字列を返す", () => {
     expect(convertDateToIso("", 2025)).toBe("");
   });
+
+  // 時刻を残すと resolveCashFlowDate の期間判定（文字列比較）で
+  // 期間末日のセルが範囲外に落ちる
+  test("時刻付きでも日付だけを返す", () => {
+    expect(convertDateToIso("01/25 08:51", 2025)).toBe("2025-01-25");
+  });
+
+  test("月末表記を実際の日付へ変換する", () => {
+    expect(convertDateToIso("2021-12月末", 2025)).toBe("2021-12-31");
+  });
+
+  // 存在しない日付の判断は呼び出し側に任せる。ここで例外にすると
+  // cash flow の行単位の文脈付きエラーが出せなくなる。
+  test("存在しない日付は例外にせずそのまま返す", () => {
+    expect(convertDateToIso("02/30", 2026)).toBe("02/30");
+  });
 });
 
 describe("calculateChange", () => {

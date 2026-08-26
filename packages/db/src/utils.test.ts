@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { describe, test, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import * as schema from "./schema/schema";
 import { createTestDb, resetTestDb, closeTestDb } from "./test-helpers";
-import { now, parseAmount, convertToIsoDate, upsertById, upsertOne, getOrCreate } from "./utils";
+import { now, convertToIsoDate, upsertById, upsertOne, getOrCreate } from "./utils";
 
 type Db = Awaited<ReturnType<typeof createTestDb>>;
 
@@ -24,32 +24,6 @@ describe("now", () => {
   test("ISO 8601 形式の文字列を返す", async () => {
     const result = now();
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
-  });
-});
-
-describe("parseAmount", () => {
-  test("円記号・カンマを除去してパースする", async () => {
-    expect(parseAmount("¥1,234,567")).toBe(1234567);
-  });
-
-  test("スペースを除去する", async () => {
-    expect(parseAmount(" 1000 ")).toBe(1000);
-  });
-
-  test("+記号を除去する", async () => {
-    expect(parseAmount("+500")).toBe(500);
-  });
-
-  test("円の文字を除去する", async () => {
-    expect(parseAmount("1000円")).toBe(1000);
-  });
-
-  test("空文字列は 0 を返す", async () => {
-    expect(parseAmount("")).toBe(0);
-  });
-
-  test("パース不能な文字列は 0 を返す", async () => {
-    expect(parseAmount("abc")).toBe(0);
   });
 });
 

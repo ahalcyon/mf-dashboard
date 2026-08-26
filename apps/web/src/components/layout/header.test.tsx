@@ -48,6 +48,38 @@ describe("Header", () => {
     expect(screen.getByRole("button", { name: "金融機関データを更新" })).not.toBeNull();
   });
 
+  // 「グループ選択なし」は Money Forward 側の擬似グループで、切り替える先が無い。
+  // 意味の分からないラベルを出し続けないようにする。
+  it("hides the selector when only the no-group pseudo group exists", () => {
+    render(
+      <SidebarProvider>
+        <Header
+          groups={[{ id: "0", name: "グループ選択なし", isCurrent: true, lastScrapedAt: null }]}
+          defaultGroupId="0"
+        />
+      </SidebarProvider>,
+    );
+
+    expect(screen.queryByText("グループ選択なし")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "グループを選択" })).toBeNull();
+  });
+
+  it("shows the selector once a real group exists alongside the pseudo group", () => {
+    render(
+      <SidebarProvider>
+        <Header
+          groups={[
+            { id: "0", name: "グループ選択なし", isCurrent: true, lastScrapedAt: null },
+            groups[1],
+          ]}
+          defaultGroupId="0"
+        />
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByRole("combobox", { name: "グループを選択" })).not.toBeNull();
+  });
+
   it("shows the update time for the group selected by the URL", () => {
     pathnameMock.mockReturnValue("/group-b/");
 

@@ -7,5 +7,5 @@
 .env
 crash.log
 crash.*.log
-*.tfplan
-tfplan.out
+# 名前に関わらず plan ファイルは無視する。理由は ../.gitignore を参照（#74）。
+*tfplan*

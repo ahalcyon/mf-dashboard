@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  formatAxisAmount,
   formatCurrency,
   formatNumber,
   formatPercent,
@@ -156,5 +157,26 @@ describe("formatLastUpdated", () => {
   it("時刻を0埋めする", () => {
     const result = formatLastUpdated("2025-01-05T09:05:00");
     expect(result).toBe("1/5 09:05");
+  });
+});
+
+describe("formatAxisAmount", () => {
+  it.for([
+    [0, "0万"],
+    [-1_000, "0万"],
+    [-5_000, "-1万"],
+    [99_999_999, "10000万"],
+    [-99_999_999, "-10000万"],
+    [100_000_000, "1億"],
+    [-100_000_000, "-1億"],
+    [125_000_000, "1.3億"],
+    [1_000_000_000, "10億"],
+  ] as const)("%d を %s にする", ([value, expected]: readonly [number, string]) => {
+    expect(formatAxisAmount(value)).toBe(expected);
+  });
+
+  // 億の分岐が無かったころ、資産チャートの軸はここで "20000万" と出ていた
+  it("2 億円の軸を万で表示しない", () => {
+    expect(formatAxisAmount(200_000_000)).toBe("2億");
   });
 });

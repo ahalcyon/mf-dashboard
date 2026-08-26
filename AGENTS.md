@@ -126,6 +126,50 @@ Bound structure-only E2E navigation independently from production crawl coverage
 - After adding or changing Storybook stories, run `pnpm --filter @mf-dashboard/web test:storybook`.
 - Run checks relevant to the files changed. Before finishing, confirm the requested behavior, review the diff for regressions, and report which checks ran and any that were not run.
 
+### Infrastructure Changes
+
+Before opening a pull request, prove the change still applies. `terraform validate` does not catch what only surfaces during planning, and CI cannot run `plan` because it holds no AWS credentials, so a broken plan otherwise reaches `main` and blocks every later apply until a follow-up fixes it.
+
+**Do not decide by which files you edited.** Ask Terraform:
+
+```bash
+cd terraform/aws
+terraform plan -detailed-exitcode   # 0 = no diff, 2 = diff, 1 = error
+```
+
+Exit code 2 means the steps below apply. Exit code 0 means they do not.
+
+Editing no `.tf` file at all still produces a diff. `terraform/aws/images.tf` lists the paths baked into each container image, and the image tag is a hash of them (`images.tf`, `image_tags`). `site-builder` alone covers `apps/web/src`, `packages/db`, `packages/analytics`, `pnpm-lock.yaml`, and more, so an app-only change — a renovate dependency bump included — replaces a task definition. A change touching only `apps/web/src/components/layout/` once planned as `2 to add, 2 to change, 2 to destroy`.
+
+1. Run `terraform plan` on the feature branch **without `-target`**. A targeted plan skips the outputs and dependencies outside the target, which is exactly how a broken output reached `main` once.
+2. Run `terraform apply` on the feature branch.
+3. Verify the behavior. See below — for an image change, `apply` alone does not update what the site serves.
+4. Run `terraform apply` on `main` again to put the deployment back.
+5. Only then open the pull request.
+
+Applying a feature branch deploys unmerged infrastructure to the real AWS account. That is acceptable here because the account serves one person, but never leave the deployment on a branch: step 4 is not optional.
+
+Expect this to take time. Image tags are content hashes, so moving between a branch and `main` rebuilds and pushes every image whose sources differ.
+
+#### Verifying an image change
+
+`pnpm test:e2e:web` runs `next dev` against the demo database on this machine. It says nothing about what CloudFront serves, so it does not on its own verify an apply.
+
+`apply` only repoints the ECS task definition. The site in S3 is whatever the last `site-builder` run wrote, and that run is triggered by the writer publishing a new database — not by `apply`. To see the change, run the task yourself:
+
+```bash
+aws ecs run-task --cluster mf-dashboard --task-definition mf-dashboard-site-builder \
+  --launch-type FARGATE --network-configuration "awsvpcConfiguration={subnets=[...],securityGroups=[...],assignPublicIp=ENABLED}"
+```
+
+Then fetch the deployed page and assert on structure only — never print balances, account names, or the Basic auth credentials. The credentials live in `aws_cloudfrontkeyvaluestore_key.authorization`. The first request answers `302` to set the session cookie, so follow redirects and keep a cookie jar.
+
+Remember that step 4 leaves the built site ahead of `main`. The next crawl rebuilds it from whatever image the task definition then points at, so the deployed page reverts on its own. After merging, `apply` and run `site-builder` once if the change should be visible before the next crawl.
+
+#### Never commit a plan file
+
+`terraform plan -out` writes a zip containing `tfstate` and `tfstate-prev` in full, so it carries every credential in the state in plaintext. Write plan files outside the repository, and keep the `*tfplan*` ignore rules intact. A file named `tfplan-dist.out` once slipped past a `tfplan.out` rule and reached `main` with the dashboard's Basic auth credentials inside.
+
 ### Validation Commands
 
 | Check               | Command                                          |

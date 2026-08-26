@@ -57,8 +57,6 @@ export const groupAccountsByCategory = fn(() => []);
 export const getAccountsGroupedByCategory = fn(() => []);
 
 // Query modules - asset
-export const parseDateString = fn();
-export const toDateString = fn();
 export const calculateTargetDate = fn();
 export const getAssetBreakdownByCategory = fn(() => []);
 export const aggregateLiabilitiesByCategory = fn(() => []);
