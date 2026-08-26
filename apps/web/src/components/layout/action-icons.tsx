@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { withBasePath } from "../../lib/base-path";
 import { formatDateTime } from "../../lib/format";
+import { Button } from "../ui/button";
 import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogDescription } from "../ui/dialog";
 import { IconButton } from "../ui/icon-button";
 
@@ -44,10 +45,12 @@ export function ActionIcons({ variant, notifications, lastScrapedAt }: ActionIco
 function RefreshControl({ iconSize }: { iconSize: string }) {
   const router = useRouter();
   const [state, setState] = useState<RefreshState>({ kind: "idle" });
+  const [isConfirming, setIsConfirming] = useState(false);
 
   async function startRefresh() {
     if (state.kind === "starting") return;
 
+    setIsConfirming(false);
     setState({ kind: "starting" });
     try {
       const response = await fetch(withBasePath("/api/refresh/"), {
@@ -85,11 +88,59 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
         ariaLabel={presentation.label}
         disabled={state.kind === "starting"}
         title={presentation.label}
-        onClick={() => void startRefresh()}
+        onClick={() => setIsConfirming(true)}
       />
       <output aria-live="polite" className="sr-only">
         {presentation.status}
       </output>
+
+      {/* 押しても画面が変わらないと、走ったかどうか分からず何度も押すことになる。
+          クロールは Money Forward へログインして一括更新を回す重い処理なので、
+          先に確認を挟む。 */}
+      <Dialog open={isConfirming} onOpenChange={setIsConfirming}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>金融機関データを更新しますか</DialogTitle>
+          <DialogDescription asChild>
+            <div className="mt-2 space-y-3 text-sm text-muted-foreground">
+              <p>Money Forward にログインして、登録金融機関の一括更新を実行します。</p>
+              <p>
+                完了まで数分から 20 分ほどかかります。
+                <span className="block">
+                  この画面に結果が出るのは、取得したデータでサイトが作り直されたあとです。
+                </span>
+              </p>
+            </div>
+          </DialogDescription>
+          <div className="mt-6 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsConfirming(false)}>
+              キャンセル
+            </Button>
+            <Button type="button" onClick={() => void startRefresh()}>
+              更新を開始
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 結果は読み上げだけでなく目にも見える形で残す */}
+      <Dialog
+        open={state.kind !== "idle" && state.kind !== "starting"}
+        onOpenChange={(open) => {
+          if (!open) setState({ kind: "idle" });
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogTitle>{presentation.label}</DialogTitle>
+          <DialogDescription asChild>
+            <p className="mt-2 text-sm text-muted-foreground">{presentation.detail}</p>
+          </DialogDescription>
+          <div className="mt-6 flex justify-end">
+            <Button type="button" onClick={() => setState({ kind: "idle" })}>
+              閉じる
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -111,15 +162,32 @@ type RefreshState =
  * 起動までしか分からない。クロールの完了はサイトが焼き直されて
  * 最終更新の表示が進むことで分かる。
  */
-const refreshPresentation: Record<RefreshState["kind"], { label: string; status: string }> = {
-  idle: { label: "金融機関データを更新", status: "" },
-  starting: { label: "更新を開始しています", status: "更新を開始しています" },
+const refreshPresentation: Record<
+  RefreshState["kind"],
+  { label: string; status: string; detail: string }
+> = {
+  idle: { label: "金融機関データを更新", status: "", detail: "" },
+  starting: {
+    label: "更新を開始しています",
+    status: "更新を開始しています",
+    detail: "更新の開始を要求しています。",
+  },
   started: {
     label: "更新を開始しました",
     status: "更新を開始しました。完了までしばらくかかります",
+    detail:
+      "完了まで数分から 20 分ほどかかります。取得したデータでサイトが作り直されると、この画面の最終更新が進みます。結果はメールでも届きます。",
   },
-  "already-running": { label: "すでに更新中です", status: "すでに更新中です" },
-  failed: { label: "更新を開始できませんでした", status: "更新を開始できませんでした" },
+  "already-running": {
+    label: "すでに更新中です",
+    status: "すでに更新中です",
+    detail: "前回の更新がまだ実行中です。二重に起動しないよう、今回の要求は見送りました。",
+  },
+  failed: {
+    label: "更新を開始できませんでした",
+    status: "更新を開始できませんでした",
+    detail: "更新を開始できませんでした。しばらく待ってからもう一度試してください。",
+  },
 };
 
 function LastUpdatedAt({ lastScrapedAt }: LastUpdatedAtProps) {

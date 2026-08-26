@@ -22,6 +22,12 @@ function refreshButton(name = "金融機関データを更新"): HTMLElement {
   return screen.getByRole("button", { name });
 }
 
+/** 確認ダイアログを開き、「更新を開始」を押すところまで進める。 */
+async function confirmRefresh(): Promise<void> {
+  fireEvent.click(refreshButton());
+  fireEvent.click(await screen.findByRole("button", { name: "更新を開始" }));
+}
+
 beforeEach(() => {
   refreshMock.mockClear();
 });
@@ -37,7 +43,7 @@ describe("ActionIcons の更新ボタン", () => {
     respondWith(202);
     render(<ActionIcons variant="header" />);
 
-    fireEvent.click(refreshButton());
+    await confirmRefresh();
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith("/api/refresh/", {
@@ -55,16 +61,16 @@ describe("ActionIcons の更新ボタン", () => {
     respondWith(202);
     render(<ActionIcons variant="header" />);
 
-    fireEvent.click(refreshButton());
+    await confirmRefresh();
 
-    expect(await screen.findByRole("button", { name: "更新を開始しました" })).not.toBeNull();
+    expect(await screen.findByRole("heading", { name: "更新を開始しました" })).not.toBeNull();
   });
 
   it("起動できたら最終更新の表示を取り直す", async () => {
     respondWith(202);
     render(<ActionIcons variant="header" />);
 
-    fireEvent.click(refreshButton());
+    await confirmRefresh();
 
     await waitFor(() => {
       expect(refreshMock).toHaveBeenCalledOnce();
@@ -75,9 +81,9 @@ describe("ActionIcons の更新ボタン", () => {
     respondWith(409);
     render(<ActionIcons variant="header" />);
 
-    fireEvent.click(refreshButton());
+    await confirmRefresh();
 
-    expect(await screen.findByRole("button", { name: "すでに更新中です" })).not.toBeNull();
+    expect(await screen.findByRole("heading", { name: "すでに更新中です" })).not.toBeNull();
     expect(refreshMock).not.toHaveBeenCalled();
   });
 
@@ -85,10 +91,10 @@ describe("ActionIcons の更新ボタン", () => {
     respondWith(502);
     render(<ActionIcons variant="header" />);
 
-    fireEvent.click(refreshButton());
+    await confirmRefresh();
 
     expect(
-      await screen.findByRole("button", { name: "更新を開始できませんでした" }),
+      await screen.findByRole("heading", { name: "更新を開始できませんでした" }),
     ).not.toBeNull();
   });
 
@@ -96,11 +102,34 @@ describe("ActionIcons の更新ボタン", () => {
     global.fetch = vi.fn<typeof fetch>(() => Promise.reject(new Error("offline")));
     render(<ActionIcons variant="header" />);
 
+    await confirmRefresh();
+
+    expect(
+      await screen.findByRole("heading", { name: "更新を開始できませんでした" }),
+    ).not.toBeNull();
+  });
+
+  // 押しても画面が変わらないと、走ったかどうか分からず何度も押すことになる
+  it("押しただけではクロールを起動しない", async () => {
+    respondWith(202);
+    render(<ActionIcons variant="header" />);
+
     fireEvent.click(refreshButton());
 
     expect(
-      await screen.findByRole("button", { name: "更新を開始できませんでした" }),
+      await screen.findByRole("heading", { name: "金融機関データを更新しますか" }),
     ).not.toBeNull();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("キャンセルすれば起動しない", async () => {
+    respondWith(202);
+    render(<ActionIcons variant="header" />);
+
+    fireEvent.click(refreshButton());
+    fireEvent.click(await screen.findByRole("button", { name: "キャンセル" }));
+
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it("サイドバーでは更新ボタンを出さない", () => {
