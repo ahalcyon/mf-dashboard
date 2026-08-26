@@ -23,7 +23,8 @@ This repository is a monorepo built with pnpm workspaces and Turborepo.
 - Keep changes scoped to the request and preserve unrelated work in the worktree.
 - Import directly from source files. Do not create barrel files (`index.ts` files that re-export modules).
 - Put debug scripts in the package's `debug/` directory. Do not create temporary `debug-*.ts` or `test-*.ts` files under `src/`.
-- Run commands on their own rather than piping them together, unless the next command actually consumes the previous output. Piping a long-running command such as `build` or `test` into `grep` or `tail` withholds every line until it finishes, so its progress is invisible while it runs. Run the command first, then inspect the result separately if you need to narrow it down.
+- Run one command per invocation. A single command is one command body plus its options and parameters.
+- Do not use pipes or redirection unless the next stage actually consumes the previous output. Run the command first, then inspect the result separately if you need to narrow it down.
 - When several pieces of work are independent of each other, give each its own `git worktree` on its own branch. Group work that touches the same files into a single worktree so the branches do not conflict.
 - Worktrees buy isolation, not concurrency. A single agent still executes one task at a time, so creating three worktrees does not make three things happen at once. What they buy is that each branch keeps its own working tree, so you can leave one mid-change, and each branch can be pushed the moment it is ready instead of waiting for the one before it.
 - What actually runs in parallel is CI. Push each branch as soon as its local work is done and let its checks run while you start the next one. This is the main reason to keep the branches separate.
