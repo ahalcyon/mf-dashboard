@@ -5,13 +5,13 @@ import { Menu } from "lucide-react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { useSidebar } from "../../contexts/sidebar-context";
 import { withBasePath } from "../../lib/base-path";
 import { extractGroupIdFromPath } from "../../lib/url";
 import { IconButton } from "../ui/icon-button";
 import { ActionIcons } from "./action-icons";
 import { GroupSelectorDisplay, groupSelectorContainerClassName } from "./group-selector-display";
 import { GroupSelectorClient, type Group } from "./group-selector.client";
-import { useSidebar } from "./sidebar-context";
 
 /** 既定グループ（グループ id を含まない URL）の通知に使うキー。 */
 export const DEFAULT_NOTIFICATIONS_KEY = "__default__";

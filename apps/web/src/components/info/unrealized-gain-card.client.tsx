@@ -1,7 +1,12 @@
 "use client";
 
 import { TrendingDown, TrendingUp } from "lucide-react";
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ALL_FILTER,
+  type GainFilter,
+  useHoldingsFilter,
+} from "../../contexts/holdings-filter-context";
 import { TreemapChart } from "../charts/treemap-chart";
 import { AmountDisplay } from "../ui/amount-display";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
@@ -16,8 +21,6 @@ interface HoldingData {
   institution: string | null;
   categoryName: string | null;
 }
-
-export type GainFilter = "all" | "gain" | "loss";
 
 interface FilterOption {
   value: string;
@@ -72,7 +75,6 @@ function groupSmallHoldings(
   return result;
 }
 
-const ALL_FILTER = "__all__";
 const GAIN_FILTER_OPTIONS: Array<{ value: GainFilter; label: string }> = [
   { value: "all", label: "損益すべて" },
   { value: "gain", label: "含み益" },
@@ -104,55 +106,6 @@ export function filterHoldings(
     }
     return holding.institution === institutionFilter;
   });
-}
-
-interface HoldingsFilterContextValue {
-  selectedFilter: string;
-  setSelectedFilter: (value: string) => void;
-  gainFilter: GainFilter;
-  setGainFilter: (value: GainFilter) => void;
-}
-
-const HoldingsFilterContext = createContext<HoldingsFilterContextValue | null>(null);
-
-export function HoldingsFilterProvider({
-  children,
-  filterAvailable = true,
-}: {
-  children: ReactNode;
-  filterAvailable?: boolean;
-}) {
-  const [selectedFilter, setSelectedFilter] = useState(ALL_FILTER);
-  const [gainFilter, setGainFilter] = useState<GainFilter>("all");
-
-  useEffect(() => {
-    if (!filterAvailable) {
-      setSelectedFilter(ALL_FILTER);
-      setGainFilter("all");
-    }
-  }, [filterAvailable]);
-
-  return (
-    <HoldingsFilterContext value={{ selectedFilter, setSelectedFilter, gainFilter, setGainFilter }}>
-      {children}
-    </HoldingsFilterContext>
-  );
-}
-
-export function useHoldingsFilter() {
-  return useContext(HoldingsFilterContext);
-}
-
-export function HoldingsFilterReset() {
-  const setSelectedFilter = useHoldingsFilter()?.setSelectedFilter;
-  const setGainFilter = useHoldingsFilter()?.setGainFilter;
-
-  useEffect(() => {
-    setSelectedFilter?.(ALL_FILTER);
-    setGainFilter?.("all");
-  }, [setGainFilter, setSelectedFilter]);
-
-  return null;
 }
 
 export function UnrealizedGainCardClient({

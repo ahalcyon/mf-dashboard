@@ -1,7 +1,7 @@
 import { getTransactions, getTransactionsByMonth } from "@mf-dashboard/db";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { mocked } from "storybook/test";
-import { DateFilterProvider } from "../date-filter-context";
+import { DateFilterProvider } from "../../../contexts/date-filter-context";
 import { TransactionTable } from "./transaction-table";
 
 const meta = {

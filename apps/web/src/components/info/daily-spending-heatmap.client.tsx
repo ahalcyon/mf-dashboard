@@ -2,11 +2,11 @@
 
 import type { LucideIcon } from "lucide-react";
 import { CalendarDays } from "lucide-react";
+import { useDateFilter } from "../../contexts/date-filter-context";
 import { buildCalendarGrid, getIntensityLevel } from "../../lib/calendar";
 import { cn } from "../../lib/utils";
 import { AmountDisplay } from "../ui/amount-display";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { useDateFilter } from "./date-filter-context";
 
 interface DailyData {
   date: string; // "YYYY-MM-DD"

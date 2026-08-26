@@ -8,12 +8,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CategoryBreakdown } from "../../../components/info/category-breakdown/category-breakdown";
 import { DailySpendingHeatmap } from "../../../components/info/daily-spending-heatmap";
-import { DateFilterProvider } from "../../../components/info/date-filter-context";
 import { FixedVariableBreakdown } from "../../../components/info/fixed-variable-breakdown";
 import { SankeyDiagram } from "../../../components/info/sankey-diagram";
 import { TransactionTable } from "../../../components/info/transaction-table/transaction-table";
 import { MonthSelector } from "../../../components/layout/month-selector";
 import { PageLayout } from "../../../components/layout/page-layout";
+import { DateFilterProvider } from "../../../contexts/date-filter-context";
 import { formatMonth } from "../../../lib/format";
 import { formatCashFlowPageTitle } from "./page-title";
 

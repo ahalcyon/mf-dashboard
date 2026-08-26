@@ -1,14 +1,16 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  HoldingsFilterProvider,
+  HoldingsFilterReset,
+  useHoldingsFilter,
+} from "../../contexts/holdings-filter-context";
 import { filterCategories, HoldingsTableClient, HoldingsTableTotal } from "./holdings-table.client";
 import {
   filterHoldings,
   getRankingLimit,
-  HoldingsFilterProvider,
-  HoldingsFilterReset,
   UnrealizedGainCardClient,
-  useHoldingsFilter,
 } from "./unrealized-gain-card.client";
 
 const categories = [

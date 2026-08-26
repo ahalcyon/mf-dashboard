@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SidebarProvider } from "../../contexts/sidebar-context";
 import { DEFAULT_NOTIFICATIONS_KEY, Header } from "./header";
-import { SidebarProvider } from "./sidebar-context";
 
 const { pathnameMock, refreshMock } = vi.hoisted(() => ({
   pathnameMock: vi.fn<() => string>(() => "/"),

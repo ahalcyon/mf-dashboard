@@ -13,6 +13,7 @@ import {
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSidebar } from "../../contexts/sidebar-context";
 import { withBasePath } from "../../lib/base-path";
 import {
   buildGroupPath,
@@ -23,7 +24,6 @@ import {
 import { cn } from "../../lib/utils";
 import { IconButton } from "../ui/icon-button";
 import { ActionIcons } from "./action-icons";
-import { useSidebar } from "./sidebar-context";
 
 interface NavItem {
   title: string;

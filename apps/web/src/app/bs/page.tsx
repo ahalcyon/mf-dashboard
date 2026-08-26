@@ -5,8 +5,8 @@ import { AssetHistoryChart } from "../../components/info/asset-history-chart";
 import { BalanceSheetChart } from "../../components/info/balance-sheet-chart";
 import { HoldingsTable } from "../../components/info/holdings-table";
 import { UnrealizedGainCard } from "../../components/info/unrealized-gain-card";
-import { HoldingsFilterProvider } from "../../components/info/unrealized-gain-card.client";
 import { PageLayout } from "../../components/layout/page-layout";
+import { HoldingsFilterProvider } from "../../contexts/holdings-filter-context";
 
 export const metadata: Metadata = {
   title: "資産",

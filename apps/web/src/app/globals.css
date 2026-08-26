@@ -7,7 +7,9 @@
   --color-success-foreground: #ffffff;
   --color-warning: #fef3c7;
   --color-warning-foreground: #92400e;
-  --color-transfer: #6b7280;
+  /* 振替行は bg-muted/30 の上に載る。#6b7280 だとその背景で 4.48 しか出ず
+     WCAG の 4.5:1 を割る。白背景でしか見ていなかったため見落としていた。 */
+  --color-transfer: #5f6773;
   --color-total-assets: #217cba;
   --color-liability: #92400e;
   --color-net-assets: #15803d;

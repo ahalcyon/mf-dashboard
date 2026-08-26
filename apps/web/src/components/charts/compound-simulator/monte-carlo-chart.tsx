@@ -345,7 +345,7 @@ function FanChartTooltip({
       {isWithdrawing && (
         <div className="mt-1 flex justify-between gap-4 border-t pt-1">
           <span className="text-muted-foreground">枯渇率</span>
-          <span className="font-medium text-expense">
+          <span className="font-medium text-balance-negative">
             {((depletionRate ?? 0) * 100).toFixed(1)}%
           </span>
         </div>
