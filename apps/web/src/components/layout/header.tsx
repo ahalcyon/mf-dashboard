@@ -1,5 +1,6 @@
 "use client";
 
+import { isNoGroup } from "@mf-dashboard/meta/groups";
 import { Menu } from "lucide-react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -27,8 +28,15 @@ export function Header({ groups, defaultGroupId, notifications }: HeaderProps) {
     groups.find((group) => group.id === defaultGroupId) ??
     null;
 
+  // 「グループ選択なし」は Money Forward 側の擬似グループで、
+  // 「グループで絞らない」ことを表す。それしか無いなら切り替える先が無いので
+  // 何も出さない。Money Forward でグループを作れば自動で現れる。
+  const hasRealGroup = groups.some((group) => !isNoGroup(group.id));
+
   let groupSelector: ReactNode = null;
-  if (groups.length > 1 && defaultGroupId) {
+  if (!hasRealGroup) {
+    groupSelector = null;
+  } else if (groups.length > 1 && defaultGroupId) {
     groupSelector = <GroupSelectorClient groups={groups} defaultGroupId={defaultGroupId} />;
   } else if (selectedGroup) {
     groupSelector = (

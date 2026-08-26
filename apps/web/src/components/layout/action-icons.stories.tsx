@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, userEvent, waitFor, within } from "storybook/test";
+import { expect, screen, userEvent, waitFor, within } from "storybook/test";
 import { AccountNotificationsClient } from "../info/account-notifications.client";
 import { ActionIcons } from "./action-icons";
 
@@ -77,9 +77,12 @@ export const RefreshStarted: Story = {
       const canvas = within(canvasElement);
       await userEvent.click(canvas.getByRole("button", { name: "金融機関データを更新" }));
 
+      // ダイアログは Portal で body 直下に出るので canvas からは見えない
+      await userEvent.click(await screen.findByRole("button", { name: "更新を開始" }));
+
       await waitFor(async () => {
         await expect(
-          canvas.getByRole("button", { name: "更新を開始しました" }),
+          screen.getByRole("heading", { name: "更新を開始しました" }),
         ).toBeInTheDocument();
       });
     } finally {
@@ -95,10 +98,29 @@ export const RefreshAlreadyRunning: Story = {
     try {
       const canvas = within(canvasElement);
       await userEvent.click(canvas.getByRole("button", { name: "金融機関データを更新" }));
+      await userEvent.click(await screen.findByRole("button", { name: "更新を開始" }));
 
       await waitFor(async () => {
-        await expect(canvas.getByRole("button", { name: "すでに更新中です" })).toBeInTheDocument();
+        await expect(screen.getByRole("heading", { name: "すでに更新中です" })).toBeInTheDocument();
       });
+    } finally {
+      restore();
+    }
+  },
+};
+
+/** 押しただけではクロールを起動せず、まず確認を出す。 */
+export const RefreshConfirmation: Story = {
+  args: { variant: "header" },
+  play: async ({ canvasElement }) => {
+    const restore = mockRefreshResponse(202);
+    try {
+      const canvas = within(canvasElement);
+      await userEvent.click(canvas.getByRole("button", { name: "金融機関データを更新" }));
+
+      await expect(
+        await screen.findByRole("heading", { name: "金融機関データを更新しますか" }),
+      ).toBeInTheDocument();
     } finally {
       restore();
     }
