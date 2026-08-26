@@ -13,10 +13,17 @@ import { GroupSelectorDisplay, groupSelectorContainerClassName } from "./group-s
 import { GroupSelectorClient, type Group } from "./group-selector.client";
 import { useSidebar } from "./sidebar-context";
 
+/** 既定グループ（グループ id を含まない URL）の通知に使うキー。 */
+export const DEFAULT_NOTIFICATIONS_KEY = "__default__";
+
 interface HeaderProps {
   groups: Group[];
   defaultGroupId: string | null;
-  notifications?: ReactNode;
+  /**
+   * グループ id をキーにした通知ノード。表示中のグループのものを選ぶ。
+   * ルートレイアウトは URL を知らないため、選択はここで行う。
+   */
+  notifications?: Record<string, ReactNode>;
 }
 
 export function Header({ groups, defaultGroupId, notifications }: HeaderProps) {
@@ -27,6 +34,10 @@ export function Header({ groups, defaultGroupId, notifications }: HeaderProps) {
     groups.find((group) => group.id === urlGroupId) ??
     groups.find((group) => group.id === defaultGroupId) ??
     null;
+
+  const groupNotifications =
+    (urlGroupId ? notifications?.[urlGroupId] : undefined) ??
+    notifications?.[DEFAULT_NOTIFICATIONS_KEY];
 
   // 「グループ選択なし」は Money Forward 側の擬似グループで、
   // 「グループで絞らない」ことを表す。それしか無いなら切り替える先が無いので
@@ -67,7 +78,7 @@ export function Header({ groups, defaultGroupId, notifications }: HeaderProps) {
         </div>
         <ActionIcons
           variant="header"
-          notifications={notifications}
+          notifications={groupNotifications}
           lastScrapedAt={selectedGroup?.lastScrapedAt ?? null}
         />
       </div>

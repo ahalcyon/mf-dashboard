@@ -20,14 +20,18 @@ export async function AssetBreakdownChart({ className, groupId }: AssetBreakdown
     return <EmptyState icon={PieChart} title="資産構成" />;
   }
 
-  const totalAssets = await getLatestTotalAssets(groupId);
-  const liabilities = await getLiabilityBreakdownByCategory(groupId);
+  // 互いに独立したクエリなので直列に待たない。
+  const [totalAssets, liabilities, dailyChanges, weeklyChanges, monthlyChanges] = await Promise.all(
+    [
+      getLatestTotalAssets(groupId),
+      getLiabilityBreakdownByCategory(groupId),
+      getCategoryChangesForPeriod("daily", groupId),
+      getCategoryChangesForPeriod("weekly", groupId),
+      getCategoryChangesForPeriod("monthly", groupId),
+    ],
+  );
   const totalLiabilities = liabilities.reduce((sum, l) => sum + l.amount, 0);
   const netAssets = totalAssets !== null ? totalAssets - totalLiabilities : null;
-
-  const dailyChanges = await getCategoryChangesForPeriod("daily", groupId);
-  const weeklyChanges = await getCategoryChangesForPeriod("weekly", groupId);
-  const monthlyChanges = await getCategoryChangesForPeriod("monthly", groupId);
 
   return (
     <AssetBreakdownChartClient
