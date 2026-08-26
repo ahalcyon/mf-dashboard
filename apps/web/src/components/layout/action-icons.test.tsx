@@ -46,7 +46,7 @@ describe("ActionIcons の更新ボタン", () => {
     await confirmRefresh();
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith("/api/refresh/", {
+      expect(global.fetch).toHaveBeenCalledWith(`${window.location.origin}/api/refresh/`, {
         method: "POST",
         // Lambda は署名されていない本文を受け付けないため、空でもハッシュを送る
         headers: {
@@ -75,6 +75,24 @@ describe("ActionIcons の更新ボタン", () => {
     await waitFor(() => {
       expect(refreshMock).toHaveBeenCalledOnce();
     });
+  });
+
+  // #80 の中身。ブックマークが https://user:pass@host/ 形式だとドキュメントの
+  // URL に資格情報が残り、相対パスを解決した結果も資格情報付きになる。fetch は
+  // その URL から Request を作れず同期的に投げるため、ネットワークには 1 件も
+  // 出ないまま失敗する。資格情報を持たない location.origin から組み立てる。
+  it("資格情報を含まない絶対 URL へ要求する", async () => {
+    respondWith(202);
+    render(<ActionIcons variant="header" />);
+
+    await confirmRefresh();
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    });
+    const [url] = vi.mocked(global.fetch).mock.calls[0] as [string];
+    expect(url).toBe(`${window.location.origin}/api/refresh/`);
+    expect(url).not.toContain("@");
   });
 
   it("すでに実行中なら二重に起動したと誤解させない", async () => {

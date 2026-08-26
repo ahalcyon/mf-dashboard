@@ -53,7 +53,7 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
     setIsConfirming(false);
     setState({ kind: "starting" });
     try {
-      const response = await fetch(withBasePath("/api/refresh/"), {
+      const response = await fetch(refreshEndpoint(), {
         method: "POST",
         headers: { "x-amz-content-sha256": EMPTY_BODY_SHA256 },
       });
@@ -161,6 +161,27 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
       </Dialog>
     </>
   );
+}
+
+/**
+ * 資格情報を含まない絶対 URL を組み立てる。
+ *
+ * このダッシュボードは https://user:pass@host/ をブックマークして踏む運用を
+ * 想定している（terraform/aws/site.tf を参照）。その場合ドキュメントの URL に
+ * 資格情報が残り、相対パスを解決した結果も資格情報付きになる。fetch は
+ * そのような URL から Request を作れず、同期的に投げる。
+ *
+ *   TypeError: Failed to execute 'fetch' on 'Window':
+ *   Request cannot be constructed from a URL that includes credentials
+ *
+ * 例外なのでネットワークには 1 件も出ず、要求が消えたようにしか見えない（#80）。
+ * location.origin は scheme + host + port だけなので資格情報を持たない。
+ */
+function refreshEndpoint(): string {
+  const path = withBasePath("/api/refresh/");
+  // SSR とテスト環境では location を当てにしない
+  if (typeof window === "undefined") return path;
+  return new URL(path, window.location.origin).toString();
 }
 
 /**
