@@ -7,5 +7,7 @@
 .env
 crash.log
 crash.*.log
-*.tfplan
-tfplan.out
+# plan ファイルは zip で、中に tfstate を丸ごと含む。資格情報が平文で入るので
+# 名前に関わらず全部無視する。tfplan-dist.out が tfplan.out に一致せず
+# main へ commit されたことがある（#74）。
+*tfplan*
