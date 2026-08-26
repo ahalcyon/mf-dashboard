@@ -70,7 +70,7 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
         return;
       }
       if (!response.ok) {
-        setState({ kind: "failed" });
+        setState({ kind: "failed", status: response.status });
         return;
       }
 
@@ -78,7 +78,9 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
       // クロールが終わるとサイトが焼き直されるので、最終更新の表示を取り直す
       router.refresh();
     } catch {
-      setState({ kind: "failed" });
+      // ここに来るのは要求そのものが出せなかったとき。サーバーには痕跡が残らない
+      // ので、応答が返った上での失敗と混ぜると原因を切り分けられなくなる。
+      setState({ kind: "unreachable" });
     }
   }
 
@@ -139,7 +141,7 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
         <DialogContent className="max-w-md">
           <DialogTitle>{presentation.label}</DialogTitle>
           <DialogDescription asChild>
-            <p className="mt-2 text-sm text-muted-foreground">{presentation.detail}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{detailFor(state)}</p>
           </DialogDescription>
           <div className="mt-6 flex justify-end gap-2">
             <Button
@@ -173,7 +175,8 @@ type RefreshState =
   | { kind: "started" }
   | { kind: "already-running" }
   | { kind: "session-expired" }
-  | { kind: "failed" };
+  | { kind: "unreachable" }
+  | { kind: "failed"; status: number };
 
 /**
  * 起動までしか分からない。クロールの完了はサイトが焼き直されて
@@ -206,12 +209,24 @@ const refreshPresentation: Record<
     detail:
       "ページを開いたままにしている間に認証が切れました。このまま押し直しても開始できません。再読み込みすると復帰します。",
   },
+  unreachable: {
+    label: "サーバーに接続できませんでした",
+    status: "サーバーに接続できませんでした",
+    detail:
+      "要求を送れませんでした。サーバーには届いていません。通信状況を確かめて、もう一度試してください。",
+  },
   failed: {
     label: "更新を開始できませんでした",
     status: "更新を開始できませんでした",
     detail: "更新を開始できませんでした。しばらく待ってからもう一度試してください。",
   },
 };
+
+/** 失敗時は応答コードを添える。次に同じ報告を受けたとき原因を絞れるようにする。 */
+function detailFor(state: RefreshState): string {
+  const base = refreshPresentation[state.kind].detail;
+  return state.kind === "failed" ? `${base}（応答コード ${state.status}）` : base;
+}
 
 function LastUpdatedAt({ lastScrapedAt }: LastUpdatedAtProps) {
   const formattedLastScrapedAt = lastScrapedAt ? formatDateTime(lastScrapedAt) : null;

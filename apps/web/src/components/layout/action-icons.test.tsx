@@ -129,15 +129,29 @@ describe("ActionIcons の更新ボタン", () => {
     expect(screen.queryByRole("button", { name: "再読み込み" })).toBeNull();
   });
 
-  it("通信そのものが失敗しても状態を残さない", async () => {
+  // 要求が出せなかった場合はサーバーに痕跡が残らない。応答が返った上での
+  // 失敗と同じ文言にすると、報告を受けても切り分けられない（#80）。
+  it("要求を送れなかった場合は応答を得た失敗と区別する", async () => {
     global.fetch = vi.fn<typeof fetch>(() => Promise.reject(new Error("offline")));
     render(<ActionIcons variant="header" />);
 
     await confirmRefresh();
 
     expect(
-      await screen.findByRole("heading", { name: "更新を開始できませんでした" }),
+      await screen.findByRole("heading", { name: "サーバーに接続できませんでした" }),
     ).not.toBeNull();
+    expect(screen.queryByRole("heading", { name: "更新を開始できませんでした" })).toBeNull();
+  });
+
+  // 次に同じ報告を受けたとき、どこで落ちたかを問い合わせずに済むようにする。
+  it("応答を得た失敗では応答コードを添える", async () => {
+    respondWith(502);
+    render(<ActionIcons variant="header" />);
+
+    await confirmRefresh();
+
+    await screen.findByRole("heading", { name: "更新を開始できませんでした" });
+    expect(screen.getByText(/応答コード 502/)).not.toBeNull();
   });
 
   // 押しても画面が変わらないと、走ったかどうか分からず何度も押すことになる
