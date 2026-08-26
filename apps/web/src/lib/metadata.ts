@@ -41,7 +41,9 @@ export function createRootMetadata(
       default: "MoneyForward Me Dashboard",
     },
     description: DASHBOARD_DESCRIPTION,
-    manifest: withBasePath("/manifest.webmanifest"),
+    // manifest はここから出さない。metadata が出す link には crossorigin が
+    // 付かず、エッジの Basic 認証に弾かれて 401 になる（#83）。
+    // app/layout.tsx が use-credentials 付きの link を直接書いている。
     icons: {
       apple: withBasePath("/apple-touch-icon.png"),
     },

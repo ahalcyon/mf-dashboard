@@ -6,6 +6,7 @@ import { AccountNotifications } from "../components/info/account-notifications";
 import { DEFAULT_NOTIFICATIONS_KEY, Header } from "../components/layout/header";
 import { Sidebar } from "../components/layout/sidebar";
 import { SidebarProvider } from "../contexts/sidebar-context";
+import { withBasePath } from "../lib/base-path";
 import { createRootMetadata } from "../lib/metadata";
 import { waitForRuntimeData } from "../lib/runtime-rendering";
 
@@ -70,6 +71,20 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 
   return (
     <html lang="ja">
+      <head>
+        {/*
+          manifest の link はここで直接書く。metadata.manifest から出る link には
+          crossorigin が付かず、ブラウザーは manifest を資格情報なしで取りに行く。
+          このサイトはエッジで Basic 認証を掛けているため 401 になり、ホーム画面へ
+          追加しても名前もアイコンも効かない（#83）。同一オリジンでも、属性が
+          無ければ資格情報は送られない。
+        */}
+        <link
+          rel="manifest"
+          href={withBasePath("/manifest.webmanifest")}
+          crossOrigin="use-credentials"
+        />
+      </head>
       <body className={bodyClassName}>{content}</body>
     </html>
   );
