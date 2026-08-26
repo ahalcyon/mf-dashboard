@@ -58,7 +58,9 @@ describe("createRootMetadata", () => {
       NEXT_PUBLIC_BASE_PATH: "/dashboard",
     });
 
-    expect(metadata.manifest).toBe("/dashboard/manifest.webmanifest");
+    // manifest の link は app/layout.tsx が crossorigin 付きで直接書く。
+    // metadata から出すと crossorigin が付かず 401 になる（#83）。
+    expect(metadata.manifest).toBeUndefined();
     expect(metadata.icons).toEqual({ apple: "/dashboard/apple-touch-icon.png" });
     expect(metadata.openGraph?.images).toEqual([
       {
