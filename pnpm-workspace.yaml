@@ -2,6 +2,26 @@ packages:
   - apps/*
   - packages/*
 
+# 脆弱性のある推移的依存を引き上げる（#87）。
+# いずれも直接依存として宣言していないため、親を最新にしても解消しない。
+# 親（@storybook/nextjs-vite, drizzle-kit, vitest, @nivo/sankey）は確認時点で
+# すべて最新だった。親が新しい版を取り込んだら、その行は削除してよい。
+overrides:
+  # GHSA-2v37-7h3g-55p8。3.x 系の最新。6.x は ESM 専用の major なので上げない
+  "nanoid@<3.3.18": "3.3.18"
+  # GHSA-rgw5-rvv9-x895 ほか計 5 件。5.0.9 が最新かつ修正版
+  "brace-expansion@<5.0.9": "5.0.9"
+  # GHSA-r5fr-rjxr-66jc, GHSA-f23m-r3pf-42rh。同 major の最新
+  "lodash@<4.18.1": "4.18.1"
+  # GHSA-mw96-cpmx-2vgc。同 major の最新
+  "rollup@<4.63.0": "4.63.0"
+  # GHSA-4x5r-pxfx-6jf8。8.x は major なので 7.x の最新に留める
+  "@babel/core@<7.29.7": "7.29.7"
+  # GHSA-67mh-4wv8-2f99。脆弱なのは @esbuild-kit 経由の 0.18.20 だけなので
+  # そこだけ差し替える。drizzle-kit 自身が既に 0.25.12 を使っている。
+  # @esbuild-kit/* はアーカイブ済みで、drizzle-kit が古い経路を残しているだけ
+  "@esbuild-kit/core-utils>esbuild": "0.25.12"
+
 allowBuilds:
   better-sqlite3: true
   esbuild: true
