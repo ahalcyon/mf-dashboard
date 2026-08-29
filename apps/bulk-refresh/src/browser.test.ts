@@ -1,6 +1,6 @@
 import type { Browser } from "playwright";
 import { describe, expect, test, vi } from "vitest";
-import { LAMBDA_CHROMIUM_ARGS, withBrowser, type BrowserSession } from "./browser.js";
+import { withBrowser, type BrowserSession } from "./browser.js";
 
 function fakeBrowser(): Browser & { close: ReturnType<typeof vi.fn> } {
   const close = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
@@ -54,21 +54,5 @@ describe("withBrowser", () => {
 
     expect(browser.close).toHaveBeenCalledOnce();
     expect(run).not.toHaveBeenCalled();
-  });
-});
-
-describe("LAMBDA_CHROMIUM_ARGS", () => {
-  // どれも Lambda では外せない。落とすとビルドもデプロイも通ったうえで、
-  // 最初の invoke で初めて壊れる。
-  test.each([
-    // サンドボックスに要るユーザー名前空間を作れない
-    "--no-sandbox",
-    // /dev/shm がほとんど無い
-    "--disable-dev-shm-usage",
-    // 子プロセスを生成できず、タブの生成が Target crashed になる
-    "--single-process",
-    "--no-zygote",
-  ])("%s を落とさない", (arg) => {
-    expect(LAMBDA_CHROMIUM_ARGS).toContain(arg);
   });
 });

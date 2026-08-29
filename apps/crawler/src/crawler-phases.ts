@@ -15,6 +15,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from "playwrig
 import { loginWithAuthState } from "./auth/login.js";
 import { hasAuthState } from "./auth/state.js";
 import { createBrowserContext } from "./browser/context.js";
+import { chromiumLaunchArgs } from "./browser/launch-args.js";
 import {
   CRAWLER_STEPS,
   normalizeCrawlerError,
@@ -119,6 +120,7 @@ export async function runSetupPhase(config: CrawlerConfig): Promise<CrawlerRunti
     log("Launching browser");
     browser = await chromium.launch({
       headless: !config.isHeaded,
+      args: chromiumLaunchArgs(),
     });
 
     const context = await createBrowserContext(browser, { useAuthState: true });
