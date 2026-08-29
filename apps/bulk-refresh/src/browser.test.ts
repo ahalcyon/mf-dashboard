@@ -58,10 +58,17 @@ describe("withBrowser", () => {
 });
 
 describe("LAMBDA_CHROMIUM_ARGS", () => {
-  // どちらも Lambda では外せない。サンドボックスはユーザー名前空間を作れず、
-  // /dev/shm はほとんど無い。
-  test("Lambda で必要な引数を落とさない", () => {
-    expect(LAMBDA_CHROMIUM_ARGS).toContain("--no-sandbox");
-    expect(LAMBDA_CHROMIUM_ARGS).toContain("--disable-dev-shm-usage");
+  // どれも Lambda では外せない。落とすとビルドもデプロイも通ったうえで、
+  // 最初の invoke で初めて壊れる。
+  test.each([
+    // サンドボックスに要るユーザー名前空間を作れない
+    "--no-sandbox",
+    // /dev/shm がほとんど無い
+    "--disable-dev-shm-usage",
+    // 子プロセスを生成できず、タブの生成が Target crashed になる
+    "--single-process",
+    "--no-zygote",
+  ])("%s を落とさない", (arg) => {
+    expect(LAMBDA_CHROMIUM_ARGS).toContain(arg);
   });
 });

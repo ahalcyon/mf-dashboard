@@ -5,11 +5,22 @@ import { chromium, type Browser, type BrowserContext, type Page } from "playwrig
  *
  * - `--no-sandbox`: Lambda ではサンドボックスに必要なユーザー名前空間を作れない
  * - `--disable-dev-shm-usage`: /dev/shm がほとんど無いため、共有メモリではなく
- *   /tmp を使わせる。既定のままだとタブが確保に失敗して落ちる
+ *   /tmp を使わせる
+ * - `--single-process` / `--no-zygote`: Lambda は子プロセスの生成に制約があり、
+ *   既定のマルチプロセス構成だとブラウザは起動できてもタブの生成で
+ *   `Target crashed` になる。実際にここで踏んだ
+ * - `--disable-gpu`: GPU は無い。探しに行かせるだけ無駄
  *
  * Fargate では既定のままで動いているので、この配列は Lambda 側だけの都合。
+ * 1 タブしか開かないので `--single-process` の制約は問題にならない。
  */
-export const LAMBDA_CHROMIUM_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"];
+export const LAMBDA_CHROMIUM_ARGS = [
+  "--no-sandbox",
+  "--disable-dev-shm-usage",
+  "--single-process",
+  "--no-zygote",
+  "--disable-gpu",
+];
 
 export interface BrowserSession {
   context: BrowserContext;

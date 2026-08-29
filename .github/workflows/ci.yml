@@ -67,7 +67,7 @@ jobs:
       fail-fast: false
       matrix:
         # terraform apply が push するイメージと同じものをビルドして壊れを検知する
-        app: [crawler, writer, site-builder, refresh-trigger]
+        app: [crawler, writer, site-builder, refresh-trigger, bulk-refresh]
     steps:
       - uses: actions/checkout@v7.0.1
         with:
