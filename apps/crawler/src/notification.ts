@@ -2,6 +2,7 @@ import type { Group } from "@mf-dashboard/db/types";
 import { formatUpdatedAt } from "./data-builder.js";
 import { error, warn } from "./logger.js";
 import type { GroupData } from "./scraper.js";
+import { isNoGroup } from "./scrapers/group.js";
 import { sendSnsErrorNotification, sendSnsNotification } from "./sns.js";
 import type { ScrapedData } from "./types.js";
 
@@ -27,7 +28,10 @@ export function buildNotificationPayload(groupData: GroupData, now = new Date())
     summary: groupData.summary,
     items: groupData.items,
     updatedAt: formatUpdatedAt(now),
-    groupName: groupData.group.name,
+    // 「グループ選択なし」は Money Forward 側の擬似グループで、「グループで絞らない」ことを
+    // 表すだけ。名前として見出しに出しても情報が無いので載せない。ヘッダーのグループ
+    // セレクタを実グループが無いときに描画しないのと同じ扱い。
+    groupName: isNoGroup(groupData.group.id) ? undefined : groupData.group.name,
     accountIssues,
   };
 }
