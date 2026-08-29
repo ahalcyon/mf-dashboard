@@ -151,15 +151,33 @@ const liabilityHoldings = [
   },
   {
     id: 11,
-    name: "カードローン",
+    name: "ご利用残高",
     type: "liability",
-    liabilityCategory: "カードローン",
+    liabilityCategory: "カード",
     categoryId: null,
     categoryName: null,
     accountId: 6,
-    accountName: "サンプルカード",
-    institution: "サンプルカード",
+    accountName: "サンプルカードA",
+    institution: "サンプルカードA",
     amount: 500000,
+    quantity: null,
+    unitPrice: null,
+    avgCostPrice: null,
+    dailyChange: null,
+    unrealizedGain: null,
+    unrealizedGainPct: null,
+  },
+  {
+    id: 12,
+    name: "ご利用残高",
+    type: "liability",
+    liabilityCategory: "カード",
+    categoryId: null,
+    categoryName: null,
+    accountId: 7,
+    accountName: "サンプルカードB",
+    institution: "サンプルカードB",
+    amount: 300000,
     quantity: null,
     unitPrice: null,
     avgCostPrice: null,
@@ -433,11 +451,13 @@ export const LiabilityPC: Story = {
     // 負債は含み損益グリッドが表示されない
     await expect(canvas.queryByText("含み損益")).not.toBeInTheDocument();
 
-    // 負債項目が表示される
-    await expect(canvas.getByRole("button", { name: /住宅ローン/ })).toBeInTheDocument();
-    await expect(canvas.getByRole("button", { name: /カードローン/ })).toBeInTheDocument();
+    // 保有名が「ご利用残高」で揃っても、口座名で区別できる
+    await expect(canvas.getAllByText("ご利用残高")).toHaveLength(2);
+    await expect(canvas.getByText("サンプルカードA")).toBeInTheDocument();
+    await expect(canvas.getByText("サンプルカードB")).toBeInTheDocument();
+    await expect(canvas.getByText("サンプル銀行A")).toBeInTheDocument();
 
-    // 負債は展開前は「割合」ラベルがDOMに存在しない（展開時のみ追加される）
+    // 割合は金額の横に % で出るため、「割合」ラベルは使わない
     await expect(canvas.queryByText("割合")).not.toBeInTheDocument();
   },
 };
@@ -458,14 +478,19 @@ export const LiabilityMobile: Story = {
     // モバイル版: 負債は含み損益グリッドが表示されない
     await expect(canvas.queryByText("含み損益")).not.toBeInTheDocument();
 
-    // モバイル版: 展開前は「割合」ラベルが表示されない
+    // モバイル版でも、展開せずに口座名が読める
+    await expect(canvas.getByText("サンプルカードA")).toBeInTheDocument();
+    await expect(canvas.getByText("サンプルカードB")).toBeInTheDocument();
+
+    // モバイル版: 「割合」ラベルは使わない（金額の横に % で出る）
     await expect(canvas.queryByText("割合")).not.toBeInTheDocument();
   },
 };
 
 // === アコーディオン展開テスト ===
 // 投信/株（含み損益あり）: 展開時に平均取得単価、数量、現在単価、保有金融機関が表示
-// 預金/負債（含み損益なし）: 展開時に割合（モバイルのみ）と保有金融機関が表示
+// 預金（含み損益なし）: 展開時に割合（モバイルのみ）と保有金融機関が表示
+// 負債: 口座名を行に出しているため展開する中身が無く、開けない
 
 export const AssetExpanded: Story = {
   name: "投信 アコーディオン展開 (PC)",
@@ -573,8 +598,8 @@ export const DepositExpandedMobile: Story = {
   },
 };
 
-export const LiabilityExpanded: Story = {
-  name: "負債 アコーディオン展開 (PC)",
+export const LiabilityNotExpandable: Story = {
+  name: "負債 展開せずに口座名が読める (PC)",
   args: { type: "liability" },
   globals: pcViewport,
   beforeEach() {
@@ -583,21 +608,18 @@ export const LiabilityExpanded: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const firstLiability = canvas.getByRole("button", { name: /住宅ローン/ });
-    await userEvent.click(firstLiability);
 
-    // 負債: 展開時に保有金融機関が表示される
-    await expect(canvas.getByText("保有金融機関")).toBeInTheDocument();
+    // 口座名が行にあるため、開くボタン自体が無い
+    await expect(canvas.queryByRole("button", { name: /ご利用残高/ })).not.toBeInTheDocument();
+
+    // 展開先にあった「保有金融機関」は行へ移したので重複しない
+    await expect(canvas.queryByText("保有金融機関")).not.toBeInTheDocument();
     await expect(canvas.getByText("サンプル銀行A")).toBeInTheDocument();
-
-    // 負債: 展開時に「割合」ラベルが存在する（モバイル専用表示だがDOM上には存在）
-    const ratioLabels = canvas.queryAllByText("割合");
-    await expect(ratioLabels.length).toBeGreaterThan(0);
   },
 };
 
-export const LiabilityExpandedMobile: Story = {
-  name: "負債 アコーディオン展開 (モバイル)",
+export const LiabilityNotExpandableMobile: Story = {
+  name: "負債 展開せずに口座名が読める (モバイル)",
   args: { type: "liability" },
   globals: mobileViewport,
   beforeEach() {
@@ -606,12 +628,9 @@ export const LiabilityExpandedMobile: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const firstLiability = canvas.getByRole("button", { name: /住宅ローン/ });
-    await userEvent.click(firstLiability);
 
-    // モバイル: 負債展開時は「割合」と保有金融機関が表示される
-    await expect(canvas.getByText("割合")).toBeInTheDocument();
-    await expect(canvas.getByText("保有金融機関")).toBeInTheDocument();
-    await expect(canvas.getByText("サンプル銀行A")).toBeInTheDocument();
+    await expect(canvas.queryByRole("button", { name: /ご利用残高/ })).not.toBeInTheDocument();
+    await expect(canvas.queryByText("保有金融機関")).not.toBeInTheDocument();
+    await expect(canvas.getByText("サンプルカードA")).toBeInTheDocument();
   },
 };
