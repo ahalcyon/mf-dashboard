@@ -1,0 +1,20 @@
+{
+  "name": "@mf-dashboard/bulk-refresh",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mf-dashboard/crawler": "workspace:*",
+    "playwright": "catalog:",
+    "tsx": "4.23.12"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -33,6 +33,20 @@ locals {
       "pnpm-workspace.yaml",
       "tsconfig.json",
     ]
+    bulk-refresh = [
+      "docker/bulk-refresh",
+      "apps/bulk-refresh",
+      "apps/crawler/package.json",
+      "apps/crawler/src",
+      "apps/crawler/tsconfig.json",
+      "packages/db",
+      "packages/date-utils",
+      "packages/meta",
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "tsconfig.json",
+    ]
     refresh-trigger = [
       "docker/refresh-trigger",
       "apps/refresh-trigger",
@@ -62,6 +76,7 @@ locals {
   }
 
   ecr_repositories = {
+    bulk-refresh    = aws_ecr_repository.bulk_refresh.repository_url
     crawler         = aws_ecr_repository.crawler.repository_url
     writer          = aws_ecr_repository.writer.repository_url
     refresh-trigger = aws_ecr_repository.refresh_trigger.repository_url
