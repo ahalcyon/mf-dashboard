@@ -165,6 +165,38 @@ variable "noncurrent_version_retention_days" {
 # ECR イメージの push や GitHub 接続の認可は Terraform の管理外なので、
 # それらが揃うまでは依存するリソースを作らずに済むようにする。
 
+# --- 一括更新ジョブ -------------------------------------------------------
+
+variable "bulk_refresh_memory" {
+  description = "Bulk refresh Lambda memory (MiB). Lambda scales CPU with memory and Chromium needs the headroom."
+  type        = number
+  default     = 3008
+}
+
+variable "bulk_refresh_timeout_seconds" {
+  description = "Bulk refresh Lambda timeout. The job only starts the refresh, so this bounds login plus one click."
+  type        = number
+  default     = 180
+}
+
+variable "bulk_refresh_ephemeral_storage" {
+  description = "Bulk refresh Lambda /tmp size (MiB). Chromium writes its profile there."
+  type        = number
+  default     = 2048
+}
+
+variable "bulk_refresh_schedule_expression" {
+  description = "EventBridge Scheduler cron for the bulk refresh, evaluated in schedule_timezone"
+  type        = string
+  default     = "cron(0 0,6,12,18 * * ? *)"
+}
+
+variable "enable_bulk_refresh_schedule" {
+  description = "Enable the scheduled bulk refresh. Turn this on together with SKIP_REFRESH on the crawler; otherwise the refresh runs twice."
+  type        = bool
+  default     = false
+}
+
 variable "enable_crawler_schedule" {
   description = "Enable the scheduled crawl. Requires an image already pushed to the crawler ECR repository."
   type        = bool

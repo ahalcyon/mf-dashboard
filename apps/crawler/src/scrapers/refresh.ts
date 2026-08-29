@@ -6,6 +6,7 @@ import { debug, info, warn } from "../logger.js";
 const DEFAULT_MAX_WAIT_MINUTES = 20;
 const POLL_INTERVAL_MS = 30000; // 30 seconds
 const NAVIGATION_RETRY_DELAY_MS = 1000;
+const REFRESH_START_SETTLE_MS = 3000;
 const NAVIGATION_TIMEOUT_MS = 60000;
 
 interface NavigationOptions {
@@ -117,16 +118,16 @@ export function getMaxWaitMinutes(env: NodeJS.ProcessEnv = process.env): number 
     : DEFAULT_MAX_WAIT_MINUTES;
 }
 
-export async function clickRefreshButton(
-  page: Page,
-  options: RefreshOptions = {},
-): Promise<RefreshResult> {
-  const maxWaitMinutes = options.maxWaitMinutes ?? getMaxWaitMinutes();
-  const maxWaitTimeMs = maxWaitMinutes * 60 * 1000;
-  const pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
+/**
+ * 金融機関の一括更新を開始するだけで、完了は待たない。
+ *
+ * 完了待ちはクロールとは別のジョブが担う。更新にかかる時間は
+ * Money Forward と金融機関しだいで、我々のコードの都合とは無関係のため、
+ * 開始と取り込みを同じ実行に縛ると取り込みまで待たされる。
+ */
+export async function startBulkRefresh(page: Page): Promise<void> {
   debug("Looking for refresh button...");
 
-  // Navigate to home and click refresh button
   await page.goto(mfUrls.home);
   await page.waitForLoadState("networkidle");
 
@@ -135,8 +136,19 @@ export async function clickRefreshButton(
 
   info("Refreshing accounts...");
 
-  // Wait for refresh to start
-  await page.waitForTimeout(3000);
+  // クリック直後は「更新中」がまだ立っていないので、状態を読む前に待つ
+  await page.waitForTimeout(REFRESH_START_SETTLE_MS);
+}
+
+export async function clickRefreshButton(
+  page: Page,
+  options: RefreshOptions = {},
+): Promise<RefreshResult> {
+  const maxWaitMinutes = options.maxWaitMinutes ?? getMaxWaitMinutes();
+  const maxWaitTimeMs = maxWaitMinutes * 60 * 1000;
+  const pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
+
+  await startBulkRefresh(page);
 
   // Navigate to accounts page to check update status
   await navigateToAccountsPage(page);

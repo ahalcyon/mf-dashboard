@@ -13,7 +13,9 @@
     "./scrapers/portfolio": "./src/scrapers/portfolio.ts",
     "./scrapers/liabilities": "./src/scrapers/liabilities.ts",
     "./sync/config": "./src/sync/config.ts",
-    "./sync/publisher": "./src/sync/publisher.ts"
+    "./sync/publisher": "./src/sync/publisher.ts",
+    "./scrapers/refresh": "./src/scrapers/refresh.ts",
+    "./logger": "./src/logger.ts"
   },
   "scripts": {
     "dev:scrape": "DEBUG=true SKIP_REFRESH=true tsx src/index.ts",
