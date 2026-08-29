@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const send = vi.fn<(command: unknown) => Promise<unknown>>();
 const destroy = vi.fn<() => void>();
+const lambdaSend = vi.fn<(command: unknown) => Promise<unknown>>();
+const lambdaDestroy = vi.fn<() => void>();
 
 // SDK のコマンドは new で組み立てられるので、アロー関数では代用できない
 function command(type: string) {
@@ -19,6 +21,14 @@ vi.mock("@aws-sdk/client-ecs", () => ({
   ListTasksCommand: command("ListTasks"),
   DescribeTasksCommand: command("DescribeTasks"),
   RunTaskCommand: command("RunTask"),
+}));
+
+vi.mock("@aws-sdk/client-lambda", () => ({
+  LambdaClient: class {
+    send = lambdaSend;
+    destroy = lambdaDestroy;
+  },
+  InvokeCommand: command("Invoke"),
 }));
 
 const { handler } = await import("./handler.js");
@@ -40,6 +50,63 @@ beforeEach(() => {
   );
   vi.stubEnv("SUBNET_IDS", "subnet-a,subnet-b");
   vi.stubEnv("SECURITY_GROUP_IDS", "sg-a");
+  vi.stubEnv("BULK_REFRESH_FUNCTION", "mf-dashboard-bulk-refresh");
+  lambdaSend.mockResolvedValue({});
+});
+
+// ボタンのラベルは「金融機関データを更新」。クロールを起動するだけでは、
+// SKIP_REFRESH を焼き込んだ時点でその名前が嘘になる。
+describe("一括更新の開始", () => {
+  test("クロールと一緒に bulk-refresh を非同期で呼ぶ", async () => {
+    send
+      .mockResolvedValueOnce({ taskArns: [] })
+      .mockResolvedValueOnce({ tasks: [{ taskArn: "arn:task/manual" }] });
+
+    const response = await handler(buildEvent("/api/refresh/"));
+
+    expect(response).toMatchObject({ statusCode: 202 });
+    const [invoke] = lambdaSend.mock.calls[0] as [{ input: Record<string, unknown> }];
+    expect(invoke.input).toMatchObject({
+      FunctionName: "mf-dashboard-bulk-refresh",
+      // 完了を待つと、外したはずの待ちがボタン経由で戻ってくる
+      InvocationType: "Event",
+    });
+  });
+
+  // 409 を返す場合にまで呼ぶと、押すたびに Money Forward へログインしてしまう
+  test("実行中で 409 を返すときは呼ばない", async () => {
+    send.mockResolvedValueOnce({ taskArns: ["arn:task/running"] }).mockResolvedValueOnce({
+      tasks: [{ lastStatus: "RUNNING" }],
+    });
+
+    const response = await handler(buildEvent("/api/refresh/"));
+
+    expect(response).toMatchObject({ statusCode: 409 });
+    expect(lambdaSend).not.toHaveBeenCalled();
+  });
+
+  // 更新が始まらなくても、取り込みは前回の更新結果に対して成立する
+  test("一括更新に失敗してもクロールは起動する", async () => {
+    lambdaSend.mockRejectedValue(new Error("Lambda unavailable"));
+    send
+      .mockResolvedValueOnce({ taskArns: [] })
+      .mockResolvedValueOnce({ tasks: [{ taskArn: "arn:task/manual" }] });
+
+    const response = await handler(buildEvent("/api/refresh/"));
+
+    expect(response).toMatchObject({ statusCode: 202 });
+    expect(commandTypes()).toContain("RunTask");
+  });
+
+  test("Lambda クライアントも閉じる", async () => {
+    send
+      .mockResolvedValueOnce({ taskArns: [] })
+      .mockResolvedValueOnce({ tasks: [{ taskArn: "arn:task/manual" }] });
+
+    await handler(buildEvent("/api/refresh/"));
+
+    expect(lambdaDestroy).toHaveBeenCalledOnce();
+  });
 });
 
 describe("パスの検証", () => {

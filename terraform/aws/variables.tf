@@ -67,7 +67,7 @@ variable "container_cli" {
 }
 
 variable "crawler_timeout_minutes" {
-  description = "Upper bound for a single crawl. Money Forward's bulk refresh alone waits MAX_WAIT_MINUTES (default 20)."
+  description = "Upper bound for a single crawl. Declared but not wired to anything yet."
   type        = number
   default     = 45
 }
@@ -125,9 +125,13 @@ variable "database_object_key" {
 }
 
 variable "schedule_expression" {
-  description = "EventBridge Scheduler cron for the crawler, evaluated in schedule_timezone"
+  description = <<-DESC
+    EventBridge Scheduler cron for the crawler, evaluated in schedule_timezone.
+    Runs half an hour after bulk_refresh_schedule_expression so the institutions
+    have had time to update. The crawl does not wait for them.
+  DESC
   type        = string
-  default     = "cron(30 6,15 * * ? *)"
+  default     = "cron(30 0,6,12,18 * * ? *)"
 }
 
 variable "schedule_timezone" {

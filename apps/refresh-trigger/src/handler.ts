@@ -4,6 +4,7 @@ import {
   ListTasksCommand,
   RunTaskCommand,
 } from "@aws-sdk/client-ecs";
+import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import type { LambdaFunctionURLEvent, LambdaFunctionURLResult } from "aws-lambda";
 import { loadConfig } from "./config.js";
 import {
@@ -15,7 +16,12 @@ import {
 } from "./result.js";
 
 /**
- * ダッシュボードから当日分のクロールを起動する。
+ * ダッシュボードの「金融機関データを更新」に応じる。
+ *
+ * ボタンの名前どおり 2 つのことをする。金融機関の一括更新を始めることと、
+ * その時点の状態を取り込むクロールを走らせること。クロールは更新の完了を
+ * 待たない（#93）ため、押した直後に見えるのは「すでに更新が終わっていた分」で、
+ * 残りは次のスケジュール実行が拾う。
  *
  * 認証は CloudFront の viewer-request 関数が担うため、ここでは扱わない。
  * Function URL は OAC で CloudFront からのみ到達できるようにしてある。
@@ -33,22 +39,52 @@ export async function handler(event: LambdaFunctionURLEvent): Promise<LambdaFunc
 
   const config = loadConfig();
   const client = new ECSClient({});
+  const lambda = new LambdaClient({});
 
   try {
-    return toResponse(await startCrawl(client, config));
+    return toResponse(await startRefresh(client, lambda, config));
   } finally {
     client.destroy();
+    lambda.destroy();
   }
 }
 
-async function startCrawl(
+/**
+ * 一括更新を非同期で開始する。応答も完了も待たない。
+ *
+ * ここで失敗してもクロールは続ける。取り込まれる値が前回の更新のままに
+ * なるだけで、何も見えなくなるよりはよい。
+ */
+async function startBulkRefresh(
+  lambda: LambdaClient,
+  config: ReturnType<typeof loadConfig>,
+): Promise<void> {
+  try {
+    await lambda.send(
+      new InvokeCommand({
+        FunctionName: config.bulkRefreshFunction,
+        InvocationType: "Event",
+      }),
+    );
+    console.info("Requested the bulk account refresh");
+  } catch (error) {
+    console.error("Failed to request the bulk account refresh:", error);
+  }
+}
+
+async function startRefresh(
   client: ECSClient,
+  lambda: LambdaClient,
   config: ReturnType<typeof loadConfig>,
 ): Promise<RefreshOutcome> {
   try {
     if (await isCrawlInProgress(client, config)) {
       return { kind: "already-running" };
     }
+
+    // 多重起動を弾いたあとに投げる。先に投げると、409 を返す場合にも
+    // Money Forward へログインしてしまう。
+    await startBulkRefresh(lambda, config);
 
     const result = await client.send(
       new RunTaskCommand({
