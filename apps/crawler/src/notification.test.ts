@@ -5,6 +5,7 @@ import {
   sendSuccessNotifications,
 } from "./notification.js";
 import type { GroupData } from "./scraper.js";
+import { NO_GROUP_ID } from "./scrapers/group.js";
 import { sendSnsNotification } from "./sns.js";
 
 vi.mock("./sns.js", () => ({
@@ -109,6 +110,19 @@ describe("buildNotificationPayload", () => {
         errorMessage: "Connection failed",
       },
     ]);
+  });
+
+  test("「グループ選択なし」は擬似グループなので groupName を載せない", () => {
+    const groupData = makeGroupData(NO_GROUP_ID, "グループ選択なし");
+
+    expect(buildNotificationPayload(groupData).groupName).toBeUndefined();
+  });
+
+  test("名前ではなく ID で判定する", () => {
+    // 実グループに「グループ選択なし」と付けることもできる。名前で弾くと消えてしまう。
+    const groupData = makeGroupData("group-a", "グループ選択なし");
+
+    expect(buildNotificationPayload(groupData).groupName).toBe("グループ選択なし");
   });
 });
 
