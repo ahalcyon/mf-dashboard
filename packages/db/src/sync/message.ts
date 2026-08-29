@@ -58,8 +58,13 @@ export interface SyncBatch {
   institutionCategories?: ReadonlyMap<string, string>;
 }
 
-export function buildPayloadKey(runId: string, kind: SyncPayloadKind): string {
-  return `payloads/${runId}/${kind}.json`;
+/**
+ * 1 回のクロールは複数の payload を発行する。履歴は月ごとに送るため、
+ * runId と kind だけではキーが衝突し、先に送ったメッセージが後から
+ * 上書きされた中身を指すことになる。run 内の連番で区別する。
+ */
+export function buildPayloadKey(runId: string, kind: SyncPayloadKind, sequence: number): string {
+  return `payloads/${runId}/${String(sequence).padStart(4, "0")}-${kind}.json`;
 }
 
 export function encodeScrapedDataPayload(batch: SyncBatch): ScrapedDataPayload {
@@ -130,6 +135,7 @@ export function buildSyncMessage(options: {
   bucket: string;
   runId: string;
   kind: SyncPayloadKind;
+  sequence: number;
   producedAt?: string;
 }): SyncMessage {
   return {
@@ -137,6 +143,9 @@ export function buildSyncMessage(options: {
     runId: options.runId,
     kind: options.kind,
     producedAt: options.producedAt ?? new Date().toISOString(),
-    payload: { bucket: options.bucket, key: buildPayloadKey(options.runId, options.kind) },
+    payload: {
+      bucket: options.bucket,
+      key: buildPayloadKey(options.runId, options.kind, options.sequence),
+    },
   };
 }

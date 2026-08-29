@@ -26,6 +26,7 @@ describe("buildSyncMessage", () => {
       bucket: "test-bucket",
       runId: "run-1",
       kind: "scraped-data",
+      sequence: 1,
       producedAt: "2026-08-25T06:30:00.000Z",
     });
 
@@ -34,7 +35,7 @@ describe("buildSyncMessage", () => {
       runId: "run-1",
       kind: "scraped-data",
       producedAt: "2026-08-25T06:30:00.000Z",
-      payload: { bucket: "test-bucket", key: "payloads/run-1/scraped-data.json" },
+      payload: { bucket: "test-bucket", key: "payloads/run-1/0001-scraped-data.json" },
     });
   });
 
@@ -43,6 +44,7 @@ describe("buildSyncMessage", () => {
       bucket: "test-bucket",
       runId: "run-1",
       kind: "scraped-data",
+      sequence: 1,
     });
 
     expect(Number.isNaN(Date.parse(message.producedAt))).toBe(false);
@@ -51,7 +53,23 @@ describe("buildSyncMessage", () => {
 
 describe("buildPayloadKey", () => {
   test("run と種別でキーを分ける", () => {
-    expect(buildPayloadKey("run-1", "scraped-data")).toBe("payloads/run-1/scraped-data.json");
+    expect(buildPayloadKey("run-1", "scraped-data", 1)).toBe(
+      "payloads/run-1/0001-scraped-data.json",
+    );
+  });
+
+  test("同じ run の連番でキーが衝突しない", () => {
+    // 履歴は月ごとに発行するので 1 回のクロールが何度も publish する。
+    // 同じキーに上書きすると、先に送ったメッセージが後の中身を指す。
+    const keys = [1, 2, 3].map((sequence) => buildPayloadKey("run-1", "scraped-data", sequence));
+
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  test("連番を 0 詰めして辞書順と発行順を揃える", () => {
+    expect(
+      buildPayloadKey("run-1", "scraped-data", 2) < buildPayloadKey("run-1", "scraped-data", 10),
+    ).toBe(true);
   });
 });
 

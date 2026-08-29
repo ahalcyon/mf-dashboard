@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   handleCrawlerFailure,
+  publishHistoryMonth,
   runAuthPhase,
   runCashFlowHistoryPhase,
   runInstitutionCategoryPhase,
@@ -20,6 +21,7 @@ import { createGroupScope } from "./scrapers/group.js";
 vi.mock("@mf-dashboard/db", () => ({ closeDb: vi.fn<() => void>() }));
 vi.mock("./crawler-phases.js", () => ({
   handleCrawlerFailure: vi.fn<() => void>(),
+  publishHistoryMonth: vi.fn<() => Promise<number>>(),
   runAuthPhase: vi.fn<() => void>(),
   runCashFlowHistoryPhase: vi.fn<() => void>(),
   runInstitutionCategoryPhase: vi.fn<() => Map<string, string>>(),
@@ -60,12 +62,8 @@ beforeEach(async () => {
   vi.mocked(runNotificationPhase).mockResolvedValue(null);
   vi.mocked(runSavePhase).mockResolvedValue([]);
   vi.mocked(runInstitutionCategoryPhase).mockResolvedValue(new Map([["account-a", "銀行"]]));
-  vi.mocked(runCashFlowHistoryPhase).mockImplementation(
-    async (_db, _page, _config, _progress, publishHistory) => {
-      if (!publishHistory) throw new Error("publishHistory is required");
-      await publishHistory([]);
-    },
-  );
+  vi.mocked(publishHistoryMonth).mockResolvedValue(0);
+  vi.mocked(runCashFlowHistoryPhase).mockResolvedValue(undefined);
   vi.mocked(runScrapePhase).mockImplementation(async (_page, _config, progress) => {
     for (const [step, metadata] of [
       [CRAWLER_STEPS.groupList],
@@ -252,11 +250,11 @@ describe("runCrawler progress", () => {
       isDebug: false,
       isHeaded: false,
     });
-    const historyMonths = [{ items: [], month: "2026-06" }];
+    const historyMonth = { items: [], month: "2026-06" };
     vi.mocked(runCashFlowHistoryPhase).mockImplementation(
-      async (_db, _page, _config, _progress, publishHistory) => {
-        if (!publishHistory) throw new Error("publishHistory is required");
-        await publishHistory(historyMonths);
+      async (_db, _page, _config, _progress, publishMonth) => {
+        if (!publishMonth) throw new Error("publishMonth is required");
+        await publishMonth(historyMonth);
       },
     );
     const progress = await createCrawlerProgressReporter(path.join(tempDir, "state.json"), {
@@ -267,15 +265,18 @@ describe("runCrawler progress", () => {
 
     await runCrawler(progress);
 
+    // 口座や残高は履歴とは別に、履歴の取得より先に保存する。
     expect(runSavePhase).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
       expect.anything(),
-      historyMonths,
+      [],
       undefined,
       new Map([["account-a", "銀行"]]),
       // DATA_BUCKET と WRITE_QUEUE_URL が無いので同期経路は無効
       null,
     );
+    // 履歴は月ごとに発行する。まとめてではない。
+    expect(publishHistoryMonth).toHaveBeenCalledWith(expect.anything(), historyMonth, null);
   });
 });

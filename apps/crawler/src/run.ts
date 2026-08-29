@@ -3,6 +3,7 @@ import { getDbPath } from "@mf-dashboard/db/db-path";
 import { buildCleanupGroupIds } from "./cleanup-groups.js";
 import {
   handleCrawlerFailure,
+  publishHistoryMonth,
   runAuthPhase,
   runCashFlowHistoryPhase,
   runInstitutionCategoryPhase,
@@ -80,29 +81,30 @@ export async function runCrawler(progress: CrawlerProgressReporter): Promise<voi
         CRAWLER_STEPS.institutionCategories,
         () => runInstitutionCategoryPhase(activeRuntime.page),
       );
-      await runCrawlerStep(progress, CRAWLER_STEPS.databaseSave, () =>
-        runCashFlowHistoryPhase(
+      // 残高や口座を先に保存する。取引は口座名から account_id を引くため、
+      // 履歴を月ごとに書くにはその前に口座が入っていなければならない。
+      // 履歴の取得中に打ち切られても、ここまでは残る。
+      await runCrawlerStep(progress, CRAWLER_STEPS.databaseSave, async () => {
+        await runSavePhase(
           activeRuntime.db,
           activeRuntime.page,
-          {
-            ...config,
-            activeAccountingMonth: scrapeResult.globalData.cashFlow.month,
-          },
-          progress,
-          async (historyMonths) => {
-            const savedCounts = await runSavePhase(
-              activeRuntime.db,
-              activeRuntime.page,
-              scrapeResult,
-              historyMonths,
-              cleanupResult?.ids,
-              institutionCategories,
-              publisher,
-            );
-            if (cleanupResult) info("Cleaned up groups not found in MoneyForward");
-            return savedCounts;
-          },
-        ),
+          scrapeResult,
+          [],
+          cleanupResult?.ids,
+          institutionCategories,
+          publisher,
+        );
+        if (cleanupResult) info("Cleaned up groups not found in MoneyForward");
+      });
+      await runCashFlowHistoryPhase(
+        activeRuntime.db,
+        activeRuntime.page,
+        {
+          ...config,
+          activeAccountingMonth: scrapeResult.globalData.cashFlow.month,
+        },
+        progress,
+        (month) => publishHistoryMonth(activeRuntime.db, month, publisher),
       );
     } catch (err) {
       crawlFailed = true;

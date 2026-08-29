@@ -460,6 +460,12 @@ export async function scrapeCashFlowHistory(
   monthsToScrape: number = 12,
   callbacks: {
     onMonthStart?: (month: string) => Promise<void> | void;
+    /**
+     * 1 か月ぶんを取り終えるたびに呼ぶ。ここで保存すると、後続の月で
+     * 打ち切られても取れたぶんが残る。全月を取り終えてからまとめて保存すると、
+     * 途中で落ちたときに何も残らず、次回もまた同じところで落ちる。
+     */
+    onMonthScraped?: (result: CashFlowHistoryResult) => Promise<void> | void;
     onMonthComplete?: (month: string) => Promise<void> | void;
     onMonthFailure?: (month: string, error: unknown) => Promise<void> | void;
   } = {},
@@ -479,8 +485,10 @@ export async function scrapeCashFlowHistory(
     await callbacks.onMonthStart?.(targetMonth);
     try {
       const data = await extractCashFlowFromPage(page);
-      results.push({ month: data.month, progressMonth: targetMonth, data });
+      const result = { month: data.month, progressMonth: targetMonth, data };
+      results.push(result);
       log(`  ${data.month}: ${data.items.length} transactions`);
+      await callbacks.onMonthScraped?.(result);
 
       if (i < monthsToScrape - 1) {
         const currentMonth = await getDisplayedCashFlowMonth(page);
