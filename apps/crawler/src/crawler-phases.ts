@@ -5,6 +5,7 @@ import { initDb, type Db } from "@mf-dashboard/db";
 import { buildAccountIdMap } from "@mf-dashboard/db/repository/accounts";
 import { saveScrapedDataBatch } from "@mf-dashboard/db/repository/save-scraped-data";
 import {
+  assertNonOverlappingTransactionRanges,
   hasCashFlowPeriod,
   saveTransactionsForMonths,
   type TransactionPeriodReplacement,
@@ -211,6 +212,25 @@ export async function runSavePhase(
   return savedCounts;
 }
 
+/**
+ * 履歴の 1 か月ぶんだけを保存して発行する。
+ *
+ * 取引は口座名から account_id を引くので、口座が先に入っていることが前提。
+ * 呼び出し側は runSavePhase を済ませてからここへ来ること。
+ */
+export async function publishHistoryMonth(
+  db: Db,
+  month: TransactionPeriodReplacement,
+  publisher: SyncPublisher | null = null,
+): Promise<number> {
+  const batch = { groupOnlyData: [], historyMonths: [month] };
+
+  const [savedCount] = await saveScrapedDataBatch(db, batch);
+  await publisher?.publish("scraped-data", encodeScrapedDataPayload(batch));
+
+  return savedCount ?? 0;
+}
+
 export async function runInstitutionCategoryPhase(page: Page): Promise<Map<string, string>> {
   phase("Institution Categories");
   await switchGroup(page, NO_GROUP_ID);
@@ -225,11 +245,10 @@ export async function runCashFlowHistoryPhase(
   page: Page,
   config: Pick<CrawlerConfig, "isHistoryMode"> & { activeAccountingMonth?: string },
   progress?: CrawlerProgressReporter,
-  publishHistory: (months: TransactionPeriodReplacement[]) => Promise<number[]> = async (
-    months,
-  ) => {
+  publishMonth: (month: TransactionPeriodReplacement) => Promise<number> = async (month) => {
     const accountIdMap = await buildAccountIdMap(db);
-    return saveTransactionsForMonths(db, months, accountIdMap);
+    const [savedCount] = await saveTransactionsForMonths(db, [month], accountIdMap);
+    return savedCount ?? 0;
   },
 ): Promise<void> {
   phase("Cash Flow History");
@@ -275,9 +294,18 @@ export async function runCashFlowHistoryPhase(
     }
   }
 
+  // 取り終えた月から順に保存する。全月を取り終えてからまとめて書くと、
+  // 途中で打ち切られたときに何も残らない。データベースは空のままなので
+  // 次回もまた history モードで同じ月数を取りに行き、同じところで落ちる。
+  //
+  // 1 回のバッチが担保していた期間の重なり検査は、run 内の累積で維持する。
+  // 会計期間は暦月と一致しないことがあり、重なったまま置き換えると
+  // 直前に入れた月の取引が消える。
+  const publishedMonths: TransactionPeriodReplacement[] = [];
+
   try {
     await switchGroup(page, NO_GROUP_ID);
-    const historyResults = await scrapeCashFlowHistory(page, monthsToFetch, {
+    await scrapeCashFlowHistory(page, monthsToFetch, {
       onMonthStart: async (month) => {
         if (!progress) return;
         if (monthSteps.has(month)) {
@@ -293,6 +321,31 @@ export async function runCashFlowHistoryPhase(
         }
         monthSteps.set(month, await progress.startStep(CRAWLER_STEPS.monthlyCashFlow, { month }));
       },
+      onMonthScraped: async ({ month, progressMonth = month, data: monthData }) => {
+        let stepId = monthSteps.get(progressMonth);
+        if (progress && !stepId) {
+          stepId = await progress.startStep(CRAWLER_STEPS.monthlyCashFlow, {
+            month: progressMonth,
+          });
+          monthSteps.set(progressMonth, stepId);
+        }
+
+        const replacement: TransactionPeriodReplacement = {
+          dateRange:
+            monthData.periodStart && monthData.periodEnd
+              ? { from: monthData.periodStart, to: monthData.periodEnd }
+              : undefined,
+          isComplete: monthData.isComplete,
+          items: monthData.items,
+          month,
+        };
+        assertNonOverlappingTransactionRanges([...publishedMonths, replacement]);
+
+        const savedCount = await publishMonth(replacement);
+        publishedMonths.push(replacement);
+        log(`  ${month}: saved ${savedCount} transactions`);
+        if (progress && stepId) await progress.completeStep(stepId);
+      },
       onMonthFailure: async (month, failure) => {
         const stepId = monthSteps.get(month);
         if (progress && stepId) {
@@ -303,39 +356,6 @@ export async function runCashFlowHistoryPhase(
         }
       },
     });
-
-    const preparedMonths: Array<TransactionPeriodReplacement & { stepId?: string }> = [];
-    for (const { month, progressMonth = month, data: monthData } of historyResults) {
-      let stepId = monthSteps.get(progressMonth);
-      if (progress && !stepId) {
-        stepId = await progress.startStep(CRAWLER_STEPS.monthlyCashFlow, {
-          month: progressMonth,
-        });
-      }
-      preparedMonths.push({
-        dateRange:
-          monthData.periodStart && monthData.periodEnd
-            ? { from: monthData.periodStart, to: monthData.periodEnd }
-            : undefined,
-        isComplete: monthData.isComplete,
-        items: monthData.items,
-        month,
-        stepId,
-      });
-    }
-
-    const savedCounts = await publishHistory(
-      preparedMonths.map(({ dateRange, isComplete, items, month }) => ({
-        dateRange,
-        isComplete,
-        items,
-        month,
-      })),
-    );
-    for (const [index, { month, stepId }] of preparedMonths.entries()) {
-      log(`  ${month}: saved ${savedCounts[index] ?? 0} transactions`);
-      if (progress && stepId) await progress.completeStep(stepId);
-    }
   } catch (failure) {
     await failRunningMonthSteps(failure);
     throw failure;

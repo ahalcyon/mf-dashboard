@@ -22,6 +22,10 @@ export class SyncPublisher {
   private readonly s3 = new S3Client({});
   private readonly sqs = new SQSClient({});
 
+  // 履歴は月ごとに発行するため、1 回のクロールが何度も publish を呼ぶ。
+  // payload のキーを run 内で一意にするための連番。
+  private sequence = 0;
+
   constructor(
     private readonly config: SyncConfig,
     private readonly runId: string,
@@ -51,7 +55,13 @@ export class SyncPublisher {
   }
 
   async publish(kind: SyncPayloadKind, payload: SyncPayload): Promise<void> {
-    const message = buildSyncMessage({ bucket: this.config.bucket, runId: this.runId, kind });
+    this.sequence += 1;
+    const message = buildSyncMessage({
+      bucket: this.config.bucket,
+      runId: this.runId,
+      kind,
+      sequence: this.sequence,
+    });
 
     await this.s3.send(
       new PutObjectCommand({
@@ -71,7 +81,7 @@ export class SyncPublisher {
       }),
     );
 
-    info(`Published ${kind} for run ${this.runId}`);
+    info(`Published ${kind} #${this.sequence} for run ${this.runId}`);
   }
 
   destroy(): void {

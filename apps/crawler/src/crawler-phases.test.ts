@@ -6,6 +6,7 @@ import { saveScrapedDataBatch } from "@mf-dashboard/db/repository/save-scraped-d
 import {
   hasCashFlowPeriod,
   saveTransactionsForMonths,
+  type TransactionPeriodReplacement,
 } from "@mf-dashboard/db/repository/transactions";
 import type { CashFlowSummary } from "@mf-dashboard/db/types";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -38,7 +39,10 @@ vi.mock("@mf-dashboard/db/repository/save-scraped-data", () => ({
   saveScrapedDataBatch: vi.fn<() => Promise<number[]>>(),
 }));
 
-vi.mock("@mf-dashboard/db/repository/transactions", () => ({
+// assertNonOverlappingTransactionRanges は純粋関数で、月ごとの保存が
+// 期間の重なりを見逃さないことを確かめたいので本物を使う。
+vi.mock("@mf-dashboard/db/repository/transactions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@mf-dashboard/db/repository/transactions")>()),
   hasCashFlowPeriod: vi.fn<() => Promise<boolean>>(),
   saveTransactionsForMonths: vi.fn<() => Promise<number[]>>(),
 }));
@@ -253,19 +257,19 @@ describe("runSavePhase", () => {
 describe("runCashFlowHistoryPhase", () => {
   test("month modeでも遅延反映を取り込むため当月と直前期間を再取得する", async () => {
     vi.mocked(scrapeCashFlowHistory).mockResolvedValue([]);
-    const publishHistory = vi.fn<() => Promise<number[]>>().mockResolvedValue([]);
+    const publishMonth = vi.fn<() => Promise<number>>().mockResolvedValue(0);
 
     await runCashFlowHistoryPhase(
       {} as Parameters<typeof runCashFlowHistoryPhase>[0],
       {} as Parameters<typeof runCashFlowHistoryPhase>[1],
       { isHistoryMode: false },
       undefined,
-      publishHistory,
+      publishMonth,
     );
 
     expect(scrapeCashFlowHistory).toHaveBeenCalledWith(expect.anything(), 2, expect.anything());
     expect(hasCashFlowPeriod).not.toHaveBeenCalled();
-    expect(publishHistory).toHaveBeenCalledWith([]);
+    expect(publishMonth).not.toHaveBeenCalled();
   });
 
   test("history modeで既存期間が揃っていても当月と直前期間を再取得する", async () => {
@@ -353,8 +357,10 @@ describe("runCashFlowHistoryPhase", () => {
       vi.mocked(buildAccountIdMap).mockResolvedValue(new Map());
       vi.mocked(hasCashFlowPeriod).mockResolvedValue(true);
       vi.mocked(scrapeCashFlowHistory).mockImplementation(async (_page, _months, callbacks) => {
+        const result = { month: "2026-05", progressMonth: "2026-06", data: monthData };
         await callbacks?.onMonthStart?.("2026-06");
-        return [{ month: "2026-05", progressMonth: "2026-06", data: monthData }];
+        await callbacks?.onMonthScraped?.(result);
+        return [result];
       });
       vi.mocked(saveTransactionsForMonths).mockResolvedValue([1]);
 
@@ -430,8 +436,10 @@ describe("runCashFlowHistoryPhase", () => {
       vi.mocked(buildAccountIdMap).mockResolvedValue(new Map());
       vi.mocked(hasCashFlowPeriod).mockResolvedValue(true);
       vi.mocked(scrapeCashFlowHistory).mockImplementation(async (_page, _months, callbacks) => {
+        const result = { month: "2026-06", data: monthData };
         await callbacks?.onMonthStart?.("2026-06");
-        return [{ month: "2026-06", data: monthData }];
+        await callbacks?.onMonthScraped?.(result);
+        return [result];
       });
       vi.mocked(saveTransactionsForMonths).mockRejectedValue(new Error("database unavailable"));
 
@@ -456,6 +464,70 @@ describe("runCashFlowHistoryPhase", () => {
     }
   });
 
+  test("後続月で失敗しても、取り終えた月はすでに保存されている", async () => {
+    // まとめて保存していた頃は、途中で落ちると 1 か月も残らなかった。
+    // データベースが空のままなので次回もまた history モードで同じ月数を
+    // 取りに行き、同じところで落ちる。
+    const publishMonth = vi.fn<(month: TransactionPeriodReplacement) => Promise<number>>();
+    publishMonth.mockResolvedValue(1);
+    vi.mocked(hasCashFlowPeriod).mockResolvedValue(false);
+    vi.mocked(scrapeCashFlowHistory).mockImplementation(async (_page, _months, callbacks) => {
+      await callbacks?.onMonthStart?.("2026-06");
+      await callbacks?.onMonthScraped?.({ month: "2026-06", data: cashFlow("2026-06", "A") });
+      await callbacks?.onMonthStart?.("2026-05");
+      throw new Error("history page unavailable");
+    });
+
+    await expect(
+      runCashFlowHistoryPhase(
+        {} as never,
+        {} as never,
+        { isHistoryMode: true },
+        undefined,
+        publishMonth,
+      ),
+    ).rejects.toThrow("history page unavailable");
+
+    expect(publishMonth).toHaveBeenCalledTimes(1);
+    expect(publishMonth).toHaveBeenCalledWith(expect.objectContaining({ month: "2026-06" }));
+  });
+
+  test("期間が重なる月は保存せずに止める", async () => {
+    // 会計期間は暦月と一致しないことがある。重なったまま置き換えると、
+    // 直前に保存した月の取引が消える。1 回のバッチで見ていた検査を、
+    // 月ごとの保存では run 内の累積で維持する。
+    const publishMonth = vi.fn<(month: TransactionPeriodReplacement) => Promise<number>>();
+    publishMonth.mockResolvedValue(1);
+    vi.mocked(hasCashFlowPeriod).mockResolvedValue(false);
+    vi.mocked(scrapeCashFlowHistory).mockImplementation(async (_page, _months, callbacks) => {
+      const june = cashFlow("2026-06", "A");
+      const may = cashFlow("2026-05", "B");
+      await callbacks?.onMonthScraped?.({
+        month: "2026-06",
+        data: { ...june, periodStart: "2026-05-25", periodEnd: "2026-06-24" },
+      });
+      await callbacks?.onMonthScraped?.({
+        month: "2026-05",
+        data: { ...may, periodStart: "2026-04-25", periodEnd: "2026-05-26" },
+      });
+      return [];
+    });
+
+    await expect(
+      runCashFlowHistoryPhase(
+        {} as never,
+        {} as never,
+        { isHistoryMode: true },
+        undefined,
+        publishMonth,
+      ),
+    ).rejects.toThrow("Overlapping transaction date ranges");
+
+    // 重なりを見つけた月は保存しない。先に入れた月は残る。
+    expect(publishMonth).toHaveBeenCalledTimes(1);
+    expect(publishMonth).toHaveBeenCalledWith(expect.objectContaining({ month: "2026-06" }));
+  });
+
   test("history mode の各対象月を YYYY-MM metadata として記録する", async () => {
     const page = {};
     const db = {};
@@ -470,9 +542,11 @@ describe("runCashFlowHistoryPhase", () => {
       vi.mocked(buildAccountIdMap).mockResolvedValue(new Map());
       vi.mocked(hasCashFlowPeriod).mockResolvedValue(true);
       vi.mocked(scrapeCashFlowHistory).mockImplementation(async (_page, _months, callbacks) => {
+        const result = { month: "2026-06", data: monthData };
         await callbacks?.onMonthStart?.("2026-06");
+        await callbacks?.onMonthScraped?.(result);
         await callbacks?.onMonthComplete?.("2026-06");
-        return [{ month: "2026-06", data: monthData }];
+        return [result];
       });
       vi.mocked(saveTransactionsForMonths).mockResolvedValue([1]);
 
