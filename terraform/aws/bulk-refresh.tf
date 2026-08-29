@@ -97,8 +97,8 @@ resource "aws_lambda_function" "bulk_refresh" {
   }
 }
 
-# 同時に 2 つ走ると、同じアカウントで 2 セッションがログインし、
-# 片方のセッションが無効化されうる。1 本に固定する。
+# 失敗を再試行させない。再試行はログインを増やすだけで、更新が始まらなかった
+# 回を取り戻せない。次の実行が同じことをする。
 resource "aws_lambda_function_event_invoke_config" "bulk_refresh" {
   function_name          = aws_lambda_function.bulk_refresh.function_name
   maximum_retry_attempts = 0

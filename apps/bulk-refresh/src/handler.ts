@@ -37,7 +37,7 @@ export async function runBulkRefresh(session: BrowserSession): Promise<BulkRefre
   return { startedAt, updatingCount: remainingCount };
 }
 
-async function handler(): Promise<BulkRefreshResult> {
+export async function handler(): Promise<BulkRefreshResult> {
   try {
     return await withBrowser(runBulkRefresh);
   } catch (err) {

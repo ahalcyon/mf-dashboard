@@ -15,6 +15,14 @@ const config: KnipConfig = {
       // playwright.config.ts が webServer のコマンド文字列から呼ぶ。
       entry: ["scripts/require-demo-db.mjs"],
     },
+    "apps/bulk-refresh": {
+      // Lambda のハンドラを名指しするのは Dockerfile の CMD で、コードからは
+      // 誰も import しない。entry に挙げないと knip が export を落とし、
+      // Lambda が "handler is undefined" で起動に失敗する。実際に踏んだ。
+      entry: ["src/handler.ts"],
+      // 同じ理由で tsx を呼ぶのも ENTRYPOINT だけ。外すとハンドラを読めない。
+      ignoreDependencies: ["tsx"],
+    },
     "apps/crawler": {
       ignore: ["src/hooks/helpers.ts"],
     },
