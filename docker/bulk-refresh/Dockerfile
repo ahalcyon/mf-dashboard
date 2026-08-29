@@ -68,4 +68,4 @@ ENV LAMBDA_TASK_ROOT=/app/apps/bulk-refresh
 
 # ハンドラは TypeScript のままなので tsx を挟む。crawler と同じ形。
 ENTRYPOINT ["/usr/bin/tini", "--", "node", "--import", "tsx", "/opt/node_modules/aws-lambda-ric/index.mjs"]
-CMD ["src/handler.handler"]
+CMD ["src/lambda.handler"]

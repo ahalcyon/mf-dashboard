@@ -19,7 +19,7 @@ const config: KnipConfig = {
       // Lambda のハンドラを名指しするのは Dockerfile の CMD で、コードからは
       // 誰も import しない。entry に挙げないと knip が export を落とし、
       // Lambda が "handler is undefined" で起動に失敗する。実際に踏んだ。
-      entry: ["src/handler.ts"],
+      entry: ["src/lambda.mjs", "src/handler.ts"],
       // 同じ理由で tsx を呼ぶのも ENTRYPOINT だけ。外すとハンドラを読めない。
       ignoreDependencies: ["tsx"],
     },
