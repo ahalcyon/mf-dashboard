@@ -5,8 +5,7 @@
  */
 
 export type RefreshOutcome =
-  | { kind: "started"; taskArn: string }
-  | { kind: "already-running" }
+  | { kind: "started" }
   | { kind: "method-not-allowed" }
   | { kind: "not-found" }
   | { kind: "failed"; message: string };
@@ -26,10 +25,7 @@ const JSON_HEADERS = {
 export function toResponse(outcome: RefreshOutcome): RefreshResponse {
   switch (outcome.kind) {
     case "started":
-      return json(202, { status: "started", taskArn: outcome.taskArn });
-    case "already-running":
-      // 二重に起動すると Money Forward へ同時にログインしてしまう
-      return json(409, { status: "already-running" });
+      return json(202, { status: "started" });
     case "method-not-allowed":
       return json(405, { status: "method-not-allowed" });
     case "not-found":
@@ -59,28 +55,4 @@ export function isRefreshPath(path: string | undefined): boolean {
   if (!path) return false;
   const normalized = path.endsWith("/") ? path.slice(0, -1) : path;
   return normalized === REFRESH_PATH || normalized.endsWith(REFRESH_PATH);
-}
-
-/** ECS の lastStatus のうち、まだ終わっていないとみなすもの。 */
-const ACTIVE_TASK_STATUSES = new Set(["PROVISIONING", "PENDING", "ACTIVATING", "RUNNING"]);
-
-export function hasActiveTask(lastStatuses: readonly (string | undefined)[]): boolean {
-  return lastStatuses.some((status) => status !== undefined && ACTIVE_TASK_STATUSES.has(status));
-}
-
-/**
- * タスク定義からファミリー名を取り出す。
- *
- * ListTasks の family はこれで絞り込むため、外すと候補が空になり
- * 実行中のクロールを見落として二重起動する。hasActiveTask がどれだけ
- * 正確でも、ここで空振りすると呼ばれもしない。
- *
- * 受け取る形は 3 通りある。完全な ARN、`family:revision`、ファミリー名のみ。
- */
-export function taskFamilyFromDefinition(taskDefinition: string): string | undefined {
-  const lastSegment = taskDefinition.split("/").pop();
-  if (!lastSegment) return undefined;
-
-  const family = lastSegment.split(":")[0];
-  return family === "" ? undefined : family;
 }

@@ -133,7 +133,14 @@ resource "aws_iam_role_policy" "crawler_task" {
   policy = data.aws_iam_policy_document.crawler_task.json
 }
 
-# --- タスク定義 -----------------------------------------------------------
+# --- バックフィル用タスク定義 ---------------------------------------------
+#
+# 定期クロールは Lambda に移った（crawl.tf）。ここに残るのは history モード
+# だけで、起動は手動に限る。前年 1 月からの取得は 20 か月ぶんになり、
+# Lambda の 15 分に収まる保証が無い。
+#
+# イメージは Lambda と同じものを使い、entryPoint だけ CLI に上書きする。
+# 分けると、バックフィルと定期クロールが違う Chromium で描画しうる。
 
 resource "aws_ecs_task_definition" "crawler" {
   # イメージが push されてからタスク定義を更新する
@@ -157,13 +164,23 @@ resource "aws_ecs_task_definition" "crawler" {
     image     = local.image_uris.crawler
     essential = true
 
+    # イメージの既定は Lambda の Runtime Interface Client。ECS では CLI として
+    # 動かすので上書きする。command を空にしないと、イメージの CMD
+    # （ハンドラ名）が引数として後ろに付く。
+    entryPoint = ["/usr/bin/tini", "--", "node", "--import", "tsx", "src/index.ts"]
+    command    = []
+
     environment = [
       { name = "TZ", value = "Asia/Tokyo" },
-      { name = "CRAWLER_RUN_SOURCE", value = "scheduled" },
-      # 一括更新の開始は bulk-refresh Lambda が受け持つ。クロールはその時点の
-      # 状態を読むだけで、金融機関の更新完了を待たない。待っていた頃は
+      { name = "CRAWLER_RUN_SOURCE", value = "backfill" },
+      # このタスクの存在理由。実行時の判定に任せると、S3 のデータベースが
+      # 取れたときに月モードで走ってしまい、バックフィルにならない。
+      { name = "SCRAPE_MODE", value = "history" },
+      # 一括更新の開始は bulk-refresh Lambda が受け持つ。待っていた頃は
       # 1 口座が終わらないだけで最大 20 分ここで止まっていた（#93）。
       { name = "SKIP_REFRESH", value = "true" },
+      { name = "CRAWLER_STATE_PATH", value = "/tmp/crawler-run-state.json" },
+      { name = "AUTH_STATE_PATH", value = "/tmp/auth-state.json" },
       { name = "SSM_PARAMETER_PREFIX", value = local.ssm_parameter_prefix },
       { name = "WRITE_QUEUE_URL", value = aws_sqs_queue.writes.url },
       { name = "WRITE_MESSAGE_GROUP_ID", value = local.write_message_group_id },
@@ -191,7 +208,8 @@ resource "aws_ecs_task_definition" "crawler" {
   }])
 }
 
-# --- スケジュール ---------------------------------------------------------
+# --- スケジューラの assume role ---------------------------------------------
+# crawl.tf と bulk-refresh.tf の両方が使う。
 
 data "aws_iam_policy_document" "scheduler_assume" {
   statement {
@@ -206,75 +224,6 @@ data "aws_iam_policy_document" "scheduler_assume" {
       test     = "StringEquals"
       variable = "aws:SourceAccount"
       values   = [local.account_id]
-    }
-  }
-}
-
-resource "aws_iam_role" "scheduler" {
-  name               = "${var.name_prefix}-scheduler"
-  assume_role_policy = data.aws_iam_policy_document.scheduler_assume.json
-}
-
-data "aws_iam_policy_document" "scheduler" {
-  statement {
-    actions   = ["ecs:RunTask"]
-    resources = ["${aws_ecs_task_definition.crawler.arn_without_revision}:*"]
-
-    condition {
-      test     = "ArnEquals"
-      variable = "ecs:cluster"
-      values   = [aws_ecs_cluster.this.arn]
-    }
-  }
-
-  statement {
-    actions   = ["iam:PassRole"]
-    resources = [aws_iam_role.crawler_execution.arn, aws_iam_role.crawler_task.arn]
-
-    condition {
-      test     = "StringEquals"
-      variable = "iam:PassedToService"
-      values   = ["ecs-tasks.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role_policy" "scheduler" {
-  name   = "run-crawler-task"
-  role   = aws_iam_role.scheduler.id
-  policy = data.aws_iam_policy_document.scheduler.json
-}
-
-resource "aws_scheduler_schedule" "crawler" {
-  name                         = "${var.name_prefix}-crawler"
-  description                  = "Scheduled Money Forward crawl"
-  schedule_expression          = var.schedule_expression
-  schedule_expression_timezone = var.schedule_timezone
-  state                        = var.enable_crawler_schedule ? "ENABLED" : "DISABLED"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  target {
-    arn      = aws_ecs_cluster.this.arn
-    role_arn = aws_iam_role.scheduler.arn
-
-    ecs_parameters {
-      task_definition_arn = aws_ecs_task_definition.crawler.arn_without_revision
-      launch_type         = "FARGATE"
-      task_count          = 1
-
-      network_configuration {
-        subnets          = [for subnet in aws_subnet.public : subnet.id]
-        security_groups  = [aws_security_group.crawler.id]
-        assign_public_ip = true
-      }
-    }
-
-    retry_policy {
-      maximum_retry_attempts       = 2
-      maximum_event_age_in_seconds = 3600
     }
   }
 }

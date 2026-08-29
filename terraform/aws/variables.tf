@@ -169,6 +169,37 @@ variable "noncurrent_version_retention_days" {
 # ECR イメージの push や GitHub 接続の認可は Terraform の管理外なので、
 # それらが揃うまでは依存するリソースを作らずに済むようにする。
 
+# --- 定期クロール ---------------------------------------------------------
+
+variable "crawl_memory" {
+  description = "Crawl Lambda memory (MiB). Lambda scales CPU with memory and Chromium needs the headroom."
+  type        = number
+  default     = 3008
+}
+
+variable "crawl_timeout_seconds" {
+  description = "Crawl Lambda timeout. A month-mode crawl measured 80 seconds; history mode runs on ECS instead."
+  type        = number
+  default     = 600
+}
+
+variable "crawl_reserved_concurrency" {
+  description = <<-DESC
+    Reserved concurrency for the crawl. Two crawls at once would log in to Money
+    Forward twice and one session can invalidate the other. Set to -1 to leave it
+    unreserved, which is required when the account's Lambda concurrency quota is 10
+    or lower because AWS keeps unreserved concurrency at 10 or above.
+  DESC
+  type        = number
+  default     = -1
+}
+
+variable "crawl_ephemeral_storage" {
+  description = "Crawl Lambda /tmp size (MiB). Holds the Chromium profile and the working copy of the database."
+  type        = number
+  default     = 2048
+}
+
 # --- 一括更新ジョブ -------------------------------------------------------
 
 variable "bulk_refresh_memory" {

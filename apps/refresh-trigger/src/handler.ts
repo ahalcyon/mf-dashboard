@@ -1,19 +1,7 @@
-import {
-  DescribeTasksCommand,
-  ECSClient,
-  ListTasksCommand,
-  RunTaskCommand,
-} from "@aws-sdk/client-ecs";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import type { LambdaFunctionURLEvent, LambdaFunctionURLResult } from "aws-lambda";
 import { loadConfig } from "./config.js";
-import {
-  hasActiveTask,
-  isRefreshPath,
-  taskFamilyFromDefinition,
-  toResponse,
-  type RefreshOutcome,
-} from "./result.js";
+import { isRefreshPath, toResponse, type RefreshOutcome } from "./result.js";
 
 /**
  * ダッシュボードの「金融機関データを更新」に応じる。
@@ -38,13 +26,11 @@ export async function handler(event: LambdaFunctionURLEvent): Promise<LambdaFunc
   }
 
   const config = loadConfig();
-  const client = new ECSClient({});
   const lambda = new LambdaClient({});
 
   try {
-    return toResponse(await startRefresh(client, lambda, config));
+    return toResponse(await startRefresh(lambda, config));
   } finally {
-    client.destroy();
     lambda.destroy();
   }
 }
@@ -72,78 +58,42 @@ async function startBulkRefresh(
   }
 }
 
+/**
+ * 一括更新を投げてからクロールを起動する。
+ *
+ * ECS の頃は ListTasks で実行中を調べて 409 を返していたが、Lambda には
+ * 同じ問い合わせが無い。予約同時実行数で止める手も、このアカウントの
+ * クォータ 10 では使えない（crawl.tf 参照）。
+ *
+ * 二重起動しても壊れはしない。データベースへの書き込みは FIFO キューと
+ * 単一 MessageGroupId が直列化しており、クロール自体も 21 分から 80 秒に
+ * 縮んで重なる余地が小さい。押下中の再押下は画面側が抑止している。
+ */
 async function startRefresh(
-  client: ECSClient,
   lambda: LambdaClient,
   config: ReturnType<typeof loadConfig>,
 ): Promise<RefreshOutcome> {
   try {
-    if (await isCrawlInProgress(client, config)) {
-      return { kind: "already-running" };
-    }
-
-    // 多重起動を弾いたあとに投げる。先に投げると、409 を返す場合にも
-    // Money Forward へログインしてしまう。
     await startBulkRefresh(lambda, config);
 
-    const result = await client.send(
-      new RunTaskCommand({
-        cluster: config.cluster,
-        taskDefinition: config.taskDefinition,
-        launchType: "FARGATE",
-        count: 1,
-        networkConfiguration: {
-          awsvpcConfiguration: {
-            subnets: config.subnets,
-            securityGroups: config.securityGroups,
-            assignPublicIp: "ENABLED",
-          },
-        },
-        overrides: {
-          containerOverrides: [
-            { name: "crawler", environment: [{ name: "CRAWLER_RUN_SOURCE", value: "manual" }] },
-          ],
-        },
+    const result = await lambda.send(
+      new InvokeCommand({
+        FunctionName: config.crawlFunction,
+        // 完了を待つと 80 秒かかる。ボタンは「開始しました」を返す作り。
+        InvocationType: "Event",
       }),
     );
 
-    const taskArn = result.tasks?.[0]?.taskArn;
-    if (!taskArn) {
-      const reason = result.failures?.[0]?.reason ?? "ECS did not start a task";
-      return { kind: "failed", message: reason };
+    const accepted = result.StatusCode !== undefined && result.StatusCode < 300;
+    if (!accepted) {
+      return { kind: "failed", message: `Lambda answered ${String(result.StatusCode)}` };
     }
 
-    console.info(`Started a manual crawl: ${taskArn}`);
-    return { kind: "started", taskArn };
+    console.info("Started a manual crawl");
+    return { kind: "started" };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to start the crawler";
     console.error("Failed to start a manual crawl:", error);
     return { kind: "failed", message };
   }
-}
-
-/**
- * 二重起動を防ぐ。Money Forward へ同時にログインすると、
- * 一括更新の待ち合わせが互いに干渉する。
- */
-async function isCrawlInProgress(
-  client: ECSClient,
-  config: ReturnType<typeof loadConfig>,
-): Promise<boolean> {
-  const family = taskFamilyFromDefinition(config.taskDefinition);
-  const listed = await client.send(
-    new ListTasksCommand({
-      cluster: config.cluster,
-      family,
-      desiredStatus: "RUNNING",
-    }),
-  );
-
-  if (!listed.taskArns || listed.taskArns.length === 0) return false;
-
-  const described = await client.send(
-    new DescribeTasksCommand({ cluster: config.cluster, tasks: listed.taskArns }),
-  );
-
-  return hasActiveTask((described.tasks ?? []).map((task) => task.lastStatus));
 }

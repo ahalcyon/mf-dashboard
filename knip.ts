@@ -24,6 +24,10 @@ const config: KnipConfig = {
       ignoreDependencies: ["tsx"],
     },
     "apps/crawler": {
+      // Lambda のハンドラを名指しするのは Dockerfile の CMD で、コードからは
+      // 誰も import しない。entry に挙げないと knip が export を落とし、
+      // 最初の invoke まで壊れていることに気付けない（#93 の ② で踏んだ）。
+      entry: ["src/lambda.mjs", "src/lambda.ts"],
       ignore: ["src/hooks/helpers.ts"],
     },
     "packages/db": {

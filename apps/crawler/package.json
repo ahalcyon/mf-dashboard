@@ -15,7 +15,8 @@
     "./sync/config": "./src/sync/config.ts",
     "./sync/publisher": "./src/sync/publisher.ts",
     "./scrapers/refresh": "./src/scrapers/refresh.ts",
-    "./logger": "./src/logger.ts"
+    "./logger": "./src/logger.ts",
+    "./browser/launch-args": "./src/browser/launch-args.ts"
   },
   "scripts": {
     "dev:scrape": "DEBUG=true SKIP_REFRESH=true tsx src/index.ts",

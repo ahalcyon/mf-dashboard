@@ -1,19 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { hasActiveTask, isRefreshPath, taskFamilyFromDefinition, toResponse } from "./result.js";
+import { isRefreshPath, toResponse } from "./result.js";
 
 describe("toResponse", () => {
-  test("起動できたら 202 とタスク ARN を返す", () => {
-    const response = toResponse({ kind: "started", taskArn: "arn:aws:ecs:...:task/abc" });
+  test("起動できたら 202 を返す", () => {
+    const response = toResponse({ kind: "started" });
 
     expect(response.statusCode).toBe(202);
-    expect(JSON.parse(response.body)).toEqual({
-      status: "started",
-      taskArn: "arn:aws:ecs:...:task/abc",
-    });
-  });
-
-  test("実行中なら 409 を返す", () => {
-    expect(toResponse({ kind: "already-running" }).statusCode).toBe(409);
+    expect(JSON.parse(response.body)).toEqual({ status: "started" });
   });
 
   test("POST 以外は 405 を返す", () => {
@@ -21,74 +14,20 @@ describe("toResponse", () => {
   });
 
   test("起動に失敗したら 502 と理由を返す", () => {
-    const response = toResponse({ kind: "failed", message: "RunTask denied" });
+    const response = toResponse({ kind: "failed", message: "Invoke denied" });
 
     expect(response.statusCode).toBe(502);
-    expect(JSON.parse(response.body)).toEqual({ status: "failed", message: "RunTask denied" });
+    expect(JSON.parse(response.body)).toEqual({ status: "failed", message: "Invoke denied" });
   });
 
   test("いずれの応答も保存させない", () => {
     for (const outcome of [
-      { kind: "started", taskArn: "a" },
-      { kind: "already-running" },
+      { kind: "started" },
       { kind: "method-not-allowed" },
       { kind: "failed", message: "x" },
     ] as const) {
       expect(toResponse(outcome).headers["cache-control"]).toBe("no-store");
     }
-  });
-});
-
-describe("hasActiveTask", () => {
-  test.each(["PROVISIONING", "PENDING", "ACTIVATING", "RUNNING"])(
-    "%s はまだ終わっていないとみなす",
-    (status) => {
-      expect(hasActiveTask([status])).toBe(true);
-    },
-  );
-
-  test.each(["DEACTIVATING", "STOPPING", "DEPROVISIONING", "STOPPED"])(
-    "%s は終了に向かっているので新しい起動を妨げない",
-    (status) => {
-      expect(hasActiveTask([status])).toBe(false);
-    },
-  );
-
-  test("タスクが無ければ起動できる", () => {
-    expect(hasActiveTask([])).toBe(false);
-  });
-
-  test("状態を取得できなかったタスクは判断材料にしない", () => {
-    expect(hasActiveTask([undefined])).toBe(false);
-  });
-
-  test("1 つでも実行中なら起動しない", () => {
-    expect(hasActiveTask(["STOPPED", "RUNNING"])).toBe(true);
-  });
-});
-
-describe("taskFamilyFromDefinition", () => {
-  // ここが空振りすると ListTasks が何も返さず、実行中のクロールを
-  // 見落として二重起動する。hasActiveTask はそもそも呼ばれない。
-  test.for([
-    [
-      "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/mf-dashboard-crawler:12",
-      "mf-dashboard-crawler",
-    ],
-    [
-      "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/mf-dashboard-crawler",
-      "mf-dashboard-crawler",
-    ],
-    ["mf-dashboard-crawler:12", "mf-dashboard-crawler"],
-    ["mf-dashboard-crawler", "mf-dashboard-crawler"],
-  ] as const)("%s からファミリーを取り出す", ([taskDefinition, expected]) => {
-    expect(taskFamilyFromDefinition(taskDefinition)).toBe(expected);
-  });
-
-  // 空を返すほうが安全。undefined なら ListTasks はファミリーで絞らず、
-  // 誤ったファミリー名で空振りするより実行中のタスクを拾える見込みがある。
-  test.for(["", "/", "task-definition/", ":12"])("%s はファミリーとして扱わない", (input) => {
-    expect(taskFamilyFromDefinition(input)).toBeUndefined();
   });
 });
 

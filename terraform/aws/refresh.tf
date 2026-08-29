@@ -48,50 +48,15 @@ data "aws_iam_policy_document" "refresh_trigger" {
     resources = ["${aws_cloudwatch_log_group.refresh_trigger.arn}:*"]
   }
 
+  # ボタンの名前は「金融機関データを更新」なので、更新の開始と取り込みの
+  # 両方を起動する。同時実行は crawl 側の予約同時実行数が止める。
   statement {
-    sid       = "StartCrawl"
-    actions   = ["ecs:RunTask"]
-    resources = ["${aws_ecs_task_definition.crawler.arn_without_revision}:*"]
-
-    condition {
-      test     = "ArnEquals"
-      variable = "ecs:cluster"
-      values   = [aws_ecs_cluster.this.arn]
-    }
-  }
-
-  # 二重起動を防ぐために実行中のタスクを調べる。ListTasks と DescribeTasks は
-  # リソース単位の指定ができないため、クラスタ条件で絞る。
-  statement {
-    sid       = "InspectRunningCrawls"
-    actions   = ["ecs:ListTasks", "ecs:DescribeTasks"]
-    resources = ["*"]
-
-    condition {
-      test     = "ArnEquals"
-      variable = "ecs:cluster"
-      values   = [aws_ecs_cluster.this.arn]
-    }
-  }
-
-  # ボタンの名前は「金融機関データを更新」で、その更新を始めるのは
-  # bulk-refresh Lambda。クロールを起動するだけでは名前が嘘になる。
-  statement {
-    sid       = "StartBulkRefresh"
-    actions   = ["lambda:InvokeFunction"]
-    resources = [aws_lambda_function.bulk_refresh.arn]
-  }
-
-  statement {
-    sid       = "PassCrawlerRoles"
-    actions   = ["iam:PassRole"]
-    resources = [aws_iam_role.crawler_execution.arn, aws_iam_role.crawler_task.arn]
-
-    condition {
-      test     = "StringEquals"
-      variable = "iam:PassedToService"
-      values   = ["ecs-tasks.amazonaws.com"]
-    }
+    sid     = "StartRefreshAndCrawl"
+    actions = ["lambda:InvokeFunction"]
+    resources = [
+      aws_lambda_function.bulk_refresh.arn,
+      aws_lambda_function.crawl.arn,
+    ]
   }
 }
 
@@ -113,12 +78,9 @@ resource "aws_lambda_function" "refresh_trigger" {
 
   environment {
     variables = {
-      TZ                      = "Asia/Tokyo"
-      ECS_CLUSTER             = aws_ecs_cluster.this.arn
-      CRAWLER_TASK_DEFINITION = aws_ecs_task_definition.crawler.arn_without_revision
-      SUBNET_IDS              = join(",", [for subnet in aws_subnet.public : subnet.id])
-      SECURITY_GROUP_IDS      = aws_security_group.crawler.id
-      BULK_REFRESH_FUNCTION   = aws_lambda_function.bulk_refresh.function_name
+      TZ                    = "Asia/Tokyo"
+      BULK_REFRESH_FUNCTION = aws_lambda_function.bulk_refresh.function_name
+      CRAWL_FUNCTION        = aws_lambda_function.crawl.function_name
     }
   }
 
