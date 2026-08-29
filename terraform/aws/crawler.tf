@@ -160,6 +160,10 @@ resource "aws_ecs_task_definition" "crawler" {
     environment = [
       { name = "TZ", value = "Asia/Tokyo" },
       { name = "CRAWLER_RUN_SOURCE", value = "scheduled" },
+      # 一括更新の開始は bulk-refresh Lambda が受け持つ。クロールはその時点の
+      # 状態を読むだけで、金融機関の更新完了を待たない。待っていた頃は
+      # 1 口座が終わらないだけで最大 20 分ここで止まっていた（#93）。
+      { name = "SKIP_REFRESH", value = "true" },
       { name = "SSM_PARAMETER_PREFIX", value = local.ssm_parameter_prefix },
       { name = "WRITE_QUEUE_URL", value = aws_sqs_queue.writes.url },
       { name = "WRITE_MESSAGE_GROUP_ID", value = local.write_message_group_id },

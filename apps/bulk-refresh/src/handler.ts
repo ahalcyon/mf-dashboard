@@ -1,11 +1,4 @@
-import { loginWithAuthState } from "@mf-dashboard/crawler/auth/login";
-import { error, info } from "@mf-dashboard/crawler/logger";
-import {
-  getRefreshStatus,
-  navigateToAccountsPage,
-  startBulkRefresh,
-} from "@mf-dashboard/crawler/scrapers/refresh";
-import { withBrowser, type BrowserSession } from "./browser.js";
+import type { BrowserSession } from "./browser.js";
 
 export interface BulkRefreshResult {
   /** 一括更新をクリックした時刻 */
@@ -23,25 +16,33 @@ export interface BulkRefreshResult {
  * 取り込みは後続のクロールが、その時点の状態に対して行う。
  */
 export async function runBulkRefresh(session: BrowserSession): Promise<BulkRefreshResult> {
+  // 値の import はすべて実行時に。init の 10 秒に収めるため（browser.ts 参照）。
+  const [{ loginWithAuthState }, { info }, refresh] = await Promise.all([
+    import("@mf-dashboard/crawler/auth/login"),
+    import("@mf-dashboard/crawler/logger"),
+    import("@mf-dashboard/crawler/scrapers/refresh"),
+  ]);
   const { context, page } = session;
 
   await loginWithAuthState(page, context);
-  await startBulkRefresh(page);
+  await refresh.startBulkRefresh(page);
   const startedAt = new Date().toISOString();
 
   // 何口座が動き出したかだけ記録する。0 なら更新が始まっていない疑いがある。
-  await navigateToAccountsPage(page);
-  const { remainingCount } = await getRefreshStatus(page);
+  await refresh.navigateToAccountsPage(page);
+  const { remainingCount } = await refresh.getRefreshStatus(page);
   info(`Bulk refresh started; ${remainingCount} account(s) updating`);
 
   return { startedAt, updatingCount: remainingCount };
 }
 
 export async function handler(): Promise<BulkRefreshResult> {
+  const { withBrowser } = await import("./browser.js");
   try {
     return await withBrowser(runBulkRefresh);
   } catch (err) {
     // 失敗しても後続のクロールは動く。取り込まれる値が前回の更新のままになるだけ。
+    const { error } = await import("@mf-dashboard/crawler/logger");
     error("Bulk refresh failed:", err);
     throw err;
   }

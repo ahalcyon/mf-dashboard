@@ -74,6 +74,14 @@ data "aws_iam_policy_document" "refresh_trigger" {
     }
   }
 
+  # ボタンの名前は「金融機関データを更新」で、その更新を始めるのは
+  # bulk-refresh Lambda。クロールを起動するだけでは名前が嘘になる。
+  statement {
+    sid       = "StartBulkRefresh"
+    actions   = ["lambda:InvokeFunction"]
+    resources = [aws_lambda_function.bulk_refresh.arn]
+  }
+
   statement {
     sid       = "PassCrawlerRoles"
     actions   = ["iam:PassRole"]
@@ -110,6 +118,7 @@ resource "aws_lambda_function" "refresh_trigger" {
       CRAWLER_TASK_DEFINITION = aws_ecs_task_definition.crawler.arn_without_revision
       SUBNET_IDS              = join(",", [for subnet in aws_subnet.public : subnet.id])
       SECURITY_GROUP_IDS      = aws_security_group.crawler.id
+      BULK_REFRESH_FUNCTION   = aws_lambda_function.bulk_refresh.function_name
     }
   }
 

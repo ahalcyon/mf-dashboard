@@ -3,6 +3,7 @@ export interface RefreshTriggerConfig {
   taskDefinition: string;
   subnets: string[];
   securityGroups: string[];
+  bulkRefreshFunction: string;
 }
 
 function required(name: string): string {
@@ -26,5 +27,6 @@ export function loadConfig(): RefreshTriggerConfig {
     taskDefinition: required("CRAWLER_TASK_DEFINITION"),
     subnets: requiredList("SUBNET_IDS"),
     securityGroups: requiredList("SECURITY_GROUP_IDS"),
+    bulkRefreshFunction: required("BULK_REFRESH_FUNCTION"),
   };
 }
