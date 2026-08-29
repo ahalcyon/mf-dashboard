@@ -70,6 +70,41 @@ const categories = [
   },
 ];
 
+const liabilityCategory = {
+  category: "カード",
+  total: 300,
+  items: [
+    {
+      id: 11,
+      name: "ご利用残高",
+      accountName: "カード A",
+      institution: "カード A",
+      categoryName: null,
+      amount: 100,
+      unrealizedGain: null,
+      unrealizedGainPct: null,
+      dailyChange: null,
+      avgCostPrice: null,
+      quantity: null,
+      unitPrice: null,
+    },
+    {
+      id: 12,
+      name: "ご利用残高",
+      accountName: "カード B",
+      institution: "カード B",
+      categoryName: null,
+      amount: 200,
+      unrealizedGain: null,
+      unrealizedGainPct: null,
+      dailyChange: null,
+      avgCostPrice: null,
+      quantity: null,
+      unitPrice: null,
+    },
+  ],
+};
+
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn<() => void>();
 });
@@ -252,6 +287,57 @@ describe("負債の金額色", () => {
     for (const label of ["-600円", "-100円"]) {
       expect(amountClasses(label)).toContain("text-balance-negative");
     }
+  });
+});
+
+describe("負債の保有金融機関表示", () => {
+  function renderLiabilities(hideAccountName = false) {
+    render(
+      <HoldingsFilterProvider>
+        <HoldingsTableClient
+          categories={[liabilityCategory]}
+          holdingsType="liability"
+          hideAccountName={hideAccountName}
+        />
+      </HoldingsFilterProvider>,
+    );
+  }
+
+  it("保有名が同じでも、行に出した口座名で区別できる", () => {
+    renderLiabilities();
+
+    expect(screen.getByText("カード A")).not.toBeNull();
+    expect(screen.getByText("カード B")).not.toBeNull();
+    expect(screen.getAllByText("ご利用残高")).toHaveLength(2);
+  });
+
+  it("行に口座名が出るので、負債は展開せずに読める", () => {
+    renderLiabilities();
+
+    expect(screen.queryByRole("button", { name: /ご利用残高/ })).toBeNull();
+    expect(screen.queryByText("保有金融機関")).toBeNull();
+  });
+
+  it("口座詳細ページでは負債の行に口座名を出さない", () => {
+    renderLiabilities(true);
+
+    expect(screen.queryByText("カード A")).toBeNull();
+    expect(screen.getAllByText("ご利用残高")).toHaveLength(2);
+  });
+
+  it("資産の口座名は行に出さず、展開時の保有金融機関のままにする", () => {
+    render(
+      <HoldingsFilterProvider>
+        <HoldingsTableClient categories={[categories[0]]} />
+      </HoldingsFilterProvider>,
+    );
+
+    expect(screen.queryByText("証券口座 A")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /銘柄 A/ }));
+
+    expect(screen.getByText("保有金融機関")).not.toBeNull();
+    expect(screen.getByText("証券口座 A")).not.toBeNull();
   });
 });
 

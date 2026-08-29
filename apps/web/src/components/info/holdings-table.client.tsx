@@ -56,6 +56,19 @@ function amountProps(amount: number, holdingsType: HoldingsType) {
   return holdingsType === "liability" ? { amount: -amount, type: "balance" as const } : { amount };
 }
 
+/**
+ * 負債の保有名は「ご利用残高」で揃いやすく、名前だけではどの口座のものか分からない。
+ * 口座名が取れていればそれを行の主ラベルに使い、保有名は副ラベルへ落とす。
+ * 口座詳細ページ（hideAccountName）はページ自体が 1 口座なので対象外。
+ */
+function liabilityAccountName(
+  holding: HoldingItem,
+  holdingsType: HoldingsType,
+  hideAccountName: boolean,
+): string | null {
+  return holdingsType === "liability" && !hideAccountName ? holding.accountName : null;
+}
+
 function sortCategoryGroups(categories: readonly CategoryGroup[]): CategoryGroup[] {
   return sortByAmountDescending(
     categories.map((group) => ({
@@ -189,11 +202,14 @@ function CategoryCard({
   // Colors are generated for all items (for chart consistency)
   const colors = getChartColorArray(items.length);
 
-  const chartData = items.map((item, i) => ({
-    name: item.name,
-    value: item.amount || 0,
-    color: colors[i],
-  }));
+  const chartData = items.map((item, i) => {
+    const accountName = liabilityAccountName(item, holdingsType, hideAccountName);
+    return {
+      name: accountName ? `${accountName}（${item.name}）` : item.name,
+      value: item.amount || 0,
+      color: colors[i],
+    };
+  });
 
   // Paginate items for the list display
   const startIndex = visiblePage * PAGE_SIZE;
@@ -294,17 +310,23 @@ function HoldingRow({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
+  const accountName = liabilityAccountName(holding, holdingsType, hideAccountName);
+
   const hasMainDetails =
     holding.unrealizedGain !== null ||
     holding.unrealizedGainPct !== null ||
     holding.dailyChange !== null;
+
+  // 行に出している口座名を展開側にも重ねて出さない
+  const showAccountNameInDetails =
+    accountName === null && !hideAccountName && holding.accountName !== null;
 
   // 展開時に表示するコンテンツがあるかどうかで判定
   const hasExpandableContent =
     holding.avgCostPrice !== null ||
     holding.unitPrice !== null ||
     holding.quantity !== null ||
-    (!hideAccountName && holding.accountName !== null);
+    showAccountNameInDetails;
 
   const isClickable = hasExpandableContent;
 
@@ -321,7 +343,7 @@ function HoldingRow({
             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
             style={{ backgroundColor: color }}
           />
-          <span className="font-medium flex-1 min-w-0 truncate">{holding.name}</span>
+          <HoldingLabel name={holding.name} accountName={accountName} />
           <div className="flex items-center gap-1 shrink-0">
             <div className="text-right tabular-nums">
               {holding.amount ? (
@@ -351,7 +373,7 @@ function HoldingRow({
             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
             style={{ backgroundColor: color }}
           />
-          <span className="font-medium flex-1 min-w-0 truncate">{holding.name}</span>
+          <HoldingLabel name={holding.name} accountName={accountName} />
           <div className="text-right shrink-0 tabular-nums">
             {holding.amount ? (
               <AmountDisplay
@@ -431,7 +453,7 @@ function HoldingRow({
               {holding.quantity !== null && (
                 <DetailItem label="数量" value={holding.quantity.toLocaleString()} />
               )}
-              {!hideAccountName && holding.accountName && (
+              {showAccountNameInDetails && holding.accountName && (
                 <DetailItem label="保有金融機関" value={holding.accountName} truncate />
               )}
             </div>
@@ -441,7 +463,7 @@ function HoldingRow({
               <div className="sm:hidden">
                 <DetailItem label="割合" value={formatPercent(ratio)} />
               </div>
-              {!hideAccountName && holding.accountName && (
+              {showAccountNameInDetails && holding.accountName && (
                 <DetailItem label="保有金融機関" value={holding.accountName} truncate />
               )}
             </div>
@@ -449,6 +471,19 @@ function HoldingRow({
         </div>
       )}
     </div>
+  );
+}
+
+function HoldingLabel({ name, accountName }: { name: string; accountName: string | null }) {
+  if (accountName === null) {
+    return <span className="font-medium flex-1 min-w-0 truncate">{name}</span>;
+  }
+
+  return (
+    <span className="flex-1 min-w-0">
+      <span className="block font-medium truncate">{accountName}</span>
+      <span className="block text-xs text-muted-foreground truncate">{name}</span>
+    </span>
   );
 }
 
