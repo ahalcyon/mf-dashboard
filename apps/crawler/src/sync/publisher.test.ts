@@ -177,6 +177,43 @@ describe("publish", () => {
     expect(message.payload).toEqual({ bucket: putCommand.input.Bucket, key: putCommand.input.Key });
   });
 
+  // 履歴は月ごとに発行するので、1 回のクロールが何度も publish を呼ぶ。
+  // キーが同じだと最後の中身で上書きされ、先に送ったメッセージが
+  // 別の月のペイロードを指す。writer はそれを気付かずに適用する。
+  test("同じ run で複数回発行してもキーが衝突しない", async () => {
+    s3Send.mockResolvedValue({});
+    sqsSend.mockResolvedValue({});
+    const publisher = new SyncPublisher(config, "run-1");
+
+    await publisher.publish("scraped-data", payload);
+    await publisher.publish("scraped-data", payload);
+    await publisher.publish("scraped-data", payload);
+
+    const keys = s3Send.mock.calls.map(
+      ([command]) => (command as { input: { Key: string } }).input.Key,
+    );
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  test("複数回発行しても各メッセージが自分のペイロードを指す", async () => {
+    s3Send.mockResolvedValue({});
+    sqsSend.mockResolvedValue({});
+    const publisher = new SyncPublisher(config, "run-1");
+
+    await publisher.publish("scraped-data", payload);
+    await publisher.publish("scraped-data", payload);
+
+    const putKeys = s3Send.mock.calls.map(
+      ([command]) => (command as { input: { Key: string } }).input.Key,
+    );
+    const messageKeys = sqsSend.mock.calls.map(([command]) => {
+      const body = (command as { input: { MessageBody: string } }).input.MessageBody;
+      return (JSON.parse(body) as SyncMessage).payload.key;
+    });
+
+    expect(messageKeys).toEqual(putKeys);
+  });
+
   test("S3 へ置く本文は渡したペイロードそのもの", async () => {
     s3Send.mockResolvedValue({});
     sqsSend.mockResolvedValue({});
