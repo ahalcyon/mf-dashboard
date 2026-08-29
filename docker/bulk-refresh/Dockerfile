@@ -24,7 +24,10 @@ RUN npm install --no-audit --no-fund aws-lambda-ric@4.0.2
 
 # --- 実行用 ---
 FROM node:26.7.0-bookworm-slim
-WORKDIR /app
+# Lambda は実行時に LAMBDA_TASK_ROOT を /var/task へ固定する。予約された
+# 環境変数なのでイメージの ENV では上書きできず、別の場所に置くと RIC が
+# ハンドラを見つけられない。実際に "Cannot find module" で踏んだ。
+WORKDIR /var/task
 ENV PNPM_HOME=/pnpm \
     COREPACK_HOME=/pnpm/corepack \
     COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
@@ -62,10 +65,9 @@ COPY --from=ric /ric/node_modules /opt/node_modules
 COPY . .
 
 # tsx は --import の解決を作業ディレクトリから行うため、パッケージの中に入る。
-# LAMBDA_TASK_ROOT も揃えて、ハンドラをここからの相対で指定できるようにする。
-WORKDIR /app/apps/bulk-refresh
-ENV LAMBDA_TASK_ROOT=/app/apps/bulk-refresh
+# ハンドラのほうは LAMBDA_TASK_ROOT (/var/task) からの相対で指定する。
+WORKDIR /var/task/apps/bulk-refresh
 
 # ハンドラは TypeScript のままなので tsx を挟む。crawler と同じ形。
 ENTRYPOINT ["/usr/bin/tini", "--", "node", "--import", "tsx", "/opt/node_modules/aws-lambda-ric/index.mjs"]
-CMD ["src/lambda.handler"]
+CMD ["apps/bulk-refresh/src/lambda.handler"]
