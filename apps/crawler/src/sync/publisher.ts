@@ -54,6 +54,25 @@ export class SyncPublisher {
     }
   }
 
+  /**
+   * この run が送るものはこれで終わり、と writer に伝える。
+   *
+   * 静的サイトの再ビルドはこの印を起点にする。writer が書き戻すたびに
+   * 起こしていた頃は、履歴を月ごとに送るクロール 1 回で何本も走っていた。
+   *
+   * 失敗したクロールでも、何かを送っていれば印を送る。途中まで適用された
+   * 内容がサイトに出ないまま次のクロールまで残るのを避けるため。
+   * 一度も送っていなければ、書き戻す中身が無いので再ビルドも要らない。
+   */
+  async publishCrawlComplete(): Promise<void> {
+    if (this.sequence === 0) {
+      info("Nothing was published in this run; skipping the crawl-complete marker");
+      return;
+    }
+
+    await this.publish("crawl-complete", { kind: "crawl-complete" });
+  }
+
   async publish(kind: SyncPayloadKind, payload: SyncPayload): Promise<void> {
     this.sequence += 1;
     const message = buildSyncMessage({

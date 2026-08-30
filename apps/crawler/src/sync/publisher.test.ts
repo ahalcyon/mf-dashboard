@@ -224,3 +224,52 @@ describe("publish", () => {
     expect(JSON.parse(putCommand.input.Body)).toEqual(payload);
   });
 });
+
+/**
+ * 静的サイトの再ビルドはこの印を起点にする。送らなければ、適用済みの内容が
+ * 次のクロールまでサイトに出ない。
+ */
+describe("publishCrawlComplete", () => {
+  const payload: SyncPayload = { kind: "scraped-data", groupOnlyData: [] };
+
+  test("発行済みなら crawl-complete を送る", async () => {
+    s3Send.mockResolvedValue({});
+    sqsSend.mockResolvedValue({});
+    const publisher = new SyncPublisher(config, "run-1");
+
+    await publisher.publish("scraped-data", payload);
+    await publisher.publishCrawlComplete();
+
+    const kinds = sqsSend.mock.calls.map(([command]) => {
+      const body = (command as { input: { MessageBody: string } }).input.MessageBody;
+      return (JSON.parse(body) as SyncMessage).kind;
+    });
+    expect(kinds).toEqual(["scraped-data", "crawl-complete"]);
+  });
+
+  // 何も書き戻していない run で再ビルドを起こしても、出る内容が変わらない。
+  test("一度も発行していなければ送らない", async () => {
+    s3Send.mockResolvedValue({});
+    sqsSend.mockResolvedValue({});
+
+    await new SyncPublisher(config, "run-1").publishCrawlComplete();
+
+    expect(sqsSend).not.toHaveBeenCalled();
+    expect(s3Send).not.toHaveBeenCalled();
+  });
+
+  // 連番を共有しないと、印のペイロードが直前の月を上書きする。
+  test("ペイロードのキーが直前の発行と衝突しない", async () => {
+    s3Send.mockResolvedValue({});
+    sqsSend.mockResolvedValue({});
+    const publisher = new SyncPublisher(config, "run-1");
+
+    await publisher.publish("scraped-data", payload);
+    await publisher.publishCrawlComplete();
+
+    const keys = s3Send.mock.calls.map(
+      ([command]) => (command as { input: { Key: string } }).input.Key,
+    );
+    expect(new Set(keys).size).toBe(2);
+  });
+});

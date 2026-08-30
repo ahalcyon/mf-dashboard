@@ -76,12 +76,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "data" {
   }
 }
 
-# 静的サイトの再ビルドは、この通知が発火する EventBridge ルールが起点になる。
-resource "aws_s3_bucket_notification" "data" {
-  bucket      = aws_s3_bucket.data.id
-  eventbridge = true
-}
-
 # --- 静的サイト ----------------------------------------------------------
 
 resource "aws_s3_bucket" "site" {

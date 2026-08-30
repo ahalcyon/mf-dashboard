@@ -132,7 +132,8 @@ aws ecs run-task \
 
 ```
 crawler → SQS FIFO → writer Lambda → S3のデータベース更新
-        → EventBridge → site-builder → S3へsync → CloudFrontのinvalidation
+        → クロール完了のイベント → EventBridge → site-builder
+        → S3へsync → CloudFrontのinvalidation
 ```
 
 サイトが焼き上がったらブックマークURLでアクセスし、ダッシュボードが表示されることを確認する。確認できたら`terraform.tfvars`で`enable_crawler_schedule = true`にして再適用し、定期実行を有効にする。

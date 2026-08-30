@@ -3,6 +3,9 @@ export interface WriterConfig {
   databaseObjectKey: string;
   databaseLocalPath: string;
   migrationsDir: string;
+  eventBusName: string;
+  crawlCompletedSource: string;
+  crawlCompletedDetailType: string;
 }
 
 function required(name: string): string {
@@ -18,5 +21,10 @@ export function loadConfig(): WriterConfig {
     // Lambda で書き込めるのは /tmp だけ
     databaseLocalPath: process.env.DATABASE_LOCAL_PATH?.trim() || "/tmp/moneyforward.db",
     migrationsDir: process.env.MIGRATIONS_DIR?.trim() || "/var/task/drizzle",
+    // イベントの名前は Terraform 側のルールと一致していなければならない。
+    // 既定値を持たせるとずれても動いてしまい、再ビルドだけが静かに止まる。
+    eventBusName: required("EVENT_BUS_NAME"),
+    crawlCompletedSource: required("CRAWL_COMPLETED_SOURCE"),
+    crawlCompletedDetailType: required("CRAWL_COMPLETED_DETAIL_TYPE"),
   };
 }

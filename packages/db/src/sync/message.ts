@@ -20,8 +20,13 @@ export const SQS_MESSAGE_MAX_BYTES = 256 * 1024;
 /**
  * キューを流れるメッセージ本体。
  * 実データは S3 に置き、ここにはその位置だけを載せる。
+ *
+ * crawl-complete は「この run が送るものはこれで終わり」を伝えるだけの印。
+ * 適用するデータを持たない。writer はこれを見て静的サイトの再ビルドを
+ * 1 回だけ起こす。同じ MessageGroupId で送るため、FIFO の順序保証により
+ * 必ず同じ run の scraped-data すべてより後に届く。
  */
-export const SYNC_PAYLOAD_KINDS = ["scraped-data"] as const;
+export const SYNC_PAYLOAD_KINDS = ["scraped-data", "crawl-complete"] as const;
 
 export type SyncPayloadKind = (typeof SYNC_PAYLOAD_KINDS)[number];
 
@@ -47,7 +52,12 @@ export interface ScrapedDataPayload {
   institutionCategories?: [string, string][];
 }
 
-export type SyncPayload = ScrapedDataPayload;
+/** データを持たない。runId と kind だけで意味が完結する。 */
+export interface CrawlCompletePayload {
+  kind: "crawl-complete";
+}
+
+export type SyncPayload = ScrapedDataPayload | CrawlCompletePayload;
 
 /** saveScrapedDataBatch がそのまま受け取れる形 */
 export interface SyncBatch {

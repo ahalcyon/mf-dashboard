@@ -178,22 +178,33 @@ resource "aws_iam_role_policy" "site_builder_trigger" {
   policy = data.aws_iam_policy_document.site_builder_trigger.json
 }
 
-resource "aws_cloudwatch_event_rule" "database_updated" {
-  name        = "${var.name_prefix}-database-updated"
-  description = "Rebuild the static site when the writer publishes a new database"
+# 再ビルドの起点。
+#
+# 以前は S3 の Object Created で、writer が書き戻すたびに発火していた。
+# 履歴を月ごとに送るようになってから 1 回のクロールで 3 本、バックフィルなら
+# 21 本の site-builder が走っていた。writer が「この run の分は適用し終えた」と
+# 知らせるイベントに変え、クロール 1 回につき 1 回にした。
+#
+# 名前は writer にも環境変数で渡している。ここだけ変えると再ビルドが黙って止まる。
+locals {
+  crawl_completed_event = {
+    source      = "mf-dashboard.writer"
+    detail_type = "Crawl Completed"
+  }
+}
+
+resource "aws_cloudwatch_event_rule" "crawl_completed" {
+  name        = "${var.name_prefix}-crawl-completed"
+  description = "Rebuild the static site once the writer has applied everything a crawl produced"
 
   event_pattern = jsonencode({
-    source        = ["aws.s3"]
-    "detail-type" = ["Object Created"]
-    detail = {
-      bucket = { name = [aws_s3_bucket.data.id] }
-      object = { key = [var.database_object_key] }
-    }
+    source        = [local.crawl_completed_event.source]
+    "detail-type" = [local.crawl_completed_event.detail_type]
   })
 }
 
 resource "aws_cloudwatch_event_target" "site_builder" {
-  rule     = aws_cloudwatch_event_rule.database_updated.name
+  rule     = aws_cloudwatch_event_rule.crawl_completed.name
   arn      = aws_ecs_cluster.this.arn
   role_arn = aws_iam_role.site_builder_trigger.arn
 
