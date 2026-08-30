@@ -66,12 +66,6 @@ variable "container_cli" {
   default     = "docker"
 }
 
-variable "crawler_timeout_minutes" {
-  description = "Upper bound for a single crawl. Declared but not wired to anything yet."
-  type        = number
-  default     = 45
-}
-
 variable "site_builder_cpu" {
   description = "Fargate CPU units for the site builder task. next build is the bottleneck."
   type        = number
