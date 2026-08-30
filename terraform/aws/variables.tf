@@ -104,7 +104,7 @@ variable "writer_reserved_concurrency" {
     because AWS keeps unreserved concurrency at 10 or above.
   DESC
   type        = number
-  default     = -1
+  default     = 1
 
   validation {
     condition     = var.writer_reserved_concurrency == -1 || var.writer_reserved_concurrency >= 1
@@ -191,7 +191,12 @@ variable "crawl_reserved_concurrency" {
     or lower because AWS keeps unreserved concurrency at 10 or above.
   DESC
   type        = number
-  default     = -1
+  default     = 1
+
+  validation {
+    condition     = var.crawl_reserved_concurrency == -1 || var.crawl_reserved_concurrency >= 1
+    error_message = "crawl_reserved_concurrency must be -1 (unreserved) or a positive number."
+  }
 }
 
 variable "crawl_ephemeral_storage" {
