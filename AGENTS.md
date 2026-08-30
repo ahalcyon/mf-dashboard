@@ -56,6 +56,14 @@ Money Forward may expose the same cash movement both as a transfer and as a norm
 - Keep chart UI and data fetching separate: pure UI belongs in `charts/`; data-fetching components belong in `info/`.
 - An `info/` component must be a Server Component that fetches data. Add a `.client.tsx` component only when interactivity requires it.
 
+### Comments and Documentation
+
+- Comments state what the code does. Keep them minimal.
+- Do not record design rationale anywhere: not in comments, not in documentation, not in the repository.
+- Architecture and design documents describe the current structure. They do not explain why a decision was made.
+- Write only what the code or the system does. Do not describe what it does not do, what was rejected, or what is out of scope.
+- `README.md` covers only behaviour a user acts on.
+
 ### Personal Information
 
 Never include personally identifiable information in tests, Storybook stories, comments, or documentation.

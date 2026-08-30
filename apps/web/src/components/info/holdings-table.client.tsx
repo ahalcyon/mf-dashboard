@@ -48,7 +48,7 @@ interface HoldingsTableClientProps {
 }
 
 /**
- * 負債の残高は「マイナスの純資産」を意味するため、符号を反転して
+ * 負債の残高は符号を反転して
  * `type="balance"` で描画し、`text-balance-negative` に載せる。
  * 資産はそのままの値を色なしで出す。account-summary-card と同じ扱い。
  */

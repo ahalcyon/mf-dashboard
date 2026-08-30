@@ -6,17 +6,14 @@ import { isRefreshPath, toResponse, type RefreshOutcome } from "./result.js";
 /**
  * ダッシュボードの「金融機関データを更新」に応じる。
  *
- * ボタンの名前どおり 2 つのことをする。金融機関の一括更新を始めることと、
- * その時点の状態を取り込むクロールを走らせること。クロールは更新の完了を
- * 待たない（#93）ため、押した直後に見えるのは「すでに更新が終わっていた分」で、
- * 残りは次のスケジュール実行が拾う。
+ * 金融機関の一括更新を始め、その時点の状態を取り込むクロールを走らせる。
+ * クロールは更新の完了を待たない。
  *
- * 認証は CloudFront の viewer-request 関数が担うため、ここでは扱わない。
- * Function URL は OAC で CloudFront からのみ到達できるようにしてある。
+ * 認証は CloudFront の viewer-request 関数が担う。
+ * Function URL は OAC で CloudFront からのみ到達する。
  */
 export async function handler(event: LambdaFunctionURLEvent): Promise<LambdaFunctionURLResult> {
-  // CloudFront は /api/* をまとめてこのオリジンへ回す。静的エクスポートで
-  // 落ちた他の /api/* への要求もここへ届くため、パスを先に確かめる。
+  // CloudFront は /api/* をまとめてこのオリジンへ回す。パスを先に確かめる。
   if (!isRefreshPath(event.requestContext.http.path)) {
     return toResponse({ kind: "not-found" });
   }

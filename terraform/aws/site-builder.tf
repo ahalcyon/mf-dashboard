@@ -1,8 +1,6 @@
 # データベースが更新されたら静的サイトを焼き直す。
 #
 # フロントは実行時の DB 接続を持たないため、データを反映するにはビルドし直す。
-# CodeBuild を使うと GitHub 接続の認可が Terraform の管理外で必要になるので、
-# crawler や writer と同じく「手元でイメージを push して apply」する形に揃える。
 
 resource "aws_ecr_repository" "site_builder" {
   name                 = "${var.name_prefix}/site-builder"
@@ -178,14 +176,8 @@ resource "aws_iam_role_policy" "site_builder_trigger" {
   policy = data.aws_iam_policy_document.site_builder_trigger.json
 }
 
-# 再ビルドの起点。
-#
-# 以前は S3 の Object Created で、writer が書き戻すたびに発火していた。
-# 履歴を月ごとに送るようになってから 1 回のクロールで 3 本、バックフィルなら
-# 21 本の site-builder が走っていた。writer が「この run の分は適用し終えた」と
-# 知らせるイベントに変え、クロール 1 回につき 1 回にした。
-#
-# 名前は writer にも環境変数で渡している。ここだけ変えると再ビルドが黙って止まる。
+# 再ビルドの起点。writer がクロール 1 回ぶんを適用し終えると発火する。
+# source と detail-type は writer にも環境変数で渡している。
 locals {
   crawl_completed_event = {
     source      = "mf-dashboard.writer"

@@ -1,16 +1,13 @@
 # クロール結果と、構成の異常をメールで届ける。
 #
-# crawler は Money Forward から総資産・前日比・今月比をそのまま取得している
-# ため、S3 のデータベース更新を待たずにタスクの中から送れる。writer や
-# site-builder の完了を待つ必要はない。
+# crawler はタスクの中から総資産・前日比・今月比を送る。
 
 resource "aws_sns_topic" "notifications" {
   name         = "${var.name_prefix}-notifications"
   display_name = "mf-dashboard"
 }
 
-# 宛先は SSM に置く。tfvars だと開発機ごとに持ち回ることになり、
-# 機械が変わると通知先が消える。
+# 宛先は SSM に置く。
 data "aws_ssm_parameter" "notification_email" {
   count = var.notification_email_parameter == "" ? 0 : 1
 
@@ -22,8 +19,7 @@ locals {
   notification_email = one(data.aws_ssm_parameter.notification_email[*].value)
 }
 
-# メールの subscription は AWS からの確認メールを承認するまで
-# PendingConfirmation のまま残る。承認は利用者が手で行う。
+# subscription は確認メールを承認するまで PendingConfirmation のまま残る。
 resource "aws_sns_topic_subscription" "email" {
   count = local.notification_email == null ? 0 : 1
 
@@ -33,8 +29,7 @@ resource "aws_sns_topic_subscription" "email" {
 }
 
 # --- 障害の通知 -----------------------------------------------------------
-# アラームと EventBridge から同じトピックへ流す。単一利用者なので、
-# 購読先を分ける利点より確認するサブスクリプションが 1 つで済む利点を取る。
+# アラームと EventBridge から同じトピックへ流す。
 
 data "aws_iam_policy_document" "notifications" {
   statement {
@@ -60,10 +55,8 @@ resource "aws_sns_topic_policy" "notifications" {
   policy = data.aws_iam_policy_document.notifications.json
 }
 
-# crawler は自分で失敗を通知するが、そこへ到達せずに死ぬ場合がある（OOM など）。
-# site-builder には通知の口が無い。どちらもタスクの終了コードで拾う。
+# タスクの終了コードで失敗を拾う。
 #
-# 起動そのものに失敗した場合は終了コードが存在しないため、この規則では拾えない。
 resource "aws_cloudwatch_event_rule" "task_failed" {
   name        = "${var.name_prefix}-task-failed"
   description = "An ECS task in this cluster exited non-zero"
@@ -92,7 +85,7 @@ resource "aws_cloudwatch_event_target" "task_failed" {
       reason = "$.detail.stoppedReason"
       task   = "$.detail.taskArn"
     }
-    # SNS のメールは本文をそのまま出すので、生の JSON ではなく一行にまとめる
+    # 本文は一行にまとめる
     input_template = "\"mf-dashboard: an ECS task failed. group=<group> reason=<reason> task=<task>\""
   }
 }

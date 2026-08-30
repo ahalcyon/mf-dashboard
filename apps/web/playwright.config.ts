@@ -8,7 +8,7 @@ const serverCommand = isCI ? "node .next/standalone/apps/web/server.js" : "pnpm 
 // 設定を読むだけの knip のようなツールまで巻き込む。
 const webServerCommand = `node scripts/require-demo-db.mjs && ${serverCommand}`;
 
-// CI は事前ビルド済みの standalone サーバーを起動するため即座に応答するが、
+// CI は事前ビルド済みの standalone サーバーを起動して即座に応答する。
 // ローカルは `next dev` がリクエストを受けてから該当ルートをコンパイルする。
 // 初回の待ち時間はマシンによっては 60 秒の既定値を超えるため、ローカルだけ緩める。
 const webServerTimeout = isCI ? 60_000 : 180_000;

@@ -1,15 +1,9 @@
 /**
- * 定期クロールの入口。
- *
- * 一括更新の開始は bulk-refresh Lambda が受け持ち、こちらはその時点の状態を
- * 取り込むだけなので 1 分強で終わる。15 分の上限は制約にならない（#93）。
- *
- * CLI 版（src/index.ts）と同じ runCrawler を呼ぶ。バックフィルは同じイメージを
- * ECS で CLI として起動する。分けないのは、バックフィルと定期クロールが違う
- * Chromium で描画するのを避けるため。
+ * 定期クロールの入口。その時点の口座状態を取り込む。
+ * CLI 版（src/index.ts）と同じ runCrawler を呼ぶ。
  */
 
-/** Lambda で書けるのは /tmp だけ。既定のパスはイメージの中で読み取り専用。 */
+/** Lambda の書き込み先。 */
 const LAMBDA_STATE_PATH = "/tmp/crawler-run-state.json";
 
 export interface CrawlSummary {
@@ -18,7 +12,7 @@ export interface CrawlSummary {
 }
 
 export async function handler(): Promise<CrawlSummary> {
-  // 重い import は init の 10 秒に収めるため実行時に読む。
+  // 重い import は実行時に読む。init は 10 秒で打ち切られる。
   const [{ randomUUID }, { createCrawlerProgressReporter }, { loadCrawlerConfig }, { error }] =
     await Promise.all([
       import("node:crypto"),
@@ -27,9 +21,7 @@ export async function handler(): Promise<CrawlSummary> {
       import("./logger.js"),
     ]);
 
-  // history モードは 20 か月ぶんを取りに行く。ここへ落ちてくるのは
-  // SCRAPE_MODE の指定が外れたか、S3 のデータベースを取得できなかったとき。
-  // 走らせても 15 分で切れて何も残らないので、始める前に止める。
+  // history モードは ECS のバックフィルタスクが受け持つ。
   const config = loadCrawlerConfig();
   if (config.isHistoryMode) {
     throw new Error(
@@ -59,7 +51,7 @@ export async function handler(): Promise<CrawlSummary> {
     } catch (finishError) {
       error("Failed to record the terminal crawler state:", finishError);
     }
-    // CLI は exitCode で伝えるが、Lambda は throw しないと失敗として記録されない。
+    // Lambda は throw しないと失敗として記録されない。
     throw err;
   }
 }

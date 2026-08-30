@@ -1,6 +1,4 @@
-// 値としての import は init の 10 秒に収まらない。tsx が playwright と
-// crawler のモジュールをまとめて変換するため、ハンドラの読み込みだけで
-// 上限を超える。実行時まで遅らせる（詳細は withBrowser のコメント）。
+// playwright と crawler のモジュールは実行時に読む。init は 10 秒で打ち切られる。
 import type { Browser, BrowserContext, Page } from "playwright";
 
 export interface BrowserSession {
@@ -18,16 +16,10 @@ async function openSession(browser: Browser): Promise<BrowserSession> {
 }
 
 /**
- * ブラウザの後始末を呼び出し側に任せない。
+ * ブラウザを開き、処理の後に必ず閉じる。
  *
  * playwright と crawler のモジュールはここから動的に読む。Lambda の init は
- * 10 秒で打ち切られ、モジュールスコープで読むと超えてしまう。超えても Lambda は
- * invoke の中で init をやり直すので動きはするが、コールドスタートのたびに
- * 10 秒を捨てたうえでログに timeout が残る。
- *
- * Lambda のコンテナは呼び出しをまたいで生き残るので、閉じ忘れた Chromium は
- * 次の呼び出しまで残り、メモリを食ったまま積み上がる。失敗した場合ほど
- * 閉じる必要がある。
+ * 10 秒で打ち切られる。
  */
 export async function withBrowser<T>(
   run: (session: BrowserSession) => Promise<T>,

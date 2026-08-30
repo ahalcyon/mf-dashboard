@@ -205,10 +205,10 @@ export async function runSavePhase(
     institutionCategories,
   };
 
-  // ローカルの複製へ先に適用する。後続の分析フェーズが最新の値を読むため。
+  // ローカルの複製へ先に適用する。
   const savedCounts = await saveScrapedDataBatch(db, batch);
 
-  // S3 上の authoritative なデータベースへ適用するのは writer だけ。
+  // S3 のデータベースへ適用するのは writer。
   await publisher?.publish("scraped-data", encodeScrapedDataPayload(batch));
 
   return savedCounts;
@@ -296,13 +296,8 @@ export async function runCashFlowHistoryPhase(
     }
   }
 
-  // 取り終えた月から順に保存する。全月を取り終えてからまとめて書くと、
-  // 途中で打ち切られたときに何も残らない。データベースは空のままなので
-  // 次回もまた history モードで同じ月数を取りに行き、同じところで落ちる。
-  //
-  // 1 回のバッチが担保していた期間の重なり検査は、run 内の累積で維持する。
-  // 会計期間は暦月と一致しないことがあり、重なったまま置き換えると
-  // 直前に入れた月の取引が消える。
+  // 取り終えた月から順に保存する。期間の重なり検査は run 内の累積で行う。
+  // 会計期間は暦月と一致しないことがある。
   const publishedMonths: TransactionPeriodReplacement[] = [];
 
   try {

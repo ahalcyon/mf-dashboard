@@ -72,7 +72,7 @@ resource "aws_iam_role_policy_attachment" "crawler_execution_managed" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# 実行ロールは、コンテナ起動時に secrets を解決するために SSM を読む。
+# 実行ロールはコンテナ起動時に secrets を解決するため SSM を読む。
 data "aws_iam_policy_document" "crawler_execution_secrets" {
   statement {
     actions   = ["ssm:GetParameters"]
@@ -91,7 +91,7 @@ resource "aws_iam_role" "crawler_task" {
   assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
 }
 
-# タスクロールは書き込みキューへの送信のみ。データベースへは直接触らせない。
+# タスクロールは書き込みキューへの送信のみ。
 data "aws_iam_policy_document" "crawler_task" {
   statement {
     sid       = "PublishDatabaseWrites"
@@ -101,15 +101,14 @@ data "aws_iam_policy_document" "crawler_task" {
 
   statement {
     sid = "ReadWorkingDatabaseCopy"
-    # crawler は authoritative なデータベースを持たない。読み取り用の複製を
-    # 落として作業し、書き込みはすべて payload として発行する。
+    # crawler は S3 のデータベースの複製を読み、書き込みは payload として発行する。
     actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.data.arn}/${var.database_object_key}"]
   }
 
   statement {
     sid = "PublishCrawlPayloads"
-    # SQS の 256 KiB 上限を超えるため、実データは S3 に置きメッセージには位置だけを載せる
+    # 実データは S3 に置き、メッセージには位置だけを載せる
     actions   = ["s3:PutObject"]
     resources = ["${aws_s3_bucket.data.arn}/payloads/*"]
   }
@@ -135,12 +134,9 @@ resource "aws_iam_role_policy" "crawler_task" {
 
 # --- バックフィル用タスク定義 ---------------------------------------------
 #
-# 定期クロールは Lambda に移った（crawl.tf）。ここに残るのは history モード
-# だけで、起動は手動に限る。前年 1 月からの取得は 20 か月ぶんになり、
-# Lambda の 15 分に収まる保証が無い。
-#
-# イメージは Lambda と同じものを使い、entryPoint だけ CLI に上書きする。
-# 分けると、バックフィルと定期クロールが違う Chromium で描画しうる。
+# history モードのバックフィル専用。起動は手動。前年 1 月から現在までの
+# 20 か月ぶんを取得する。イメージは crawl Lambda と共有し、entryPoint だけ
+# CLI に上書きする。
 
 resource "aws_ecs_task_definition" "crawler" {
   # イメージが push されてからタスク定義を更新する
@@ -164,20 +160,17 @@ resource "aws_ecs_task_definition" "crawler" {
     image     = local.image_uris.crawler
     essential = true
 
-    # イメージの既定は Lambda の Runtime Interface Client。ECS では CLI として
-    # 動かすので上書きする。command を空にしないと、イメージの CMD
-    # （ハンドラ名）が引数として後ろに付く。
+    # イメージの既定は Lambda の Runtime Interface Client。CLI として動かすため
+    # entryPoint を上書きし、command を空にしてイメージの CMD を打ち消す。
     entryPoint = ["/usr/bin/tini", "--", "node", "--import", "tsx", "src/index.ts"]
     command    = []
 
     environment = [
       { name = "TZ", value = "Asia/Tokyo" },
       { name = "CRAWLER_RUN_SOURCE", value = "backfill" },
-      # このタスクの存在理由。実行時の判定に任せると、S3 のデータベースが
-      # 取れたときに月モードで走ってしまい、バックフィルにならない。
+      # history モードに固定する。
       { name = "SCRAPE_MODE", value = "history" },
-      # 一括更新の開始は bulk-refresh Lambda が受け持つ。待っていた頃は
-      # 1 口座が終わらないだけで最大 20 分ここで止まっていた（#93）。
+      # 一括更新の開始は bulk-refresh Lambda が受け持つ。
       { name = "SKIP_REFRESH", value = "true" },
       { name = "CRAWLER_STATE_PATH", value = "/tmp/crawler-run-state.json" },
       { name = "AUTH_STATE_PATH", value = "/tmp/auth-state.json" },

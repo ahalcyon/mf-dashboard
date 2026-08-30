@@ -2,29 +2,24 @@ import type { TransactionPeriodReplacement } from "../repositories/transactions"
 import type { ScrapedData } from "../types";
 
 /**
- * crawler（producer）と writer（consumer）の間の契約。
- *
- * S3 上の SQLite はファイル全体を書き換えるしかないため、書き込みは
- * FIFO キューと単一 MessageGroupId で直列化する。
- * このモジュールはその経路を流れるメッセージの形だけを定義する。
+ * crawler（producer）と writer（consumer）の間を流れるメッセージの形。
+ * 書き込みは FIFO キューと単一 MessageGroupId で直列化される。
  */
 
 export const SYNC_MESSAGE_VERSION = 1;
 
-/** 送信側は必ずこの MessageGroupId を使う。分けると書き込みが並行して走る。 */
+/** 送信側は必ずこの MessageGroupId を使う。 */
 export const SYNC_MESSAGE_GROUP_ID = "sqlite-write";
 
-/** SQS の 1 メッセージ上限は 256 KiB で、全履歴クロールは容易に超える。 */
+/** SQS の 1 メッセージ上限。 */
 export const SQS_MESSAGE_MAX_BYTES = 256 * 1024;
 
 /**
- * キューを流れるメッセージ本体。
- * 実データは S3 に置き、ここにはその位置だけを載せる。
+ * キューを流れるメッセージ本体。実データは S3 に置き、位置だけを載せる。
  *
- * crawl-complete は「この run が送るものはこれで終わり」を伝えるだけの印。
- * 適用するデータを持たない。writer はこれを見て静的サイトの再ビルドを
- * 1 回だけ起こす。同じ MessageGroupId で送るため、FIFO の順序保証により
- * 必ず同じ run の scraped-data すべてより後に届く。
+ * crawl-complete はその run が送るものの終わりを示す印で、適用するデータを
+ * 持たない。同じ MessageGroupId で送るため、同じ run の scraped-data すべてより
+ * 後に届く。writer はこれを見て静的サイトの再ビルドを 1 回起こす。
  */
 export const SYNC_PAYLOAD_KINDS = ["scraped-data", "crawl-complete"] as const;
 
@@ -41,7 +36,7 @@ export interface SyncMessage {
 
 /**
  * S3 に置く実データ。saveScrapedDataBatch の引数と 1 対 1 で対応する。
- * Map は JSON にできないため、institutionCategories だけ entries 配列で持つ。
+ * institutionCategories は entries 配列で持つ。
  */
 export interface ScrapedDataPayload {
   kind: "scraped-data";
@@ -52,7 +47,7 @@ export interface ScrapedDataPayload {
   institutionCategories?: [string, string][];
 }
 
-/** データを持たない。runId と kind だけで意味が完結する。 */
+/** 適用するデータを持たない。 */
 export interface CrawlCompletePayload {
   kind: "crawl-complete";
 }
@@ -68,11 +63,7 @@ export interface SyncBatch {
   institutionCategories?: ReadonlyMap<string, string>;
 }
 
-/**
- * 1 回のクロールは複数の payload を発行する。履歴は月ごとに送るため、
- * runId と kind だけではキーが衝突し、先に送ったメッセージが後から
- * 上書きされた中身を指すことになる。run 内の連番で区別する。
- */
+/** run 内の連番でキーを一意にする。 */
 export function buildPayloadKey(runId: string, kind: SyncPayloadKind, sequence: number): string {
   return `payloads/${runId}/${String(sequence).padStart(4, "0")}-${kind}.json`;
 }
@@ -95,11 +86,7 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
-/**
- * キューから受け取った文字列を検証する。
- * 送信側は自分たちのコードだが、再配信や版ずれで壊れた値が届きうるため、
- * writer が S3 を触る前にここで弾く。
- */
+/** キューから受け取った文字列を検証する。 */
 export function parseSyncMessage(raw: string): SyncMessage {
   let value: unknown;
   try {

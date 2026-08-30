@@ -25,8 +25,7 @@ export async function publishCrawlCompleted(
     }),
   );
 
-  // PutEvents は個々のエントリが弾かれても HTTP 200 を返す。ここを見ないと
-  // 再ビルドが起きないまま成功として扱われ、サイトが黙って古いままになる。
+  // PutEvents は個々のエントリが弾かれても HTTP 200 を返す。
   if ((response.FailedEntryCount ?? 0) > 0) {
     const [entry] = response.Entries ?? [];
     const reason = [entry?.ErrorCode, entry?.ErrorMessage].filter(Boolean).join(" ");

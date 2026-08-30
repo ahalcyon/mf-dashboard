@@ -15,7 +15,7 @@ export interface TotpOptions {
 
 /**
  * 認証アプリが表示するセットアップキー（Base32）をバイト列へ変換する。
- * 見た目を整えるための空白とハイフン、末尾のパディングは許容する。
+ * 空白とハイフン、末尾のパディングは許容する。
  */
 export function decodeBase32(secret: string): Buffer {
   const normalized = secret.replace(/[\s-]/g, "").replace(/=+$/, "").toUpperCase();
@@ -46,12 +46,7 @@ export function decodeBase32(secret: string): Buffer {
   return Buffer.from(bytes);
 }
 
-/**
- * RFC 6238 の TOTP を生成する。
- *
- * 認証アプリと同じ計算をローカルで行うため、シークレットさえ持っていれば
- * 外部サービスへの問い合わせなしにコードを得られる。
- */
+/** RFC 6238 の TOTP を生成する。 */
 export function generateTotp(secret: string, options: TotpOptions = {}): string {
   const {
     timestampMs = Date.now(),
@@ -84,10 +79,7 @@ export function generateTotp(secret: string, options: TotpOptions = {}): string 
   return String(binary % 10 ** digits).padStart(digits, "0");
 }
 
-/**
- * 生成直後のコードが有効期限切れ間際でないかを判定する。
- * ログイン操作に数秒かかるため、残り時間が短いときは次の窓を待つ判断に使う。
- */
+/** 現在の窓が終わるまでの残り秒数。 */
 export function secondsUntilNextWindow(
   timestampMs: number = Date.now(),
   periodSeconds: number = DEFAULT_PERIOD_SECONDS,

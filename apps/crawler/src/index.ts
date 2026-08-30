@@ -4,9 +4,7 @@ import { getCrawlerRunStatePath } from "./crawler-run-state.js";
 import { error } from "./logger.js";
 import { runCrawler } from "./run.js";
 
-// 同時実行は ECS 側で防いでいる。スケジュールは EventBridge が 1 タスクずつ起動し、
-// 手動起動は refresh-trigger Lambda が実行中タスクの有無を見てから RunTask する。
-// タスクごとにファイルシステムが独立するため、プロセス内のロックは何も守れない。
+// 同時実行は ECS 側で防ぐ。
 async function main() {
   const progress = await createCrawlerProgressReporter(
     process.env.CRAWLER_STATE_PATH ?? getCrawlerRunStatePath(),

@@ -14,16 +14,14 @@ import { info, warn } from "../logger.js";
 import type { SyncConfig } from "./config.js";
 
 /**
- * crawler は authoritative なデータベースを持たない。
- * S3 上の複製を作業用に落として読み書きし、書き込みは payload として発行する。
- * 実際に S3 のデータベースへ適用するのは writer だけ。
+ * S3 のデータベースの複製を落として読み書きし、書き込みは payload として発行する。
+ * S3 のデータベースへ適用するのは writer。
  */
 export class SyncPublisher {
   private readonly s3 = new S3Client({});
   private readonly sqs = new SQSClient({});
 
-  // 履歴は月ごとに発行するため、1 回のクロールが何度も publish を呼ぶ。
-  // payload のキーを run 内で一意にするための連番。
+  // payload のキーを run 内で一意にする連番。
   private sequence = 0;
 
   constructor(
@@ -56,13 +54,8 @@ export class SyncPublisher {
 
   /**
    * この run が送るものはこれで終わり、と writer に伝える。
-   *
-   * 静的サイトの再ビルドはこの印を起点にする。writer が書き戻すたびに
-   * 起こしていた頃は、履歴を月ごとに送るクロール 1 回で何本も走っていた。
-   *
-   * 失敗したクロールでも、何かを送っていれば印を送る。途中まで適用された
-   * 内容がサイトに出ないまま次のクロールまで残るのを避けるため。
-   * 一度も送っていなければ、書き戻す中身が無いので再ビルドも要らない。
+   * 静的サイトの再ビルドはこの印を起点にする。
+   * 一度も発行していない run では送らない。
    */
   async publishCrawlComplete(): Promise<void> {
     if (this.sequence === 0) {

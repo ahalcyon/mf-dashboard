@@ -1,11 +1,5 @@
-# 定期クロール。
-#
-# 一括更新の開始は bulk-refresh Lambda が受け持ち、こちらはその時点の状態を
-# 取り込むだけなので 1 分強で終わる（実測 80 秒）。15 分の上限に対して余裕が
-# あるため Fargate である必要が無い（#93）。
-#
-# イメージは ECS のバックフィルタスクと共有する。分けると、バックフィルと
-# 定期クロールが違う Chromium で描画しうる。
+# 定期クロール。その時点の口座状態を取り込む。実測 80 秒。
+# イメージは ECS のバックフィルタスクと共有する。
 
 resource "aws_cloudwatch_log_group" "crawl" {
   name              = "/aws/lambda/${var.name_prefix}-crawl"
@@ -17,8 +11,7 @@ resource "aws_iam_role" "crawl" {
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
 }
 
-# ECS のタスクロールと同じ範囲。crawler は authoritative なデータベースを
-# 持たず、複製を読んで書き込みは payload として発行するだけ。
+# crawler は S3 のデータベースの複製を読み、書き込みは payload として発行する。
 data "aws_iam_policy_document" "crawl" {
   statement {
     sid       = "WriteLogs"
@@ -40,7 +33,7 @@ data "aws_iam_policy_document" "crawl" {
 
   statement {
     sid = "PublishCrawlPayloads"
-    # SQS の 256 KiB 上限を超えるため、実データは S3 に置きメッセージには位置だけを載せる
+    # 実データは S3 に置き、メッセージには位置だけを載せる
     actions   = ["s3:PutObject"]
     resources = ["${aws_s3_bucket.data.arn}/payloads/*"]
   }
@@ -51,7 +44,7 @@ data "aws_iam_policy_document" "crawl" {
     resources = [aws_sns_topic.notifications.arn]
   }
 
-  # Lambda には ECS の secrets のような注入が無いので、実行時に自分で読む。
+  # 認証情報は実行時に SSM から読む。
   statement {
     sid       = "ReadCredentialsAtRuntime"
     actions   = ["ssm:GetParameters", "ssm:GetParameter"]
@@ -75,14 +68,11 @@ resource "aws_lambda_function" "crawl" {
   timeout       = var.crawl_timeout_seconds
   memory_size   = var.crawl_memory
 
-  # 同時に 2 つ走ると Money Forward へ同時にログインし、片方のセッションが
-  # 無効化されうる。ただしこのアカウントの同時実行クォータは 10 で、AWS は
-  # 未予約分を 10 以上に保つため予約できない（writer と同じ事情）。
-  # 既定は -1（予約しない）。クォータが上がったら 1 にする。
+  # 同時実行を 1 に制限する。-1 で予約しない。
   reserved_concurrent_executions = var.crawl_reserved_concurrency
 
   image_config {
-    # イメージの既定は ECS 側と共有するため、Lambda のハンドラをここで指す。
+    # Lambda のハンドラ。
     command = ["apps/crawler/src/lambda.handler"]
   }
 
@@ -96,9 +86,7 @@ resource "aws_lambda_function" "crawl" {
       TZ                 = "Asia/Tokyo"
       CRAWLER_RUN_SOURCE = "scheduled"
       SKIP_REFRESH       = "true"
-      # 実行時の判定に任せると、S3 のデータベースを取得できなかっただけで
-      # 20 か月ぶんのバックフィルが始まり、15 分で切れて何も残らない。
-      # バックフィルは ECS のタスクが受け持つ。
+      # 月モードに固定する。バックフィルは ECS のタスクが受け持つ。
       SCRAPE_MODE            = "month"
       SSM_PARAMETER_PREFIX   = local.ssm_parameter_prefix
       WRITE_QUEUE_URL        = aws_sqs_queue.writes.url
@@ -106,7 +94,7 @@ resource "aws_lambda_function" "crawl" {
       DATA_BUCKET            = aws_s3_bucket.data.id
       DATABASE_OBJECT_KEY    = var.database_object_key
       NOTIFICATION_TOPIC_ARN = aws_sns_topic.notifications.arn
-      # Lambda で書けるのは /tmp だけ
+      # 書き込み先は /tmp
       DB_PATH            = "/tmp/moneyforward.db"
       CRAWLER_STATE_PATH = "/tmp/crawler-run-state.json"
       AUTH_STATE_PATH    = "/tmp/auth-state.json"
@@ -119,8 +107,7 @@ resource "aws_lambda_function" "crawl" {
   }
 }
 
-# 同じ時刻に 2 つ走ると Money Forward へ同時にログインし、
-# 片方のセッションが無効化されうる。書き込みも FIFO の直列化に頼っている。
+# 実行は重ならない。
 resource "aws_lambda_function_event_invoke_config" "crawl" {
   function_name          = aws_lambda_function.crawl.function_name
   maximum_retry_attempts = 0
@@ -161,7 +148,7 @@ resource "aws_scheduler_schedule" "crawl" {
     arn      = aws_lambda_function.crawl.arn
     role_arn = aws_iam_role.crawl_scheduler.arn
 
-    # 再試行はログインを増やすだけ。次の実行が同じことをする。
+    # 失敗しても再試行しない。
     retry_policy {
       maximum_retry_attempts = 0
     }
