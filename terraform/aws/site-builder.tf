@@ -19,11 +19,11 @@ resource "aws_ecr_lifecycle_policy" "site_builder" {
   policy = jsonencode({
     rules = [{
       rulePriority = 1
-      description  = "Keep the 10 most recent images"
+      description  = "Keep the deployed image and the one before it"
       selection = {
         tagStatus   = "any"
         countType   = "imageCountMoreThan"
-        countNumber = 10
+        countNumber = 2
       }
       action = { type = "expire" }
     }]
