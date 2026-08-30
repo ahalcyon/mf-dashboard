@@ -309,6 +309,9 @@ importers:
 
   apps/writer:
     dependencies:
+      '@aws-sdk/client-eventbridge':
+        specifier: ^3.1121.0
+        version: 3.1121.0
       '@aws-sdk/client-s3':
         specifier: ^3.1111.0
         version: 3.1116.0
@@ -450,6 +453,10 @@ packages:
 
   '@aws-sdk/checksums@3.1000.29':
     resolution: {integrity: sha512-Dtu0gr4dnATZAPwEYbpCsG+MpLM7OAliy2gTepEFQwl1vZ6DL3QMH2FveMa3HLvPsOdhJsPRB3KtxVhph9T75A==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-eventbridge@3.1121.0':
+    resolution: {integrity: sha512-+zT6z91ZxHozsKGWf5wOJfxEebht3GmPBoXedlWoumHeAvzAueM1KwbWkzClLWjpi76HXuCIx7R3x4pvSVGqIw==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-lambda@3.1120.0':
@@ -5112,6 +5119,18 @@ snapshots:
       '@aws-sdk/core': 3.977.9
       '@aws-sdk/types': 3.974.5
       '@smithy/core': 3.33.3
+      '@smithy/types': 4.17.2
+      tslib: 2.8.1
+
+  '@aws-sdk/client-eventbridge@3.1121.0':
+    dependencies:
+      '@aws-sdk/core': 3.977.9
+      '@aws-sdk/credential-provider-node': 3.972.81
+      '@aws-sdk/signature-v4-multi-region': 3.996.46
+      '@aws-sdk/types': 3.974.5
+      '@smithy/core': 3.33.3
+      '@smithy/fetch-http-handler': 5.7.2
+      '@smithy/node-http-handler': 4.11.3
       '@smithy/types': 4.17.2
       tslib: 2.8.1
 

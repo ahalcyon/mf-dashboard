@@ -38,6 +38,19 @@ async function disposeGroupScope(
   }
 }
 
+/**
+ * 印の送信が失敗しても、クロール自体の結果を塗り潰さない。
+ * この呼び出しは finally の中にあり、投げると本来の失敗が消える。
+ * 落ちた場合の実害は「今回の分がサイトに出ず、次のクロールまで待つ」に留まる。
+ */
+async function publishCrawlCompleteQuietly(publisher: SyncPublisher | null): Promise<void> {
+  try {
+    await publisher?.publishCrawlComplete();
+  } catch (error) {
+    warn(`Failed to publish the crawl-complete marker: ${String(error)}`);
+  }
+}
+
 export async function runCrawler(progress: CrawlerProgressReporter): Promise<void> {
   // AWS 上では authoritative なデータベースは S3 にある。crawler は作業用の
   // 複製を落として読み書きし、書き込みは payload として発行するだけに留める。
@@ -136,6 +149,9 @@ export async function runCrawler(progress: CrawlerProgressReporter): Promise<voi
         await runtime.browser.close();
       }
     } finally {
+      // 適用済みの内容を 1 回だけサイトへ出す。書き戻しごとではなく
+      // クロール 1 回につき 1 回の再ビルドにするための印。
+      await publishCrawlCompleteQuietly(publisher);
       publisher?.destroy();
       // AWS SDK のクライアントはソケットを掴んだままなので、閉じてから抜ける
       destroySnsClient();

@@ -24,6 +24,10 @@ resource "aws_ecr_lifecycle_policy" "writer" {
   })
 }
 
+data "aws_cloudwatch_event_bus" "default" {
+  name = "default"
+}
+
 resource "aws_cloudwatch_log_group" "writer" {
   name              = "/aws/lambda/${var.name_prefix}-writer"
   retention_in_days = var.log_retention_days
@@ -69,6 +73,13 @@ data "aws_iam_policy_document" "writer" {
     sid       = "ReadCrawlPayloads"
     actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.data.arn}/payloads/*"]
+  }
+
+  # 適用し終えたことを知らせる先。site-builder はこのイベントで起動する。
+  statement {
+    sid       = "AnnounceCrawlCompletion"
+    actions   = ["events:PutEvents"]
+    resources = [data.aws_cloudwatch_event_bus.default.arn]
   }
 
   statement {
@@ -117,6 +128,11 @@ resource "aws_lambda_function" "writer" {
       TZ                  = "Asia/Tokyo"
       DATA_BUCKET         = aws_s3_bucket.data.id
       DATABASE_OBJECT_KEY = var.database_object_key
+      # site-builder を起動するルールと一致していなければならない。
+      # writer 側は既定値を持たないので、ずれれば起動時に落ちる。
+      EVENT_BUS_NAME              = data.aws_cloudwatch_event_bus.default.name
+      CRAWL_COMPLETED_SOURCE      = local.crawl_completed_event.source
+      CRAWL_COMPLETED_DETAIL_TYPE = local.crawl_completed_event.detail_type
     }
   }
 
@@ -132,8 +148,10 @@ resource "aws_lambda_event_source_mapping" "writes" {
   event_source_arn = aws_sqs_queue.writes.arn
   function_name    = aws_lambda_function.writer.arn
 
-  # ファイル全体の書き換えは高コストなので、まとめて 1 回で適用する。
-  # FIFO キューはバッチングウィンドウを受け付けないため batch_size だけで制御する。
+  # まとめて適用できればファイル全体の書き換えがその分減る。ただしポーラーは
+  # バッチが埋まるのを待たないので、これは上限でしかなく、数秒おきに届く
+  # メッセージは 1 件ずつ引き取られる。再ビルドの回数はこの値に依らない
+  # （crawl-complete のイベントが起点）。
   batch_size              = 10
   function_response_types = ["ReportBatchItemFailures"]
 }
