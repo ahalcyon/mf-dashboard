@@ -30,13 +30,23 @@ apps/crawler/tests/e2e/*.db-shm
 apps/crawler/tests/e2e/*.db-wal
 apps/crawler/tests/e2e/screenshots
 
-# Terraform local state
-terraform/.terraform
-terraform/*.tfstate
-terraform/*.tfstate.*
-terraform/*.tfvars
-terraform/*.tfvars.bak.*
-terraform/.env
+# Terraform
+#
+# イメージは terraform の中身を一切使わない。ディレクトリごと外す。
+# 以前は terraform/ 直下を指すパターンだったが、ルートは terraform/aws/ なので
+# どれも一致しておらず、895MB のプロバイダーキャッシュと state・plan が
+# COPY . . でイメージへ入っていた。
+terraform
+
+# state と plan はどこに置かれても外す。plan は zip の中に state を丸ごと含み、
+# state には Basic 認証のパスワードが平文で入る。深さに依存しない形で書く。
+**/.terraform
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+**/*.tfvars.bak.*
+**/*tfplan*
+**/.env
 
 # その他
 docs
