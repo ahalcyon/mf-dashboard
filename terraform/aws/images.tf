@@ -98,6 +98,14 @@ locals {
   image_uris = { for name, url in local.ecr_repositories : name => "${url}:${local.image_tags[name]}" }
 }
 
+# publish-image.mjs は呼ばれれば必ずビルドして push する。省略が起きるのは
+# triggers_replace が同じでこのリソースを作り直さないときだけで、ブランチと
+# main を行き来すればハッシュは毎回変わる。ECR に同じタグが残っていても
+# ビルドは省略されない。
+#
+# つまり ECR の世代数はビルドのキャッシュではない。残しておいて効くのは
+# コンソールからタスク定義や Lambda を古いダイジェストへ手で向け直すときだけで、
+# 各リポジトリのライフサイクルポリシーはそのために 2 世代だけ保つ。
 resource "terraform_data" "image" {
   for_each = local.ecr_repositories
 
