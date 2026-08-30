@@ -1,5 +1,5 @@
 terraform {
-  required_version = "1.15.9"
+  required_version = "1.16.0"
 
   # state には Basic 認証のパスワードなど平文の機密値が入るため、
   # git へは置かず S3 に暗号化して保管する。バージョニングにより

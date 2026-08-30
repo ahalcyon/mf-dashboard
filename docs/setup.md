@@ -18,7 +18,7 @@
 - AWSアカウント
 - ローカルにインストール済みのツール:
   - `git`
-  - `terraform`（1.15.9以上）
+  - `terraform`（1.16.0以上）
   - `aws`（`aws configure`でプロファイル設定済み）
   - Docker互換のCLI（`terraform apply`がコンテナイメージをビルドしてECRへpushする）
 
