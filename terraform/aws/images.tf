@@ -9,8 +9,12 @@ locals {
   project_root = "${path.root}/../.."
 
   # イメージに焼き込まれる範囲。ここに挙げたパス配下が変わるとタグが変わる。
+  #
+  # .dockerignore を全イメージに入れているのは、これが「何が焼き込まれるか」を
+  # 決めるため。挙げ忘れると、除外を直してもタグが動かず古いイメージのままになる。
   image_sources = {
     crawler = [
+      ".dockerignore",
       "docker/crawler",
       "apps/crawler/package.json",
       "apps/crawler/src",
@@ -24,6 +28,7 @@ locals {
       "tsconfig.json",
     ]
     writer = [
+      ".dockerignore",
       "docker/writer",
       "apps/writer",
       "packages/db",
@@ -34,6 +39,7 @@ locals {
       "tsconfig.json",
     ]
     bulk-refresh = [
+      ".dockerignore",
       "docker/bulk-refresh",
       "apps/bulk-refresh",
       "apps/crawler/package.json",
@@ -48,6 +54,7 @@ locals {
       "tsconfig.json",
     ]
     refresh-trigger = [
+      ".dockerignore",
       "docker/refresh-trigger",
       "apps/refresh-trigger",
       "package.json",
@@ -56,6 +63,7 @@ locals {
       "tsconfig.json",
     ]
     "site-builder" = [
+      ".dockerignore",
       "docker/site-builder",
       "scripts/publish-site.mjs",
       "apps/web/package.json",
