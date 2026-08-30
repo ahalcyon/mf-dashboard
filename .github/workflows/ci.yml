@@ -42,7 +42,7 @@ jobs:
           persist-credentials: false
       - uses: hashicorp/setup-terraform@v3.1.2
         with:
-          terraform_version: 1.15.9
+          terraform_version: 1.16.0
           terraform_wrapper: false
       - run: terraform fmt -check -recursive terraform
       # validate は認証情報を必要としないため、backend を初期化せずプロバイダーだけ取得する

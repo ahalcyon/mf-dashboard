@@ -51,7 +51,7 @@ Money Forward の一括更新完了待ちだけで既定 20 分を見込む。La
 
 ## 前提
 
-- Terraform 1.15.9
+- Terraform 1.16.0
 - `aws configure` 済みのプロファイル（既定は `default`）
 - SSM Parameter Store に SecureString で認証情報を作成済み
 
