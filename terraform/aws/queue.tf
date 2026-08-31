@@ -52,7 +52,6 @@ resource "aws_cloudwatch_metric_alarm" "writes_dlq_not_empty" {
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
 
-  # DLQ に落ちた分はそのクロールが失われている。
   alarm_actions = [aws_sns_topic.notifications.arn]
   ok_actions    = [aws_sns_topic.notifications.arn]
 

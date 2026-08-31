@@ -38,7 +38,6 @@ function parameterNameFor(key: SecretKey): string {
 
 /** SSM Parameter Store から SecureString をまとめて取得する。 */
 async function resolveFromParameterStore(keys: SecretKey[]): Promise<void> {
-  // AWS SDK は必要になってから読む
   const { SSMClient, GetParametersCommand } = await import("@aws-sdk/client-ssm");
 
   const nameToKey = new Map(keys.map((key) => [parameterNameFor(key), key]));

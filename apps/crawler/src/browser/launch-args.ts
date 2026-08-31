@@ -23,6 +23,5 @@ export function chromiumLaunchArgs(env: NodeJS.ProcessEnv = process.env): string
       .filter(Boolean);
   }
 
-  // Lambda かどうかは実行環境が必ず入れるこの変数で判る
   return env.AWS_LAMBDA_FUNCTION_NAME ? LAMBDA_CHROMIUM_ARGS : [];
 }

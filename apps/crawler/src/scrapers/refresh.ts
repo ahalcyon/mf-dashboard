@@ -144,7 +144,6 @@ export async function clickRefreshButton(
 
   await startBulkRefresh(page);
 
-  // Navigate to accounts page to check update status
   await navigateToAccountsPage(page);
 
   info("Waiting for all updates to complete on /accounts page...");
@@ -169,7 +168,6 @@ export async function clickRefreshButton(
       return { completed: true, incompleteAccounts: [] };
     }
 
-    // Wait and navigate to accounts page again to get fresh status
     // goto で読み直す。reload はフレームが外れると ERR_ABORTED になる
     await page.waitForTimeout(pollIntervalMs);
     await navigateToAccountsPage(page);

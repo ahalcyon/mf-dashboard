@@ -1,7 +1,7 @@
 # ダッシュボードから当日分のクロールを起動する経路。
 #
-# CloudFront の /api/* ビヘイビアの後ろに Lambda を置く。認証は viewer-request
-# 関数がビヘイビア全体で行う。Function URL は OAC で CloudFront からのみ到達する。
+# CloudFront の /api/* ビヘイビアの後ろに置く。認証は viewer-request 関数が
+# ビヘイビア全体で行う。Function URL は OAC で CloudFront からのみ到達する。
 
 resource "aws_ecr_repository" "refresh_trigger" {
   name                 = "${var.name_prefix}/refresh-trigger"
@@ -46,7 +46,6 @@ data "aws_iam_policy_document" "refresh_trigger" {
     resources = ["${aws_cloudwatch_log_group.refresh_trigger.arn}:*"]
   }
 
-  # 一括更新の開始とクロールの両方を起動する。
   statement {
     sid     = "StartRefreshAndCrawl"
     actions = ["lambda:InvokeFunction"]
@@ -88,8 +87,7 @@ resource "aws_lambda_function" "refresh_trigger" {
 }
 
 resource "aws_lambda_function_url" "refresh_trigger" {
-  function_name = aws_lambda_function.refresh_trigger.function_name
-  # CloudFront が OAC で SigV4 署名する
+  function_name      = aws_lambda_function.refresh_trigger.function_name
   authorization_type = "AWS_IAM"
 }
 

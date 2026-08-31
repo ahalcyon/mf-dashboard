@@ -7,8 +7,7 @@ locals {
 }
 
 # --- SQLite データベース -------------------------------------------------
-# 書き込みはファイル全体の read-modify-write になる。バージョニングで
-# apply ごとの断面が残る。
+# 書き込みはファイル全体の read-modify-write になる。
 
 resource "aws_s3_bucket" "data" {
   bucket = local.data_bucket
@@ -46,7 +45,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "data" {
   bucket     = aws_s3_bucket.data.id
   depends_on = [aws_s3_bucket_versioning.data]
 
-  # 適用済みのペイロードを期限付きで消す。
   rule {
     id     = "expire-applied-payloads"
     status = "Enabled"

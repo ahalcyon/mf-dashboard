@@ -75,7 +75,6 @@ export function AssetBreakdownChartClient({
   };
   const periodData = changesByPeriod[period];
 
-  // Build a map of category changes for quick lookup
   const changeMap = new Map(periodData?.categories.map((c) => [c.name, c]) ?? []);
 
   if (total === 0) return <EmptyState icon={PieChartIcon} title="資産構成" />;

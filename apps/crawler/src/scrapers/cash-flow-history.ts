@@ -231,7 +231,6 @@ async function detectMonth(
 
   const headerTitle = await getOptionalText(page.locator(".fc-header-title h2"), SUMMARY_TIMEOUT);
 
-  // Prefer the CSV period because range headers can start in the previous calendar month.
   const csvLink = await getOptionalAttribute(page.locator("a[href*='/cf/csv']").first(), "href");
   const csvMonth = parseCashFlowMonthCsvHref(csvLink);
   if (csvMonth) {
@@ -380,7 +379,6 @@ export async function extractCashFlowFromPage(
   const year = Number(month.slice(0, 4));
   debug(`  Extracting data for ${month}...`);
 
-  // Get totals from summary table (並列取得)
   const summaryRow = page.locator("#monthly_total_table_kakeibo tbody tr").first();
   const summaryCells = summaryRow.locator("td");
 
@@ -403,7 +401,6 @@ export async function extractCashFlowFromPage(
   const totalExpense = parseJapaneseNumber(expenseText || "0");
   const balance = parseJapaneseNumber(balanceText || "0");
 
-  // Parse detail items
   const detailRows = page.locator("#cf-detail-table tbody > tr");
   const detailCount = await detailRows.count();
   await verifyCashFlowRowsComplete(page, detailCount, [totalIncome, totalExpense, balance]);

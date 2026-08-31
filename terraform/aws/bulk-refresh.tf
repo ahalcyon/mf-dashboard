@@ -43,7 +43,6 @@ data "aws_iam_policy_document" "bulk_refresh" {
     resources = ["${aws_cloudwatch_log_group.bulk_refresh.arn}:*"]
   }
 
-  # 認証情報は実行時に SSM から読む。
   statement {
     sid       = "ReadCredentialsAtRuntime"
     actions   = ["ssm:GetParameters", "ssm:GetParameter"]
@@ -67,7 +66,6 @@ resource "aws_lambda_function" "bulk_refresh" {
   timeout       = var.bulk_refresh_timeout_seconds
   memory_size   = var.bulk_refresh_memory
 
-  # Chromium の作業領域。
   ephemeral_storage {
     size = var.bulk_refresh_ephemeral_storage
   }
@@ -76,8 +74,7 @@ resource "aws_lambda_function" "bulk_refresh" {
     variables = {
       TZ                   = "Asia/Tokyo"
       SSM_PARAMETER_PREFIX = local.ssm_parameter_prefix
-      # ログインセッションの保存先。コンテナが温かい間は次の呼び出しで再利用する。
-      AUTH_STATE_PATH = "/tmp/auth-state.json"
+      AUTH_STATE_PATH      = "/tmp/auth-state.json"
     }
   }
 
@@ -87,7 +84,6 @@ resource "aws_lambda_function" "bulk_refresh" {
   }
 }
 
-# 失敗しても再試行しない。
 resource "aws_lambda_function_event_invoke_config" "bulk_refresh" {
   function_name          = aws_lambda_function.bulk_refresh.function_name
   maximum_retry_attempts = 0
@@ -128,7 +124,6 @@ resource "aws_scheduler_schedule" "bulk_refresh" {
     arn      = aws_lambda_function.bulk_refresh.arn
     role_arn = aws_iam_role.bulk_refresh_scheduler.arn
 
-    # 失敗しても再試行しない。
     retry_policy {
       maximum_retry_attempts = 0
     }

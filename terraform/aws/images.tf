@@ -1,12 +1,9 @@
-# コンテナイメージのビルドと push を apply の一部として行う。
-# タグはソースのハッシュで、内容が変わったときだけビルドが走り、
-# タスク定義と Lambda の参照も同時に切り替わる。
+# イメージのビルドと push を apply の一部として行う。タグはソースのハッシュ。
 
 locals {
   project_root = "${path.root}/../.."
 
-  # イメージに焼き込まれる範囲。ここに挙げたパス配下が変わるとタグが変わる。
-  # .dockerignore は焼き込まれる範囲を決めるため、全イメージに含める。
+  # ここに挙げたパス配下が変わるとタグが変わる。
   image_sources = {
     crawler = [
       ".dockerignore",
@@ -101,12 +98,10 @@ locals {
   image_uris = { for name, url in local.ecr_repositories : name => "${url}:${local.image_tags[name]}" }
 }
 
-# publish-image.mjs は呼ばれれば必ずビルドして push する。ビルドが走らないのは
-# triggers_replace が同じでこのリソースを作り直さないときだけ。
+# publish-image.mjs は呼ばれれば必ずビルドして push する。
 resource "terraform_data" "image" {
   for_each = local.ecr_repositories
 
-  # ハッシュが変わったときだけ作り直す = ビルドが走る
   triggers_replace = local.image_tags[each.key]
 
   provisioner "local-exec" {

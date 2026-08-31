@@ -56,7 +56,6 @@ export async function getAssetHistory(page: Page): Promise<AssetHistory> {
       ...categoryPromises,
     ]);
 
-    // カテゴリオブジェクトを構築
     const categories: Record<string, number> = {};
     for (let j = 0; j < categoryNames.length; j++) {
       categories[categoryNames[j]] = parseJapaneseNumber(categoryTexts[j] || "0");
@@ -71,7 +70,6 @@ export async function getAssetHistory(page: Page): Promise<AssetHistory> {
     }
   }
 
-  // Calculate changes
   for (let i = 0; i < rawPoints.length; i++) {
     const current = rawPoints[i];
     const previous = rawPoints[i + 1];

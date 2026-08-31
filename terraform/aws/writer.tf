@@ -74,7 +74,6 @@ data "aws_iam_policy_document" "writer" {
     resources = ["${aws_s3_bucket.data.arn}/payloads/*"]
   }
 
-  # site-builder はこのイベントで起動する。
   statement {
     sid       = "AnnounceCrawlCompletion"
     actions   = ["events:PutEvents"]
@@ -100,9 +99,8 @@ resource "aws_iam_role_policy" "writer" {
   policy = data.aws_iam_policy_document.writer.json
 }
 
-# SQLite をまるごと書き換える単一ライタ。
-# 書き込みは FIFO キューと単一 MessageGroupId、および予約同時実行数 1 で
-# 直列化される。
+# SQLite をまるごと書き換える単一ライタ。書き込みは FIFO キューと
+# 単一 MessageGroupId、および予約同時実行数 1 で直列化される。
 resource "aws_lambda_function" "writer" {
   function_name = "${var.name_prefix}-writer"
   role          = aws_iam_role.writer.arn
@@ -141,8 +139,7 @@ resource "aws_lambda_event_source_mapping" "writes" {
   event_source_arn = aws_sqs_queue.writes.arn
   function_name    = aws_lambda_function.writer.arn
 
-  # 1 バッチの上限。ポーラーはバッチが埋まるのを待たないため、数秒おきに届く
-  # メッセージは 1 件ずつ引き取られる。
+  # 上限。ポーラーはバッチが埋まるのを待たない。
   batch_size              = 10
   function_response_types = ["ReportBatchItemFailures"]
 }
@@ -159,7 +156,6 @@ resource "aws_cloudwatch_metric_alarm" "writer_errors" {
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
 
-  # writer が失敗すると S3 の SQLite が更新されない。
   alarm_actions = [aws_sns_topic.notifications.arn]
   ok_actions    = [aws_sns_topic.notifications.arn]
 

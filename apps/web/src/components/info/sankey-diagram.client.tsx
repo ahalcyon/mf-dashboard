@@ -28,7 +28,6 @@ export function SankeyDiagramClient({ income, expense, height = 600 }: SankeyDia
     );
   }
 
-  // Build 3-column sankey data
   // Column 1: 収入カテゴリ (individual income sources)
   // Column 2: 収入支出 (central total)
   // Column 3: 支出カテゴリ (individual expense categories) + 収支
@@ -64,7 +63,6 @@ export function SankeyDiagramClient({ income, expense, height = 600 }: SankeyDia
     // Column 2: central (収入支出)
     nodes.push({ id: centralNodeId, color: semanticColors.transfer });
 
-    // Handle balance (positive = savings, negative = deficit)
     if (balance > 0) {
       // Positive balance: central → balance
       nodes.push({ id: balanceNodeId, color: semanticColors.balancePositive });

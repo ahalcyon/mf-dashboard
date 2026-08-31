@@ -205,10 +205,8 @@ export async function runSavePhase(
     institutionCategories,
   };
 
-  // ローカルの複製へ先に適用する。
   const savedCounts = await saveScrapedDataBatch(db, batch);
 
-  // S3 のデータベースへ適用するのは writer。
   await publisher?.publish("scraped-data", encodeScrapedDataPayload(batch));
 
   return savedCounts;

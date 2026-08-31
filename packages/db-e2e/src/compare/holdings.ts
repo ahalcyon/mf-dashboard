@@ -95,14 +95,12 @@ function compareItems(
     matches: boolean;
   }> = [];
 
-  // スクレイピング結果をMapに変換
   const scrapedMap = new Map<string, number>();
   for (const item of scrapedItems) {
     // 同名の銘柄がある場合は合算（複数口座で同じ銘柄を持つ場合）
     scrapedMap.set(item.name, (scrapedMap.get(item.name) || 0) + item.balance);
   }
 
-  // DB結果をMapに変換
   const dbMap = new Map<string, number>();
   for (const item of dbItems) {
     dbMap.set(item.name, (dbMap.get(item.name) || 0) + item.amount);

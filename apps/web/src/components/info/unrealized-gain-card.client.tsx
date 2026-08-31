@@ -37,7 +37,6 @@ function getGainColor(gain: number): string {
   return gain >= 0 ? "var(--color-balance-positive)" : "var(--color-balance-negative)";
 }
 
-// Group small holdings into "その他" and sort by value descending
 function groupSmallHoldings(
   holdings: HoldingData[],
   totalValue: number,
@@ -47,7 +46,6 @@ function groupSmallHoldings(
   let othersValue = 0;
   let othersGain = 0;
 
-  // Sort by amount descending first
   const sorted = [...holdings].sort((a, b) => b.amount - a.amount);
 
   for (const h of sorted) {
@@ -144,7 +142,6 @@ export function UnrealizedGainCardClient({
   const selectOptions = [{ value: ALL_FILTER, label: "金融機関すべて" }, ...filterOptions];
   const rankingLimit = getRankingLimit(gainFilter);
 
-  // Sort by gain for top/bottom lists
   const sortedByGain = [...filteredHoldings].sort((a, b) => b.unrealizedGain - a.unrealizedGain);
   const topGainers = sortedByGain.filter((h) => h.unrealizedGain > 0).slice(0, rankingLimit);
   const topLosers = sortedByGain

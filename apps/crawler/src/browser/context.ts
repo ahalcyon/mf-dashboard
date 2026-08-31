@@ -1,7 +1,6 @@
 import type { Browser, BrowserContext } from "playwright";
 import { getAuthStatePath, hasAuthState } from "../auth/state.js";
 
-// 共通設定を定数化
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const LOCALE = "ja-JP";
@@ -22,7 +21,6 @@ export async function createBrowserContext(
 ): Promise<BrowserContext> {
   const { storageStatePath, useAuthState = false } = options;
 
-  // storageStateの決定
   let storageState: string | undefined;
   if (storageStatePath) {
     storageState = storageStatePath;

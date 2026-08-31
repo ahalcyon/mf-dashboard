@@ -1,13 +1,11 @@
 # クロール結果と、構成の異常をメールで届ける。
 #
-# crawler はタスクの中から総資産・前日比・今月比を送る。
 
 resource "aws_sns_topic" "notifications" {
   name         = "${var.name_prefix}-notifications"
   display_name = "mf-dashboard"
 }
 
-# 宛先は SSM に置く。
 data "aws_ssm_parameter" "notification_email" {
   count = var.notification_email_parameter == "" ? 0 : 1
 
@@ -29,7 +27,6 @@ resource "aws_sns_topic_subscription" "email" {
 }
 
 # --- 障害の通知 -----------------------------------------------------------
-# アラームと EventBridge から同じトピックへ流す。
 
 data "aws_iam_policy_document" "notifications" {
   statement {
@@ -55,7 +52,6 @@ resource "aws_sns_topic_policy" "notifications" {
   policy = data.aws_iam_policy_document.notifications.json
 }
 
-# タスクの終了コードで失敗を拾う。
 #
 resource "aws_cloudwatch_event_rule" "task_failed" {
   name        = "${var.name_prefix}-task-failed"
@@ -85,7 +81,6 @@ resource "aws_cloudwatch_event_target" "task_failed" {
       reason = "$.detail.stoppedReason"
       task   = "$.detail.taskArn"
     }
-    # 本文は一行にまとめる
     input_template = "\"mf-dashboard: an ECS task failed. group=<group> reason=<reason> task=<task>\""
   }
 }

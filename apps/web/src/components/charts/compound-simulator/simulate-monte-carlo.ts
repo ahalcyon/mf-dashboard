@@ -376,7 +376,6 @@ export function simulateMonteCarlo({
       }
     }
 
-    // Compute median yearly withdrawal for rate mode
     let medianYearlyWithdrawal: number | undefined;
     if (isWithdrawing && yearlyWithdrawals) {
       const sortedWithdrawals = new Float64Array(yearlyWithdrawals);
@@ -406,7 +405,6 @@ export function simulateMonteCarlo({
 
   const depletionProbability = yearlyData.at(-1)?.depletionRate ?? 0;
 
-  // Build distribution histogram from final-year sorted values
   // Bin width based on p90 for readable ranges; tail extends with same width
   const NUM_MAIN_BINS = 10;
   const MAX_TAIL_BINS = 5;
@@ -442,7 +440,6 @@ export function simulateMonteCarlo({
     }
   }
 
-  // Compute sensitivity analysis rows
   let sensitivityRows: SensitivityRow[] | undefined;
   const fp = failureCount / NUM_SIMULATIONS;
 

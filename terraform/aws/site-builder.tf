@@ -1,6 +1,6 @@
 # データベースが更新されたら静的サイトを焼き直す。
 #
-# フロントは実行時の DB 接続を持たないため、データを反映するにはビルドし直す。
+# フロントは実行時の DB 接続を持たない。
 
 resource "aws_ecr_repository" "site_builder" {
   name                 = "${var.name_prefix}/site-builder"
@@ -176,7 +176,7 @@ resource "aws_iam_role_policy" "site_builder_trigger" {
   policy = data.aws_iam_policy_document.site_builder_trigger.json
 }
 
-# 再ビルドの起点。writer がクロール 1 回ぶんを適用し終えると発火する。
+# writer がクロール 1 回ぶんを適用し終えると発火する。
 # source と detail-type は writer にも環境変数で渡している。
 locals {
   crawl_completed_event = {

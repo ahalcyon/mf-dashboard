@@ -58,11 +58,24 @@ Money Forward may expose the same cash movement both as a transfer and as a norm
 
 ### Comments and Documentation
 
-- Comments state what the code does. Keep them minimal.
+- Comments state what the code does. Every comment costs context, so write none unless the code alone is unclear.
+- Delete a comment that restates its code, names an obvious step, or repeats a nearby comment.
 - Do not record design rationale anywhere: not in comments, not in documentation, not in the repository.
 - Architecture and design documents describe the current structure. They do not explain why a decision was made.
 - Write only what the code or the system does. Do not describe what it does not do, what was rejected, or what is out of scope.
 - `README.md` covers only behaviour a user acts on.
+
+### Branch Names
+
+Make every branch name unique. Include the issue number, or the date when there is no issue.
+
+```
+chore/112-comment-policy
+fix/98-site-builder-trigger
+chore/20260831-ecr-cleanup
+```
+
+A bare `fix/header` or `chore/cleanup` collides with earlier work and makes the history ambiguous.
 
 ### Personal Information
 

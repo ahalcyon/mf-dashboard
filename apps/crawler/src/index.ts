@@ -4,7 +4,6 @@ import { getCrawlerRunStatePath } from "./crawler-run-state.js";
 import { error } from "./logger.js";
 import { runCrawler } from "./run.js";
 
-// 同時実行は ECS 側で防ぐ。
 async function main() {
   const progress = await createCrawlerProgressReporter(
     process.env.CRAWLER_STATE_PATH ?? getCrawlerRunStatePath(),

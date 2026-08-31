@@ -1,15 +1,13 @@
 terraform {
   required_version = "1.16.0"
 
-  # state は平文の機密値を含む。S3 に暗号化して保管し、バージョニングで
-  # apply ごとの断面が残る。バケットは bootstrap モジュールが作る。
+  # state は平文の機密値を含む。バケットは bootstrap モジュールが作る。
   backend "s3" {
     bucket = "mf-dashboard-tfstate-769813884566"
     key    = "aws/terraform.tfstate"
     region = "ap-northeast-1"
 
-    encrypt = true
-    # S3 だけでロックする。
+    encrypt      = true
     use_lockfile = true
   }
 

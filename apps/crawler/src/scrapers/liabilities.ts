@@ -16,7 +16,6 @@ export async function getLiabilities(page: Page): Promise<Liabilities> {
   const items: LiabilityItem[] = [];
   let totalLiabilities = 0;
 
-  // Find the detail table (table-det class)
   // Structure: 種類 | 名称・説明 | 残高 | 保有金融機関 | 変更 | 削除
   const detailTable = page.locator("table.table-det");
   const detailExists = await detailTable.count();
@@ -51,7 +50,6 @@ export async function getLiabilities(page: Page): Promise<Liabilities> {
             .catch(() => ""),
         ]);
 
-        // Skip header rows
         if (category?.includes("種類") || name?.includes("名称")) {
           continue;
         }

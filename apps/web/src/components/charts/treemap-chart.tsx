@@ -51,7 +51,6 @@ function CustomizedContent({ x, y, width, height, name, color }: CustomContentPr
 
   const showName = width > 60 && height > 35;
 
-  // Round to avoid subpixel rendering
   const rx = Math.round(x ?? 0);
   const ry = Math.round(y ?? 0);
   const rw = Math.round(width);

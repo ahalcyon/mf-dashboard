@@ -10,7 +10,6 @@ interface DailySpendingHeatmapProps {
 export async function DailySpendingHeatmap({ month, groupId }: DailySpendingHeatmapProps) {
   const transactions = await getTransactionsByMonth(month, groupId);
 
-  // Group expense amounts by date (exclude transfers)
   const dailyMap = new Map<string, number>();
   for (const tx of transactions) {
     if (tx.type === "expense" && !tx.isTransfer) {

@@ -36,12 +36,10 @@ export async function CategoryBreakdown({ month, type, groupId }: CategoryBreakd
     }
   }
 
-  // Filter transactions (exclude transfers and mf-grayout)
   const filteredTransactions = transactions.filter(
     (tx) => !tx.isTransfer && !tx.isExcludedFromCalculation,
   );
 
-  // Build sub-category grouping: { "category:type" -> { subCategory -> transactions[] } }
   const subCategoryMap = filteredTransactions.reduce(
     (acc, tx) => {
       const key = `${tx.category}:${tx.type}`;

@@ -18,7 +18,6 @@ resource "aws_cloudfront_origin_access_control" "site" {
 }
 
 # --- 認証情報 -------------------------------------------------------------
-# 資格情報は KeyValueStore に置き、エッジの関数から読む。
 
 resource "random_password" "basic_auth" {
   length  = 32
@@ -111,7 +110,6 @@ resource "aws_cloudfront_distribution" "site" {
     }
   }
 
-  # 認証は default_cache_behavior と同じ viewer-request 関数が担う。
   # Authorization ヘッダーは OAC の SigV4 署名に使う。
   ordered_cache_behavior {
     path_pattern           = "/api/*"

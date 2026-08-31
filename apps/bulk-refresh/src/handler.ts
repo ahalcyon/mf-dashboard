@@ -12,7 +12,6 @@ export interface BulkRefreshResult {
  * 取り込みは後続のクロールが、その時点の状態に対して行う。
  */
 export async function runBulkRefresh(session: BrowserSession): Promise<BulkRefreshResult> {
-  // 値の import はすべて実行時に行う。
   const [{ loginWithAuthState }, { info }, refresh] = await Promise.all([
     import("@mf-dashboard/crawler/auth/login"),
     import("@mf-dashboard/crawler/logger"),
@@ -24,7 +23,6 @@ export async function runBulkRefresh(session: BrowserSession): Promise<BulkRefre
   await refresh.startBulkRefresh(page);
   const startedAt = new Date().toISOString();
 
-  // 動き出した口座数を記録する。
   await refresh.navigateToAccountsPage(page);
   const { remainingCount } = await refresh.getRefreshStatus(page);
   info(`Bulk refresh started; ${remainingCount} account(s) updating`);
@@ -37,7 +35,6 @@ export async function handler(): Promise<BulkRefreshResult> {
   try {
     return await withBrowser(runBulkRefresh);
   } catch (err) {
-    // 失敗しても後続のクロールは動く。取り込まれる値が前回の更新のままになるだけ。
     const { error } = await import("@mf-dashboard/crawler/logger");
     error("Bulk refresh failed:", err);
     throw err;

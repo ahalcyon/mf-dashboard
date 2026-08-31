@@ -37,7 +37,6 @@ function Select({
     }
   };
 
-  // Find the current label for controlled value
   const currentLabel = value ? options.find((o) => o.value === value)?.label : undefined;
 
   return (
