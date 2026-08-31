@@ -339,7 +339,6 @@ describe("calculateCompound", () => {
     });
 
     it("should produce same result as contribution with zero monthly amount", () => {
-      // 据え置き10年 vs 積立0円×10年は等価であるべき
       const idle = calculateCompound({
         initialAmount: 5_000_000,
         monthlyContribution: 0,

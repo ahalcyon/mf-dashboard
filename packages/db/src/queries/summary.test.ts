@@ -736,7 +736,6 @@ describe("getExpenseByFixedVariable", () => {
   });
 
   it("グループ内からグループ外への振替は収入であり、支出の固定費/変動費には含まれない", async () => {
-    // グループ内→グループ外への振替は収入としてカウントされるため、
     // 支出の固定費/変動費分類には含まれない
     const accountId = await createTestAccount("Bank A");
     const externalAccountId = await createExternalAccount("External");
@@ -750,7 +749,6 @@ describe("getExpenseByFixedVariable", () => {
       category: "食費",
     });
 
-    // グループ内からグループ外への振替（収入として扱われるため支出には含まれない）
     await createTransaction({
       accountId,
       date: "2025-04-20",
@@ -761,7 +759,6 @@ describe("getExpenseByFixedVariable", () => {
 
     const result = await getExpenseByFixedVariable("2025-04", undefined, db);
 
-    // 食費30000のみ（振替は収入なので支出には含まれない）
     expect(result.variable.total).toBe(30000);
 
     // 「支出」カテゴリは存在しない（振替は収入扱い）
@@ -1063,7 +1060,6 @@ describe("buildIncludedTransactionCondition", () => {
     const accountId = await createTestAccount("Bank A");
     const externalAccountId = await createExternalAccount("External");
 
-    // 収入（含まれるべき）
     await createTransaction({
       accountId,
       date: "2025-04-15",
@@ -1072,7 +1068,6 @@ describe("buildIncludedTransactionCondition", () => {
       category: "給与",
     });
 
-    // 支出（含まれるべき）
     await createTransaction({
       accountId,
       date: "2025-04-16",
@@ -1081,7 +1076,6 @@ describe("buildIncludedTransactionCondition", () => {
       category: "食費",
     });
 
-    // グループ外への振替（含まれるべき）
     await createTransaction({
       accountId,
       date: "2025-04-17",
@@ -1434,7 +1428,6 @@ describe("getDeduplicatedTransferExpense", () => {
 
     const result = await getDeduplicatedTransferExpense(db, [groupAccountId], "2025-04");
 
-    // 通常TXでカウント済みなので振替は除外される
     expect(result.get("2025-04")).toBeUndefined();
   });
 
@@ -1530,7 +1523,6 @@ describe("getDeduplicatedTransferExpense", () => {
 
     const result = await getDeduplicatedTransferExpense(db, [groupAccountId], "2025-04");
 
-    // グループ外→グループ内の振替ではないのでカウントされない
     expect(result.get("2025-04")).toBeUndefined();
   });
 });

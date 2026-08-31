@@ -3,7 +3,6 @@ import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 
 type AnyMock = (...args: any[]) => any;
 
-// Mock fs module
 vi.mock("node:fs", () => ({
   existsSync: vi.fn<AnyMock>(),
 }));

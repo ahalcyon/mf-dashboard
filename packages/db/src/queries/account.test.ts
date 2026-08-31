@@ -414,7 +414,6 @@ describe("getAccountsWithAssets", () => {
 
   it("nullフィールドにデフォルト値を適用する", async () => {
     await createTestAccount({ mfId: "mf1", name: "Bank A" });
-    // statusを作成しない（nullになる）
 
     const result = await getAccountsWithAssets(undefined, db);
 
@@ -498,7 +497,6 @@ describe("getAccountByMfId", () => {
   });
 
   it("グループ外のアカウントはnullを返す", async () => {
-    // グループに所属しないアカウントを作成
     const now = new Date().toISOString();
     await db
       .insert(schema.accounts)

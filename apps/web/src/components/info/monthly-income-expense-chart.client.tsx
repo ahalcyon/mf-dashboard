@@ -35,7 +35,6 @@ interface MonthlyIncomeExpenseChartProps {
 export function MonthlyIncomeExpenseChartClient({ data, groupId }: MonthlyIncomeExpenseChartProps) {
   const router = useRouter();
 
-  // Create a map of existing data by month
   const dataMap = new Map(data.map((d) => [d.month, d]));
 
   // Generate last 12 months
@@ -47,7 +46,6 @@ export function MonthlyIncomeExpenseChartClient({ data, groupId }: MonthlyIncome
     months.push(month);
   }
 
-  // Build chart data with 12 months, filling missing months with 0
   const chartData = months.map((month) => {
     const d = dataMap.get(month);
     const income = d?.totalIncome ?? 0;
@@ -66,15 +64,12 @@ export function MonthlyIncomeExpenseChartClient({ data, groupId }: MonthlyIncome
     router.push(path as Route);
   };
 
-  // Calculate Y axis domain based on actual income and expense ranges
   const maxIncome = Math.max(...chartData.map((d) => d.収入), 1);
   const maxExpense = Math.max(...chartData.map((d) => Math.abs(d.支出)), 1);
 
-  // Add 10% padding and round to nice value
   const yAxisMax = roundToNice(maxIncome * 1.1);
   const yAxisMin = -roundToNice(maxExpense * 1.1);
 
-  // Format value to 万円 or 億円
   const formatYAxis = (value: number) => {
     if (value === 0) return "0万円";
     const manEn = value / 10000;

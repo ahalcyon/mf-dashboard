@@ -67,7 +67,6 @@ export const SingleGroup: Story = {
   },
 };
 
-/** Money Forward にグループを作っていない状態。切り替える先が無いのでセレクタを出さない。 */
 export const OnlyNoGroupPseudoGroup: Story = {
   args: {
     groups: [{ id: "0", name: "グループ選択なし", isCurrent: true, lastScrapedAt: null }],

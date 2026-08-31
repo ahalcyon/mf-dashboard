@@ -56,7 +56,6 @@ export const Expanded: Story = {
   },
 };
 
-/** 前月より増えた。増減は比較なので balance-negative 側になる。 */
 export const IncreasedFromPrevMonth: Story = {
   args: {
     item: food,

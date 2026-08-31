@@ -18,7 +18,6 @@ export async function getAssetItems(page: Page): Promise<AssetItem[]> {
   // ヘッダーからカテゴリ名を動的取得
   // Structure: 日付(th) | 合計(th) | カテゴリ1(th) | ... | 詳細(th)
   const headers = await page.locator("table.table-bordered thead th").allTextContents();
-  // 最初の「日付」と最後の「詳細」を除外
   const categories = headers.slice(1, -1).map((h) => h.trim());
 
   const rows = page.locator("table.table-bordered tbody tr");

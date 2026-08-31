@@ -588,7 +588,6 @@ describe("getCategoryChangesForPeriod", () => {
   it("最新と前期間が同じ日付の場合はnullを返す", async () => {
     await createAssetHistory({ date: "2025-04-15", totalAssets: 200000 });
 
-    // 同じ日付しかないので比較対象がない
     const result = await getCategoryChangesForPeriod("daily", undefined, db);
 
     expect(result).toBeNull();

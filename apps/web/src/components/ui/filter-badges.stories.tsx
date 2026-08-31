@@ -86,11 +86,9 @@ export const WithPlayTest: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
 
-    // Find and click remove button on first category badge
     const badges = canvas.getAllByRole("button", { name: /を削除/ });
     await userEvent.click(badges[0]);
 
-    // Verify onRemoveCategory was called
     await expect(args.onRemoveCategory).toHaveBeenCalled();
   },
 };
@@ -106,11 +104,9 @@ export const ClearAllTest: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
 
-    // Click clear all button
     const clearButton = canvas.getByText("すべてクリア");
     await userEvent.click(clearButton);
 
-    // Verify onClearAll was called
     await expect(args.onClearAll).toHaveBeenCalled();
   },
 };

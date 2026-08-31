@@ -50,10 +50,8 @@ describe.skipIf(!hasAuthState())("Holdings比較: スクレイピング vs DB", 
 
     const db = getDb();
 
-    // ページからグループを取得（グループセレクタがない場合は空配列）
     const pageGroups = await getPageGroups(page);
 
-    // DBからグループを取得
     const dbGroups = await getDbGroups(db);
 
     if (dbGroups.length === 0) {
@@ -138,7 +136,6 @@ describe.skipIf(!hasAuthState())("Holdings比較: スクレイピング vs DB", 
       throw new Error("比較するデータが取得できませんでした");
     }
 
-    // 総資産の一致を確認（銘柄数や個別銘柄は警告のみ）
     const totalAssetFailures = failures.filter((f) => f.includes("総資産"));
     expect(totalAssetFailures).toEqual([]);
   });

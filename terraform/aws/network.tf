@@ -1,6 +1,5 @@
-# 単一の Fargate タスクが外向き通信するだけなので、NAT Gateway を避けて
-# パブリックサブネット + パブリック IP 直付けで構成する。
-# インバウンドはセキュリティグループで全遮断している。
+# パブリックサブネットにパブリック IP を直付けする。
+# インバウンドはセキュリティグループで全遮断する。
 
 data "aws_availability_zones" "available" {
   state = "available"

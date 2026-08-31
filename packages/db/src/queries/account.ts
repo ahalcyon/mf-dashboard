@@ -184,12 +184,10 @@ export function groupAccountsByCategory(accounts: AccountWithCategory[]) {
     grouped.get(categoryName)!.push(account);
   }
 
-  // Sort accounts within each category by totalAssets (descending)
   for (const categoryAccounts of grouped.values()) {
     categoryAccounts.sort((a, b) => b.totalAssets - a.totalAssets);
   }
 
-  // Convert to array and sort categories by displayOrder
   return Array.from(grouped.entries())
     .map(([categoryName, categoryAccounts]) => ({
       categoryName,

@@ -173,12 +173,10 @@ async function parseBalanceOnlyTable(
   return items;
 }
 
-// Parse deposits from .table-depo
 async function parseDeposits(page: Page): Promise<PortfolioItem[]> {
   return parseBalanceOnlyTable(page, "table.table-depo", resolveDepositTableCategory);
 }
 
-// Parse bonds from .table-bd
 async function parseBonds(page: Page): Promise<PortfolioItem[]> {
   return parseBalanceOnlyTable(page, "table.table-bd", () => BOND_CATEGORY);
 }
@@ -469,7 +467,6 @@ export async function getLinkedAccountDetailSource(
   return { complete: failedPageCount === 0, fingerprints, items, scheduledWithdrawals };
 }
 
-// Parse stocks from .table-eq
 async function parseStocks(page: Page): Promise<PortfolioItem[]> {
   const rows = page.locator("table.table-eq tbody tr");
   const count = await rows.count();
@@ -518,7 +515,6 @@ async function parseStocks(page: Page): Promise<PortfolioItem[]> {
   return items;
 }
 
-// Parse mutual funds from .table-mf
 async function parseFunds(page: Page): Promise<PortfolioItem[]> {
   const rows = page.locator("table.table-mf tbody tr");
   const count = await rows.count();
@@ -564,7 +560,6 @@ async function parseFunds(page: Page): Promise<PortfolioItem[]> {
   return items;
 }
 
-// Get category from section title (h1.heading-normal before the table)
 // Returns the title if it's a valid asset category, otherwise returns "不明"
 export function identifyTableTypeFromTitle(titleText: string): string {
   if (ASSET_CATEGORY_SET.has(titleText)) {
@@ -573,7 +568,6 @@ export function identifyTableTypeFromTitle(titleText: string): string {
   return UNKNOWN_CATEGORY;
 }
 
-// Parse insurance, pension, and points from .table-pns
 export async function parseInsuranceAndPoints(
   page: Page,
   manualHoldingAccountMap: ManualHoldingAccountMap = new Map(),
@@ -660,7 +654,6 @@ export async function getPortfolio(
 ): Promise<Portfolio> {
   debug("Getting portfolio from /bs/portfolio page...");
 
-  // Get official totalAssets from bs/history (more accurate than summing items)
   await page.goto(mfUrls.assetHistory, { waitUntil: "domcontentloaded" });
   // テーブルが表示されるまで待機
   await page.locator("table.table-bordered").waitFor({ state: "visible", timeout: 10000 });
@@ -675,7 +668,6 @@ export async function getPortfolio(
     debug("  Failed to get totalAssets from bs/history");
   }
 
-  // Get individual items from bs/portfolio
   await page.goto(mfUrls.portfolio, { waitUntil: "domcontentloaded" });
   // ポートフォリオコンテンツが表示されるまで待機
   await page.locator("h1.heading-normal").first().waitFor({ state: "visible", timeout: 10000 });

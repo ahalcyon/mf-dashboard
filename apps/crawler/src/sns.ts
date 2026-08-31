@@ -4,8 +4,7 @@ import { getDashboardUrl } from "./dashboard-url.js";
 import { error, info, log } from "./logger.js";
 import type { ScrapedData } from "./types.js";
 
-// SNS の Subject は ASCII の印字可能文字のみ、100 文字以内という制約がある。
-// 日本語を入れると Publish が弾かれるため、件名は ASCII で組み立てる。
+// SNS の Subject は ASCII の印字可能文字のみ、100 文字以内。件名は ASCII で組み立てる。
 const SUBJECT_MAX_LENGTH = 100;
 
 let client: SNSClient | null = null;

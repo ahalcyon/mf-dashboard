@@ -104,7 +104,6 @@ describe.skipIf(!demoDbExists)("demo.db 整合性テスト", () => {
 
       expect(transfers.length).toBeGreaterThan(0);
 
-      // transferTargetがあるものはtransferTargetAccountIdも設定されているべき
       const withTarget = transfers.filter((t) => t.transferTarget !== null);
       for (const t of withTarget) {
         expect(t.transferTargetAccountId).not.toBeNull();
@@ -133,7 +132,6 @@ describe.skipIf(!demoDbExists)("demo.db 整合性テスト", () => {
     });
 
     test("ゆうちょ銀行からの振替が存在する", async () => {
-      // ゆうちょ銀行（貯蓄用）のIDを取得
       const yuchoAccount = await db
         .select()
         .from(schema.accounts)

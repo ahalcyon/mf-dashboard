@@ -118,7 +118,6 @@ export async function getAllGroups(page: Page): Promise<Group[]> {
     const value = (await option.getAttribute("value")) || "";
     const text = (await option.textContent()) || "";
 
-    // 「グループの追加・編集」などの特殊オプションを除外
     if (!isValidGroupOption(value)) {
       debug("Skipping non-group option");
       continue;

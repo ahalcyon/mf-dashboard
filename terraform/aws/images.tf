@@ -1,17 +1,9 @@
-# コンテナイメージのビルドと push を apply の一部にする。
-#
-# 手元でビルドして push してから apply する運用だと、Terraform が
-# 「No changes.」でも中身が古いままになる。実際にそれを踏んだ。
-# タグをソースのハッシュにすることで、内容が変わったときだけビルドが走り、
-# タスク定義と Lambda の参照も同時に切り替わる。
+# イメージのビルドと push を apply の一部として行う。タグはソースのハッシュ。
 
 locals {
   project_root = "${path.root}/../.."
 
-  # イメージに焼き込まれる範囲。ここに挙げたパス配下が変わるとタグが変わる。
-  #
-  # .dockerignore を全イメージに入れているのは、これが「何が焼き込まれるか」を
-  # 決めるため。挙げ忘れると、除外を直してもタグが動かず古いイメージのままになる。
+  # ここに挙げたパス配下が変わるとタグが変わる。
   image_sources = {
     crawler = [
       ".dockerignore",
@@ -106,18 +98,10 @@ locals {
   image_uris = { for name, url in local.ecr_repositories : name => "${url}:${local.image_tags[name]}" }
 }
 
-# publish-image.mjs は呼ばれれば必ずビルドして push する。省略が起きるのは
-# triggers_replace が同じでこのリソースを作り直さないときだけで、ブランチと
-# main を行き来すればハッシュは毎回変わる。ECR に同じタグが残っていても
-# ビルドは省略されない。
-#
-# つまり ECR の世代数はビルドのキャッシュではない。残しておいて効くのは
-# コンソールからタスク定義や Lambda を古いダイジェストへ手で向け直すときだけで、
-# 各リポジトリのライフサイクルポリシーはそのために 2 世代だけ保つ。
+# publish-image.mjs は呼ばれれば必ずビルドして push する。
 resource "terraform_data" "image" {
   for_each = local.ecr_repositories
 
-  # ハッシュが変わったときだけ作り直す = ビルドが走る
   triggers_replace = local.image_tags[each.key]
 
   provisioner "local-exec" {

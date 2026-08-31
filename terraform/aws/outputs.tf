@@ -71,8 +71,8 @@ output "notification_topic_arn" {
 
 output "notification_subscription_status" {
   description = "Whether the email subscription still needs to be confirmed by hand"
-  # 宛先そのものは参照しない。SSM の SecureString 由来で sensitive なので、
-  # 条件に使うだけでも出力全体が sensitive 扱いになり plan が通らなくなる。
+  # 宛先そのものは参照しない。sensitive な値を条件に使うと出力全体が
+  # sensitive 扱いになる。
   value = (
     var.notification_email_parameter == ""
     ? "no subscriber configured"

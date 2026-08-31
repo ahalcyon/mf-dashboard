@@ -27,7 +27,6 @@ export function SecurityScore({
 
   const isRateMode = sensitivityRows.length > 0 && sensitivityRows[0].withdrawalRate != null;
 
-  // Find the best suggestion to reach SAFE_THRESHOLD
   const safeRow =
     score < SAFE_THRESHOLD
       ? isRateMode

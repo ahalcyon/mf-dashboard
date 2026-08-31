@@ -16,7 +16,6 @@ export async function getAssetSummary(page: Page): Promise<AssetSummary> {
     .first()
     .waitFor({ state: "visible", timeout: 10000 });
 
-  // Get total assets - try multiple selectors
   let totalAssets = "取得失敗";
   try {
     // Primary: .heading-radius-box (more reliable, contains just the amount)
@@ -41,7 +40,6 @@ export async function getAssetSummary(page: Page): Promise<AssetSummary> {
     }
   }
 
-  // Get monthly change from .pfm-sheet-table
   // Table rows: 今週 | -0.0% | -14,764円 / 今月 | +2.2% | +2,140,505円 / 今年 | +2.2% | +2,140,505円
   let monthlyChange = "取得失敗";
   let monthlyChangePercent = "";

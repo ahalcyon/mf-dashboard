@@ -15,7 +15,7 @@ import { createS3Client, downloadDatabase, readJsonObject, uploadDatabase } from
 
 /** データベースを変えたら true。crawl-complete は印だけなので false。 */
 async function applyPayload(db: Db, message: SyncMessage, payload: SyncPayload): Promise<boolean> {
-  // 種別がずれていたら、意図しない適用になる前に止める
+  // 種別がずれていたら適用せずに止める
   if (message.kind !== payload.kind) {
     throw new Error(`Payload kind ${payload.kind} does not match message kind ${message.kind}`);
   }
@@ -26,13 +26,7 @@ async function applyPayload(db: Db, message: SyncMessage, payload: SyncPayload):
   return true;
 }
 
-/**
- * クロール 1 回につき 1 回だけ、静的サイトの再ビルドを起こす。
- *
- * 以前は S3 の Object Created を起点にしていたため、書き戻すたびに走っていた。
- * 履歴を月ごとに送るようになってからは 1 回のクロールで 3 本、バックフィルなら
- * 21 本になっていた。
- */
+/** クロール 1 回につき 1 回、静的サイトの再ビルドを起こす。 */
 async function announceCompletedRuns(config: WriterConfig, runIds: string[]): Promise<void> {
   if (runIds.length === 0) return;
 
@@ -54,11 +48,8 @@ async function announceCompletedRuns(config: WriterConfig, runIds: string[]): Pr
 
 /**
  * SQS から届いたクロール結果を、S3 上の SQLite へ適用する。
- *
- * S3 には部分書き込みもロックも無いため、ファイル全体を取得して書き換え、
- * まとめて書き戻す。これが壊れないのは、FIFO キューと単一 MessageGroupId に
- * よって同時に走る書き込みが存在しないためで、どちらかを外すと後勝ちで
- * データが消える。予約同時実行数はその上に重ねる多重防御。
+ * ファイル全体を取得して書き換え、まとめて書き戻す。書き込みは FIFO キューと
+ * 単一 MessageGroupId、および予約同時実行数 1 で直列化される。
  */
 export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
   const config = loadConfig();
@@ -69,8 +60,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
   const messageIds = event.Records.map((record) => record.messageId);
   let firstFailureIndex = -1;
   let appliedCount = 0;
-  // 書き戻しが要るかどうかは、データベースを変えたメッセージの数で決める。
-  // crawl-complete だけのバッチで数 MB を上げ直す意味は無い。
+  // データベースを変えたメッセージの数。0 なら書き戻さない。
   let changedCount = 0;
   const completedRuns: string[] = [];
 
@@ -101,8 +91,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
       }
     }
 
-    // 適用済みの分は書き戻す。saveScrapedDataBatch は upsert と月単位の
-    // 置き換えで構成されているため、再配信で同じ内容が再適用されても問題ない。
+    // 適用済みの分を書き戻す。
     if (changedCount > 0) {
       await uploadDatabase(client, {
         bucket: config.dataBucket,
@@ -111,7 +100,7 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
       });
     }
 
-    // 書き戻してから知らせる。逆にすると site-builder が古いデータベースを読む。
+    // 書き戻してから知らせる。
     await announceCompletedRuns(config, completedRuns);
   } finally {
     closeDb();

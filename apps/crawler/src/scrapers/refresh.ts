@@ -118,13 +118,7 @@ export function getMaxWaitMinutes(env: NodeJS.ProcessEnv = process.env): number 
     : DEFAULT_MAX_WAIT_MINUTES;
 }
 
-/**
- * 金融機関の一括更新を開始するだけで、完了は待たない。
- *
- * 完了待ちはクロールとは別のジョブが担う。更新にかかる時間は
- * Money Forward と金融機関しだいで、我々のコードの都合とは無関係のため、
- * 開始と取り込みを同じ実行に縛ると取り込みまで待たされる。
- */
+/** 金融機関の一括更新を開始する。完了は待たない。 */
 export async function startBulkRefresh(page: Page): Promise<void> {
   debug("Looking for refresh button...");
 
@@ -150,7 +144,6 @@ export async function clickRefreshButton(
 
   await startBulkRefresh(page);
 
-  // Navigate to accounts page to check update status
   await navigateToAccountsPage(page);
 
   info("Waiting for all updates to complete on /accounts page...");
@@ -175,8 +168,7 @@ export async function clickRefreshButton(
       return { completed: true, incompleteAccounts: [] };
     }
 
-    // Wait and navigate to accounts page again to get fresh status
-    // Using goto instead of reload to avoid ERR_ABORTED when frame is detached
+    // goto で読み直す。reload はフレームが外れると ERR_ABORTED になる
     await page.waitForTimeout(pollIntervalMs);
     await navigateToAccountsPage(page);
   }

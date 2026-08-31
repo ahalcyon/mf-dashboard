@@ -8,7 +8,6 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 // Terraform の local-exec から呼ばれ、イメージをビルドして ECR へ push する。
-// タグはソースのハッシュなので、同じ内容なら Terraform 側が再実行しない。
 
 const projectDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 

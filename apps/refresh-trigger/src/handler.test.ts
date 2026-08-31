@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const lambdaSend = vi.fn<(command: unknown) => Promise<unknown>>();
 const lambdaDestroy = vi.fn<() => void>();
 
-// SDK のコマンドは new で組み立てられるので、アロー関数では代用できない
 function command(type: string) {
   return class {
     readonly __type = type;
@@ -42,7 +41,6 @@ beforeEach(() => {
 describe("パスの検証", () => {
   // CloudFront は /api/* をまとめてこの Lambda へ回す。静的エクスポートで
   // route handler が落ちた他の /api/* への POST は、ここで止まらなければ
-  // クロールを起動してしまう。
   test.for(["/api/bank-forecast/dismiss/", "/api/bank-forecast/manual-events/", "/api/"])(
     "%s への POST は 404 で、何も起動しない",
     async (path) => {
@@ -67,7 +65,6 @@ describe("メソッドの検証", () => {
   });
 });
 
-// ボタンのラベルは「金融機関データを更新」。更新の開始と取り込みの両方を
 // 起動して初めて名前どおりになる。
 describe("起動するもの", () => {
   test("一括更新を先に、クロールを後に起動する", async () => {

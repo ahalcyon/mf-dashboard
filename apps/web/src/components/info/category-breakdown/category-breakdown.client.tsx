@@ -34,7 +34,6 @@ export function CategoryBreakdownClient({
   const total = data.reduce((sum, item) => sum + item.amount, 0);
   const hasPrevData = !!(prevAmountByCategory && Object.keys(prevAmountByCategory).length > 0);
 
-  // Calculate total delta
   const totalDelta = hasPrevData
     ? total - Object.values(prevAmountByCategory!).reduce((s, v) => s + v, 0)
     : null;

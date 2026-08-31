@@ -59,7 +59,6 @@ describe("buildPayloadKey", () => {
   });
 
   test("同じ run の連番でキーが衝突しない", () => {
-    // 履歴は月ごとに発行するので 1 回のクロールが何度も publish する。
     // 同じキーに上書きすると、先に送ったメッセージが後の中身を指す。
     const keys = [1, 2, 3].map((sequence) => buildPayloadKey("run-1", "scraped-data", sequence));
 
@@ -178,7 +177,6 @@ describe("SYNC_MESSAGE_GROUP_ID", () => {
     const queueTf = readFileSync(queueTfPath, "utf8");
     const match = queueTf.match(/write_message_group_id\s*=\s*"([^"]+)"/);
 
-    // 定義が見つからないなら、突き合わせが成立していないので落とす
     expect(match?.[1]).toBeTypeOf("string");
     expect(SYNC_MESSAGE_GROUP_ID).toBe(match?.[1]);
   });

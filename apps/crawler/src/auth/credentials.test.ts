@@ -9,7 +9,6 @@ const { mockSend, mockDestroy, mockGetParametersCommand } = vi.hoisted(() => {
   return { mockSend, mockDestroy, mockGetParametersCommand };
 });
 
-// SDK 側は new で生成されるため、モックもコンストラクタとして呼べる必要がある
 vi.mock("@aws-sdk/client-ssm", () => ({
   SSMClient: class {
     send = mockSend;

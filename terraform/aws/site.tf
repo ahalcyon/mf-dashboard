@@ -18,8 +18,6 @@ resource "aws_cloudfront_origin_access_control" "site" {
 }
 
 # --- 認証情報 -------------------------------------------------------------
-# 資格情報は KeyValueStore に置き、エッジの関数から読む。
-# 関数コードに埋め込むと、コードの更新なしに差し替えられなくなる。
 
 resource "random_password" "basic_auth" {
   length  = 32
@@ -54,12 +52,8 @@ resource "aws_cloudfrontkeyvaluestore_key" "session" {
 }
 
 # --- viewer-request -------------------------------------------------------
-# viewer-request は 1 つのビヘイビアに 1 つしか関連付けられないため、
-# 認証とディレクトリインデックスの書き換えを 1 つの関数にまとめる。
-#
-# ブラウザーは Basic 認証のセッションを保持できないので、
-# https://user:pass@host/ をブックマークして踏む運用を想定する。
-# 初回だけ Basic を検証し、以後はクッキーで通す。
+# 認証とディレクトリインデックスの書き換えを 1 つの関数で行う。
+# 初回だけ Basic 認証を検証し、以後はクッキーで通す。
 resource "aws_cloudfront_function" "viewer_request" {
   name    = "${var.name_prefix}-viewer-request"
   runtime = "cloudfront-js-2.0"
@@ -116,8 +110,7 @@ resource "aws_cloudfront_distribution" "site" {
     }
   }
 
-  # 認証は default_cache_behavior と同じ viewer-request 関数が担う。
-  # Authorization ヘッダーは OAC の SigV4 署名に使われるため転送しない。
+  # Authorization ヘッダーは OAC の SigV4 署名に使う。
   ordered_cache_behavior {
     path_pattern           = "/api/*"
     target_origin_id       = "refresh-trigger"

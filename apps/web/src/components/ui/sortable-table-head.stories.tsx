@@ -64,11 +64,9 @@ export const WithPlayTest: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
 
-    // Click sort button
     const button = canvas.getByRole("button", { name: /日付/ });
     await userEvent.click(button);
 
-    // Verify onSort was called with correct column
     await expect(args.onSort).toHaveBeenCalledWith("date");
   },
 };

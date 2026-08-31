@@ -11,14 +11,6 @@ import {
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { SyncConfig } from "./config.js";
 
-/**
- * publisher は run.test.ts の対象外になっている。loadSyncConfig がテスト環境で
- * null を返すため、この経路が一度も実行されない。
- *
- * 壊れても静かなので、ここで直接押さえる。S3 の put と SQS の send を
- * 入れ替えると、writer が payload の無いキーを読みに行って DLQ へ落ちる。
- */
-
 const { s3Send, sqsSend } = vi.hoisted(() => ({
   s3Send: vi.fn<(command: unknown) => Promise<unknown>>(),
   sqsSend: vi.fn<(command: unknown) => Promise<unknown>>(),
@@ -80,7 +72,6 @@ describe("downloadDatabase", () => {
     expect(await readFile(localPath, "utf8")).toBe("sqlite-bytes");
   });
 
-  // false はそのまま history モードを意味する。ここで true を返すと
   // 初回クロールが空の DB を「既存」とみなし、履歴を取り込まない。
   test("S3 に複製が無ければ false を返す", async () => {
     s3Send.mockRejectedValue(new NoSuchKey({ message: "missing", $metadata: {} }));
@@ -177,7 +168,6 @@ describe("publish", () => {
     expect(message.payload).toEqual({ bucket: putCommand.input.Bucket, key: putCommand.input.Key });
   });
 
-  // 履歴は月ごとに発行するので、1 回のクロールが何度も publish を呼ぶ。
   // キーが同じだと最後の中身で上書きされ、先に送ったメッセージが
   // 別の月のペイロードを指す。writer はそれを気付かずに適用する。
   test("同じ run で複数回発行してもキーが衝突しない", async () => {

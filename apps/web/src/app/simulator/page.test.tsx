@@ -34,7 +34,6 @@ describe("SimulatorContent", () => {
     expect(screen.getByText("初期投資額: 1999859")).toBeTruthy();
   });
 
-  // 以前は「投資信託」だけを数えていたため、この構成で 2,000,000 になっていた。
   // 株式・債券・暗号資産・年金が丸ごと落ちるのが #72 の中身。
   it("投資信託以外の運用資産も初期投資額に含める", async () => {
     vi.stubEnv("DEMO_MODE", "false");

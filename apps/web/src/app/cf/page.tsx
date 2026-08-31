@@ -18,7 +18,6 @@ export const metadata: Metadata = {
 export async function CFContent({ groupId }: { groupId?: string }) {
   const monthlySummaries = await getMonthlySummaries({ groupId });
 
-  // Group summaries by year
   const summariesByYear = monthlySummaries.reduce(
     (acc, summary) => {
       const year = summary.month.substring(0, 4);
@@ -31,7 +30,6 @@ export async function CFContent({ groupId }: { groupId?: string }) {
     {} as Record<string, typeof monthlySummaries>,
   );
 
-  // Build href with groupId prefix
   const cfPath = groupId ? `/${groupId}/cf` : "/cf";
 
   const summaryContent = (

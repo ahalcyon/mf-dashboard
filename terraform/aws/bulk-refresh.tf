@@ -1,11 +1,4 @@
-# 金融機関の一括更新を開始するだけのジョブ。
-#
-# クロールと同じ実行に縛られていた頃は、1 口座が更新を終えないだけで
-# 取り込みまで最大 20 分待たされていた（#93）。更新の開始と取り込みを
-# 別のジョブに分け、取り込み側はその時点の状態を読む。
-#
-# Fargate ではなく Lambda に置く。待たないので所要時間は 30 秒ほどで、
-# 15 分の上限に対して十分な余裕がある。
+# 金融機関の一括更新を開始する。更新の完了は待たず、30 秒ほどで終わる。
 
 resource "aws_ecr_repository" "bulk_refresh" {
   name                 = "${var.name_prefix}/bulk-refresh"
@@ -50,8 +43,6 @@ data "aws_iam_policy_document" "bulk_refresh" {
     resources = ["${aws_cloudwatch_log_group.bulk_refresh.arn}:*"]
   }
 
-  # ECS のタスク定義のような secrets の注入が Lambda には無いため、
-  # 認証情報は実行時に自分で読む。crawler のタスクロールと同じ範囲。
   statement {
     sid       = "ReadCredentialsAtRuntime"
     actions   = ["ssm:GetParameters", "ssm:GetParameter"]
@@ -75,7 +66,6 @@ resource "aws_lambda_function" "bulk_refresh" {
   timeout       = var.bulk_refresh_timeout_seconds
   memory_size   = var.bulk_refresh_memory
 
-  # Chromium は書き込み先を必要とする。既定の 512 MB では起動に失敗しうる。
   ephemeral_storage {
     size = var.bulk_refresh_ephemeral_storage
   }
@@ -84,10 +74,7 @@ resource "aws_lambda_function" "bulk_refresh" {
     variables = {
       TZ                   = "Asia/Tokyo"
       SSM_PARAMETER_PREFIX = local.ssm_parameter_prefix
-      # Lambda で書けるのは /tmp だけ。ログイン後の保存先をそこへ向ける。
-      # コンテナが温かいうちは次の呼び出しでセッションを再利用でき、
-      # Money Forward へのログイン回数を抑えられる。
-      AUTH_STATE_PATH = "/tmp/auth-state.json"
+      AUTH_STATE_PATH      = "/tmp/auth-state.json"
     }
   }
 
@@ -97,8 +84,6 @@ resource "aws_lambda_function" "bulk_refresh" {
   }
 }
 
-# 失敗を再試行させない。再試行はログインを増やすだけで、更新が始まらなかった
-# 回を取り戻せない。次の実行が同じことをする。
 resource "aws_lambda_function_event_invoke_config" "bulk_refresh" {
   function_name          = aws_lambda_function.bulk_refresh.function_name
   maximum_retry_attempts = 0
@@ -139,8 +124,6 @@ resource "aws_scheduler_schedule" "bulk_refresh" {
     arn      = aws_lambda_function.bulk_refresh.arn
     role_arn = aws_iam_role.bulk_refresh_scheduler.arn
 
-    # 失敗しても再試行しない。次の実行が同じことをするし、再試行は
-    # ログインを増やすだけで、更新が始まらなかった回を取り戻せない。
     retry_policy {
       maximum_retry_attempts = 0
     }

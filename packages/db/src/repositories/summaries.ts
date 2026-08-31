@@ -38,7 +38,6 @@ async function saveAssetHistoryCategories(
 ): Promise<void> {
   const categoryNames = Object.keys(categories);
 
-  // スクレイピング結果にないカテゴリを削除
   if (categoryNames.length > 0) {
     await db
       .delete(schema.assetHistoryCategories)

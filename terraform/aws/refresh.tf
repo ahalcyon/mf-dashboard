@@ -1,9 +1,7 @@
 # ダッシュボードから当日分のクロールを起動する経路。
 #
-# 静的サイトにはサーバーが無いため、CloudFront に /api/* のビヘイビアを足して
-# Lambda を後ろに置く。認証は既存の viewer-request 関数がビヘイビア全体で
-# 行うため、この Lambda に認証の実装は要らない。
-# Function URL は OAC で CloudFront からのみ到達できるようにする。
+# CloudFront の /api/* ビヘイビアの後ろに置く。認証は viewer-request 関数が
+# ビヘイビア全体で行う。Function URL は OAC で CloudFront からのみ到達する。
 
 resource "aws_ecr_repository" "refresh_trigger" {
   name                 = "${var.name_prefix}/refresh-trigger"
@@ -48,8 +46,6 @@ data "aws_iam_policy_document" "refresh_trigger" {
     resources = ["${aws_cloudwatch_log_group.refresh_trigger.arn}:*"]
   }
 
-  # ボタンの名前は「金融機関データを更新」なので、更新の開始と取り込みの
-  # 両方を起動する。同時実行は crawl 側の予約同時実行数が止める。
   statement {
     sid     = "StartRefreshAndCrawl"
     actions = ["lambda:InvokeFunction"]
@@ -91,13 +87,11 @@ resource "aws_lambda_function" "refresh_trigger" {
 }
 
 resource "aws_lambda_function_url" "refresh_trigger" {
-  function_name = aws_lambda_function.refresh_trigger.function_name
-  # CloudFront が OAC で SigV4 署名するため、素の呼び出しは通らない
+  function_name      = aws_lambda_function.refresh_trigger.function_name
   authorization_type = "AWS_IAM"
 }
 
-# OAC は 2 つの権限を必要とする。InvokeFunctionUrl だけでは
-# 署名付きの要求でも 403 になる。
+# OAC は InvokeFunctionUrl と InvokeFunction の両方を必要とする。
 resource "aws_lambda_permission" "refresh_trigger_url_from_cloudfront" {
   statement_id           = "AllowCloudFrontInvokeFunctionUrl"
   action                 = "lambda:InvokeFunctionUrl"

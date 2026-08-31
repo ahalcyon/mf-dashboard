@@ -1,8 +1,4 @@
-/**
- * クロール起動要求に対する応答の組み立て。
- *
- * HTTP と AWS SDK から切り離してあるのは、判断そのものを試験するため。
- */
+/** クロール起動要求に対する応答の組み立て。 */
 
 export type RefreshOutcome =
   | { kind: "started" }
@@ -44,12 +40,9 @@ const REFRESH_PATH = "/api/refresh";
 /**
  * この Lambda が応じてよいパスかどうか。
  *
- * CloudFront は /api/* をまとめてこのオリジンへ回すため、静的サイトから
- * 落ちた他の /api/* への POST もここへ届く。パスを見ないと、どの POST でも
- * クロールが起動してしまう。
- *
- * basePath 配下で配信する場合に前置きが付くので末尾で判定する。
- * 末尾のスラッシュは trailingSlash: true の設定で必ず付く。
+ * CloudFront は /api/* をまとめてこのオリジンへ回す。basePath 配下で配信する
+ * 場合に前置きが付くため末尾で判定する。末尾のスラッシュは trailingSlash: true
+ * の設定で必ず付く。
  */
 export function isRefreshPath(path: string | undefined): boolean {
   if (!path) return false;

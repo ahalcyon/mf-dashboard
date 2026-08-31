@@ -7,8 +7,7 @@ locals {
 }
 
 # --- SQLite データベース -------------------------------------------------
-# S3 には部分書き込みもロックも無いため、書き込みはファイル全体の
-# read-modify-write になる。バージョニングは事故時の唯一の巻き戻し手段なので必須。
+# 書き込みはファイル全体の read-modify-write になる。
 
 resource "aws_s3_bucket" "data" {
   bucket = local.data_bucket
@@ -46,7 +45,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "data" {
   bucket     = aws_s3_bucket.data.id
   depends_on = [aws_s3_bucket_versioning.data]
 
-  # ペイロードは writer が適用した時点で用済み。失敗調査の猶予だけ残して消す。
   rule {
     id     = "expire-applied-payloads"
     status = "Enabled"

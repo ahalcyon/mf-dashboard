@@ -58,7 +58,6 @@ export const WithPlayTest: Story = {
     const button = canvas.getByRole("button", { name: "カテゴリー" });
     await userEvent.click(button);
 
-    // Wait for popover to open
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Popover content is rendered in a portal outside canvasElement
@@ -66,7 +65,6 @@ export const WithPlayTest: Story = {
     const foodOption = body.getByText("食費");
     await userEvent.click(foodOption);
 
-    // Verify onChange was called
     await expect(args.onChange).toHaveBeenCalled();
   },
 };

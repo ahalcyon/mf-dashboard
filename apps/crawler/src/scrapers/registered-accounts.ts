@@ -15,7 +15,6 @@ export async function getRegisteredAccounts(page: Page): Promise<RegisteredAccou
 
   const accounts: AccountStatus[] = [];
 
-  // Get all #account-table tables (first is manual, second is auto-linked)
   const tables = page.locator("#account-table");
   const tableCount = await tables.count();
 
@@ -24,7 +23,6 @@ export async function getRegisteredAccounts(page: Page): Promise<RegisteredAccou
     const rows = table.locator("tbody tr");
     const rowCount = await rows.count();
 
-    // Skip header row (first row contains headers)
     for (let i = 1; i < rowCount; i++) {
       const row = rows.nth(i);
       const cells = row.locator("td");
@@ -73,11 +71,8 @@ export async function getRegisteredAccounts(page: Page): Promise<RegisteredAccou
             .catch(() => ""));
 
         if (nameCell) {
-          // Parse name - first line before any parentheses or newlines
           let name = nameCell.trim();
-          // Get first line
           const firstLine = name.split(/[\n\r]/)[0].trim();
-          // Skip if it's a header row
           if (firstLine === "登録名" || firstLine === "金融機関") {
             continue;
           }
@@ -99,7 +94,6 @@ export async function getRegisteredAccounts(page: Page): Promise<RegisteredAccou
             errorMessage = statusText.trim();
           }
 
-          // Parse last updated from dateText (format: 登録日\n(最終取得日))
           const lastUpdatedMatch = dateText?.match(/\(([^)]+)\)/);
           const lastUpdated = lastUpdatedMatch ? lastUpdatedMatch[1] : dateText?.trim() || "";
 

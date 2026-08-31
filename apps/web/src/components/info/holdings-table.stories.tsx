@@ -457,7 +457,6 @@ export const LiabilityPC: Story = {
     await expect(canvas.getByText("サンプルカードB")).toBeInTheDocument();
     await expect(canvas.getByText("サンプル銀行A")).toBeInTheDocument();
 
-    // 割合は金額の横に % で出るため、「割合」ラベルは使わない
     await expect(canvas.queryByText("割合")).not.toBeInTheDocument();
   },
 };
@@ -490,7 +489,6 @@ export const LiabilityMobile: Story = {
 // === アコーディオン展開テスト ===
 // 投信/株（含み損益あり）: 展開時に平均取得単価、数量、現在単価、保有金融機関が表示
 // 預金（含み損益なし）: 展開時に割合（モバイルのみ）と保有金融機関が表示
-// 負債: 口座名を行に出しているため展開する中身が無く、開けない
 
 export const AssetExpanded: Story = {
   name: "投信 アコーディオン展開 (PC)",
@@ -559,7 +557,6 @@ export const DepositExpandedPC: Story = {
 
     // 預金: 展開時に保有金融機関が表示される
     await expect(canvas.getByText("保有金融機関")).toBeInTheDocument();
-    // 複数の「サンプル銀行A」があるためgetAllByTextを使用
     await expect(canvas.getAllByText("サンプル銀行A").length).toBeGreaterThan(0);
 
     // 預金: 展開時に「割合」ラベルが存在する（モバイル専用表示だがDOM上には存在）
@@ -609,10 +606,8 @@ export const LiabilityNotExpandable: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    // 口座名が行にあるため、開くボタン自体が無い
     await expect(canvas.queryByRole("button", { name: /ご利用残高/ })).not.toBeInTheDocument();
 
-    // 展開先にあった「保有金融機関」は行へ移したので重複しない
     await expect(canvas.queryByText("保有金融機関")).not.toBeInTheDocument();
     await expect(canvas.getByText("サンプル銀行A")).toBeInTheDocument();
   },

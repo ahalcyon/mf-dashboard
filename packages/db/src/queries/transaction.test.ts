@@ -18,7 +18,6 @@ afterAll(() => {
 
 beforeEach(async () => {
   await resetTestDb(db);
-  // Setup test group
   const now = new Date().toISOString();
   await db
     .insert(schema.groups)

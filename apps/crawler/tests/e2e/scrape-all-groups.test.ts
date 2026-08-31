@@ -51,7 +51,6 @@ describe("scrapeAllGroups", () => {
     test("globalData, groupDataList, defaultGroupを返す", () => {
       expect(result.globalData).toBeDefined();
       // Array.isArray は空配列でも真になる。セレクタが外れて 0 件になる
-      // のがまさに検知したい失敗なので、下限を置く。
       expect(result.groupDataList.length).toBeGreaterThan(0);
     });
 
@@ -97,7 +96,6 @@ describe("scrapeAllGroups", () => {
     });
 
     test("refreshResultがnullまたは有効なオブジェクト", () => {
-      // skipRefresh=trueなのでnullのはず
       expect(result.globalData.refreshResult).toBeNull();
     });
   });
@@ -142,8 +140,6 @@ describe("scrapeAllGroups", () => {
     });
 
     // 個々のカスタムグループは空でも不思議はないが、「グループ選択なし」は
-    // 全体の集計なので空にならない。Array.isArray だけだとセレクタが外れて
-    // 全部 0 件になっても通るため、ここに下限を置く。
     test("「グループ選択なし」の各構造が空でない", () => {
       const noGroupData = result.groupDataList.find((gd) => isNoGroup(gd.group.id));
       expect(noGroupData).toBeDefined();
@@ -169,7 +165,6 @@ describe("scrapeAllGroups", () => {
     });
 
     // defaultGroup === null を許すと、既定グループの検出が壊れたときに
-    // 無条件で通る。上で非 null を確かめているのでここでは素直に比べる。
     test("isCurrent=trueのグループはdefaultGroupと一致する", () => {
       const currentGroup = result.groupDataList.find((gd) => gd.group.isCurrent);
 

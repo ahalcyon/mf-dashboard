@@ -101,19 +101,16 @@ export function useTransactionFiltering({
     [transactions, selectedYear],
   );
 
-  // Get unique categories with count, sorted by count descending
   const { keys: categories, countMap: categoryCount } = useMemo(
     () => getSortedCountMap(transactionsInSelectedYear, (t) => t.category ?? "振替"),
     [transactionsInSelectedYear],
   );
 
-  // Get unique accounts with count, sorted by count descending
   const { keys: accounts, countMap: accountCount } = useMemo(
     () => getSortedCountMap(transactionsInSelectedYear, (t) => t.accountName ?? "不明"),
     [transactionsInSelectedYear],
   );
 
-  // Filter and sort transactions using pure functions
   const filteredAndSortedTransactions = useMemo(() => {
     const filtered = filterTransactions(transactionsInSelectedYear, {
       searchText,

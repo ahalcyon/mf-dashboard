@@ -88,7 +88,6 @@ export async function scrapeInstitutionCategories(page: Page): Promise<Map<strin
     debug(`    - ${category}: ${count}`);
   }
 
-  // Convert to Map
   const categoryMap = new Map<string, string>();
   for (const item of categoryData) {
     categoryMap.set(item.mfId, item.category);

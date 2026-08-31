@@ -79,10 +79,7 @@ export type CategoryName = IncomeCategoryName | ExpenseCategoryName | AssetCateg
 
 /**
  * 市場で運用され、複利で増減する資産カテゴリ。
- *
- * 年金は Money Forward では確定拠出年金（iDeCo・企業型 DC）の残高で、
- * 中身は投資信託なので含める。60 歳まで引き出せない点はシミュレーターの
- * 取り崩し設定で調整する前提。
+ * 年金は確定拠出年金（iDeCo・企業型 DC）の残高で、中身は投資信託として扱う。
  */
 export const INVESTMENT_ASSET_CATEGORIES = [
   "暗号資産",

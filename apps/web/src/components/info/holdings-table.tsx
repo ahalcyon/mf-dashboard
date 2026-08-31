@@ -60,7 +60,6 @@ export async function HoldingsTable({
       ? ((await getLatestTotalAssets(groupId)) ?? holdingsTotal)
       : holdingsTotal;
 
-  // Group holdings by category
   const grouped = holdings.reduce<Record<string, CategoryGroup["items"]>>((acc, holding) => {
     const category =
       holding.type === "liability"

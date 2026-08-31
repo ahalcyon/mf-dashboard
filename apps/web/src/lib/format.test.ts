@@ -97,7 +97,6 @@ describe("formatDateShort", () => {
 describe("formatDateTime", () => {
   it("日付と時刻をフォーマットする", () => {
     // UTCで01:30 → JSTで10:30
-    // 部分一致だと月日を入れ替えても分を落としても通ってしまうため、
     // 表示文字列をそのまま比較する。
     expect(formatDateTime("2025-04-30T01:30:00Z")).toBe("4/30 10:30");
   });

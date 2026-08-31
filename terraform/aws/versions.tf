@@ -1,18 +1,13 @@
 terraform {
   required_version = "1.16.0"
 
-  # state には Basic 認証のパスワードなど平文の機密値が入るため、
-  # git へは置かず S3 に暗号化して保管する。バージョニングにより
-  # apply ごとの断面が残る。バケットは bootstrap モジュールが作る。
-  #
-  # backend の設定は変数を受け付けないため、値はここに直接書く。
+  # state は平文の機密値を含む。バケットは bootstrap モジュールが作る。
   backend "s3" {
     bucket = "mf-dashboard-tfstate-769813884566"
     key    = "aws/terraform.tfstate"
     region = "ap-northeast-1"
 
-    encrypt = true
-    # Terraform 1.10 以降は S3 だけでロックできる。DynamoDB は不要。
+    encrypt      = true
     use_lockfile = true
   }
 
@@ -44,7 +39,7 @@ provider "aws" {
   }
 }
 
-# CloudFront が参照する ACM 証明書は us-east-1 にしか置けない。
+# CloudFront が参照する ACM 証明書は us-east-1 に置く。
 provider "aws" {
   alias   = "us_east_1"
   region  = "us-east-1"

@@ -38,11 +38,7 @@ async function disposeGroupScope(
   }
 }
 
-/**
- * 印の送信が失敗しても、クロール自体の結果を塗り潰さない。
- * この呼び出しは finally の中にあり、投げると本来の失敗が消える。
- * 落ちた場合の実害は「今回の分がサイトに出ず、次のクロールまで待つ」に留まる。
- */
+/** 印の送信が失敗しても投げず、警告に留める。 */
 async function publishCrawlCompleteQuietly(publisher: SyncPublisher | null): Promise<void> {
   try {
     await publisher?.publishCrawlComplete();
@@ -52,8 +48,7 @@ async function publishCrawlCompleteQuietly(publisher: SyncPublisher | null): Pro
 }
 
 export async function runCrawler(progress: CrawlerProgressReporter): Promise<void> {
-  // AWS 上では authoritative なデータベースは S3 にある。crawler は作業用の
-  // 複製を落として読み書きし、書き込みは payload として発行するだけに留める。
+  // S3 のデータベースの複製を落として読み書きし、書き込みは payload として発行する。
   // スクレイプモードはデータベースの有無から決まるため、設定を読む前に取得する。
   const syncConfig = loadSyncConfig();
   const publisher = syncConfig ? new SyncPublisher(syncConfig, buildRunId()) : null;
@@ -94,9 +89,7 @@ export async function runCrawler(progress: CrawlerProgressReporter): Promise<voi
         CRAWLER_STEPS.institutionCategories,
         () => runInstitutionCategoryPhase(activeRuntime.page),
       );
-      // 残高や口座を先に保存する。取引は口座名から account_id を引くため、
-      // 履歴を月ごとに書くにはその前に口座が入っていなければならない。
-      // 履歴の取得中に打ち切られても、ここまでは残る。
+      // 取引は口座名から account_id を引くため、残高と口座を先に保存する。
       await runCrawlerStep(progress, CRAWLER_STEPS.databaseSave, async () => {
         await runSavePhase(
           activeRuntime.db,
@@ -149,11 +142,10 @@ export async function runCrawler(progress: CrawlerProgressReporter): Promise<voi
         await runtime.browser.close();
       }
     } finally {
-      // 適用済みの内容を 1 回だけサイトへ出す。書き戻しごとではなく
-      // クロール 1 回につき 1 回の再ビルドにするための印。
+      // クロール 1 回につき 1 回、静的サイトの再ビルドを起こす印。
       await publishCrawlCompleteQuietly(publisher);
       publisher?.destroy();
-      // AWS SDK のクライアントはソケットを掴んだままなので、閉じてから抜ける
+      // AWS SDK のクライアントを閉じる
       destroySnsClient();
       closeDb();
     }

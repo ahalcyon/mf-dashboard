@@ -39,7 +39,6 @@ describe("scrapeCashFlowHistory", () => {
 
       expect(results.length).toBe(2);
 
-      // 異なる月であることを確認
       const months = results.map((r) => r.month);
       const uniqueMonths = new Set(months);
       expect(uniqueMonths.size).toBe(results.length);

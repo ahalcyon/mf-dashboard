@@ -57,9 +57,8 @@ data "aws_iam_policy_document" "writer" {
   }
 
   statement {
-    sid     = "ConsumeDatabaseWrites"
-    actions = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
-    # 予約同時実行数 1 と併せて、書き込みを直列化する経路はこの一本だけに保つ。
+    sid       = "ConsumeDatabaseWrites"
+    actions   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
     resources = [aws_sqs_queue.writes.arn]
   }
 
@@ -75,7 +74,6 @@ data "aws_iam_policy_document" "writer" {
     resources = ["${aws_s3_bucket.data.arn}/payloads/*"]
   }
 
-  # 適用し終えたことを知らせる先。site-builder はこのイベントで起動する。
   statement {
     sid       = "AnnounceCrawlCompletion"
     actions   = ["events:PutEvents"]
@@ -101,14 +99,8 @@ resource "aws_iam_role_policy" "writer" {
   policy = data.aws_iam_policy_document.writer.json
 }
 
-# SQLite をまるごと書き換える単一ライタ。
-#
-# 書き込みが直列化されるのは、FIFO キューと単一 MessageGroupId により
-# SQS が同じグループを一度に 1 バッチしか配信しないため。これが一次保証で、
-# 送信側が MessageGroupId を分けた時点で read-modify-write が競合し、
-# 後勝ちでデータが消える。
-# reserved_concurrent_executions はその二重化だが、アカウントの
-# 同時実行クォータが 10 以下だと設定できない（変数の説明を参照）。
+# SQLite をまるごと書き換える単一ライタ。書き込みは FIFO キューと
+# 単一 MessageGroupId、および予約同時実行数 1 で直列化される。
 resource "aws_lambda_function" "writer" {
   function_name = "${var.name_prefix}-writer"
   role          = aws_iam_role.writer.arn
@@ -128,8 +120,7 @@ resource "aws_lambda_function" "writer" {
       TZ                  = "Asia/Tokyo"
       DATA_BUCKET         = aws_s3_bucket.data.id
       DATABASE_OBJECT_KEY = var.database_object_key
-      # site-builder を起動するルールと一致していなければならない。
-      # writer 側は既定値を持たないので、ずれれば起動時に落ちる。
+      # site-builder を起動するルールと一致させる。既定値は持たない。
       EVENT_BUS_NAME              = data.aws_cloudwatch_event_bus.default.name
       CRAWL_COMPLETED_SOURCE      = local.crawl_completed_event.source
       CRAWL_COMPLETED_DETAIL_TYPE = local.crawl_completed_event.detail_type
@@ -148,10 +139,7 @@ resource "aws_lambda_event_source_mapping" "writes" {
   event_source_arn = aws_sqs_queue.writes.arn
   function_name    = aws_lambda_function.writer.arn
 
-  # まとめて適用できればファイル全体の書き換えがその分減る。ただしポーラーは
-  # バッチが埋まるのを待たないので、これは上限でしかなく、数秒おきに届く
-  # メッセージは 1 件ずつ引き取られる。再ビルドの回数はこの値に依らない
-  # （crawl-complete のイベントが起点）。
+  # 上限。ポーラーはバッチが埋まるのを待たない。
   batch_size              = 10
   function_response_types = ["ReportBatchItemFailures"]
 }
@@ -168,8 +156,6 @@ resource "aws_cloudwatch_metric_alarm" "writer_errors" {
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
 
-  # writer が失敗すると S3 の SQLite が更新されない。画面は正常に見えるので
-  # 通知が無いと気づけない。
   alarm_actions = [aws_sns_topic.notifications.arn]
   ok_actions    = [aws_sns_topic.notifications.arn]
 

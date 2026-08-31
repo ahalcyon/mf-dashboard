@@ -106,7 +106,6 @@ describe("filterDataByPeriod", () => {
   it("keeps only last day of each month for non-1m periods", () => {
     const result = filterDataByPeriod(testData, "6m", now);
 
-    // Check that each month appears only once
     const months = result.map((d) => d.date.slice(0, 7));
     const uniqueMonths = new Set(months);
     expect(months.length).toBe(uniqueMonths.size);

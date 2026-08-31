@@ -13,7 +13,6 @@ export async function TransactionStats({ year, groupId }: TransactionStatsProps)
   const allTransactions = await getTransactions({ groupId });
   const transactions = allTransactions.filter((t) => t.date.substring(0, 4) === year);
 
-  // Filter out excluded transactions and transfers (for expense)
   const validTransactions = transactions.filter(
     (t) => !t.isExcludedFromCalculation && !t.isTransfer,
   );

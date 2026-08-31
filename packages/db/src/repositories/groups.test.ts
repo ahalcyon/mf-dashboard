@@ -125,7 +125,6 @@ describe("getCurrentGroupId", () => {
   });
 
   test("現在のグループがない場合はnullを返す", async () => {
-    // グループを作成してからisCurrent=falseに更新
     await upsertGroup(db, { id: "g1", name: "テストグループ", isCurrent: true });
     await db.update(schema.groups).set({ isCurrent: false }).run();
 

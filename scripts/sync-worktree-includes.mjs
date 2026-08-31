@@ -1,11 +1,6 @@
 #!/usr/bin/env node
 // `.worktreeinclude` に書いたローカル設定を、リンク済み worktree へ引き写す。
-//
-// git は `.worktreeinclude` を知らないので、`git worktree add` では何もコピー
-// されない。post-checkout フックからこれを呼んで穴を埋める。
-//
-// 既にあるファイルは触らない。フックは通常のブランチ切り替えでも走るため、
-// 上書きすると手元の変更を壊す。
+// post-checkout フックから呼ばれる。既にあるファイルは触らない。
 
 import { execFileSync } from "node:child_process";
 import { copyFileSync, existsSync, globSync, mkdirSync, readFileSync, statSync } from "node:fs";
@@ -13,8 +8,7 @@ import path from "node:path";
 
 const INCLUDE_FILE = ".worktreeinclude";
 
-// フックから走るので、git の外や壊れた状態でも黙って終わる。
-// 失敗を伝えるためにチェックアウトを騒がしくする価値はない。
+// git の外や壊れた状態では黙って終わる。
 function git(args, cwd) {
   return execFileSync("git", args, {
     cwd,

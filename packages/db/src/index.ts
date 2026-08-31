@@ -37,7 +37,6 @@ export type DbExecutor = Db | DbTransaction;
 export async function initDb() {
   const db = getDb();
 
-  // Apply migrations
   await migrate(db, { migrationsFolder: join(import.meta.dirname, "../drizzle") });
 
   return db;

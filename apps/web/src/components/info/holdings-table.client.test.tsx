@@ -249,7 +249,6 @@ describe("HoldingsTableTotal", () => {
 });
 
 describe("負債の金額色", () => {
-  // AmountDisplay は fixedWidth のとき金額を内側の span へ入れるため、色は親に付く。
   // どちらの形でも拾えるように、自身と親のクラスを合わせて見る。
   function amountClasses(text: string) {
     const node = screen.getByText(text);

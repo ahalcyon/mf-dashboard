@@ -22,10 +22,7 @@ const PARAMETER_SUFFIXES: Record<SecretKey, string> = {
 
 const DEFAULT_PARAMETER_PREFIX = "/mf-dashboard";
 
-/**
- * 生成したコードがフォーム送信中に失効するのを避けるための下限。
- * これを下回る場合は次の窓が始まるまで待ってから生成し直す。
- */
+/** 残り時間の下限。下回る場合は次の窓が始まるまで待ってから生成し直す。 */
 const MIN_REMAINING_SECONDS = 3;
 
 let cache: Partial<Record<SecretKey, string>> = {};
@@ -39,14 +36,8 @@ function parameterNameFor(key: SecretKey): string {
   return `${getParameterPrefix()}/${PARAMETER_SUFFIXES[key]}`;
 }
 
-/**
- * SSM Parameter Store から SecureString をまとめて取得する。
- *
- * ECS では タスク定義の secrets が同じ値を環境変数として注入するため、
- * この経路を通るのはローカル実行時だけになる。
- */
+/** SSM Parameter Store から SecureString をまとめて取得する。 */
 async function resolveFromParameterStore(keys: SecretKey[]): Promise<void> {
-  // 環境変数だけで完結する場合に AWS SDK を読み込まないよう、遅延 import する
   const { SSMClient, GetParametersCommand } = await import("@aws-sdk/client-ssm");
 
   const nameToKey = new Map(keys.map((key) => [parameterNameFor(key), key]));
@@ -80,12 +71,7 @@ async function resolveFromParameterStore(keys: SecretKey[]): Promise<void> {
   }
 }
 
-/**
- * 環境変数を優先し、足りない分だけ SSM から解決する。
- *
- * ローカルは .env、CI は環境変数、AWS はタスク定義経由の注入と、
- * 実行場所ごとに呼び出し側を変えずに済ませるための順序。
- */
+/** 環境変数を優先し、足りない分だけ SSM から解決する。 */
 async function resolveSecrets(keys: SecretKey[]): Promise<Record<SecretKey, string>> {
   for (const key of keys) {
     const fromEnv = process.env[ENV_KEYS[key]]?.trim();

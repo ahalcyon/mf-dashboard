@@ -174,8 +174,7 @@ function RefreshControl({ iconSize }: { iconSize: string }) {
  *   TypeError: Failed to execute 'fetch' on 'Window':
  *   Request cannot be constructed from a URL that includes credentials
  *
- * 例外なのでネットワークには 1 件も出ず、要求が消えたようにしか見えない（#80）。
- * location.origin は scheme + host + port だけなので資格情報を持たない。
+ * location.origin は scheme + host + port だけで、資格情報を持たない。
  */
 function refreshEndpoint(): string {
   const path = withBasePath("/api/refresh/");

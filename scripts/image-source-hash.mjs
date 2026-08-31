@@ -6,11 +6,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // Terraform の external データソースとして呼ばれ、指定パス配下のソースから
-// 決定的なハッシュを返す。イメージのタグに使い、中身が変わったときだけ
-// ビルドと push が走るようにする。
+// 決定的なハッシュを返す。イメージのタグに使う。
 //
-// 列挙に git を使うのは node_modules や .next、data/ を確実に除外するため。
-// --others --exclude-standard を付けるので、まだ add していない新規ファイルも含む。
+// ファイルの列挙は git が行い、--others --exclude-standard により
+// まだ add していない新規ファイルも含む。
 
 const projectDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -43,7 +42,7 @@ const files = execFileSync(
 
 if (files.length === 0) fail(`image-source-hash: no files matched ${paths.join(", ")}`);
 
-// パスも混ぜる。ファイルの移動や削除でもハッシュが変わるようにするため。
+// パスも混ぜる。ファイルの移動や削除でもハッシュが変わる。
 const digest = createHash("sha256");
 for (const file of files) {
   digest.update(file);

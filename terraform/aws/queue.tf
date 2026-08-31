@@ -1,9 +1,6 @@
-# S3 上の SQLite はファイル全体を書き換えるしかないため、書き込みは
-# 厳密に直列化する必要がある。それを担保しているのは FIFO キューと
-# 単一 MessageGroupId の 2 点で、writer の予約同時実行数はその上に重ねる
-# 多重防御（既定は無効。#10 を参照）。
-# 送信側は必ず MessageGroupId = local.write_message_group_id を使うこと。
-# この値は packages/db の SYNC_MESSAGE_GROUP_ID と一致していなければならず、
+# S3 上の SQLite への書き込みを直列化する FIFO キュー。
+# 送信側は必ず MessageGroupId = local.write_message_group_id を使う。
+# この値は packages/db の SYNC_MESSAGE_GROUP_ID と一致させる。
 # message.test.ts がこのファイルを読んで突き合わせている。
 
 locals {
@@ -25,7 +22,7 @@ resource "aws_sqs_queue" "writes" {
   message_retention_seconds   = 345600 # 4 days
   sqs_managed_sse_enabled     = true
 
-  # Lambda の実行時間を下回ると、処理中のメッセージが再配信され二重書き込みになる。
+  # Lambda の実行時間を上回る値にする。
   visibility_timeout_seconds = var.writer_timeout_seconds * 6
 
   redrive_policy = jsonencode({
@@ -55,8 +52,6 @@ resource "aws_cloudwatch_metric_alarm" "writes_dlq_not_empty" {
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
 
-  # 宛先が無いと発報しても誰にも届かない。DLQ に落ちた分はそのクロールが
-  # 失われているので、気づけないと古い数字を見続けることになる。
   alarm_actions = [aws_sns_topic.notifications.arn]
   ok_actions    = [aws_sns_topic.notifications.arn]
 

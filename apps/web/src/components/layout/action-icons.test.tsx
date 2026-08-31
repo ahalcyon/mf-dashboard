@@ -48,7 +48,6 @@ describe("ActionIcons の更新ボタン", () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(`${window.location.origin}/api/refresh/`, {
         method: "POST",
-        // Lambda は署名されていない本文を受け付けないため、空でもハッシュを送る
         headers: {
           "x-amz-content-sha256":
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -79,7 +78,6 @@ describe("ActionIcons の更新ボタン", () => {
 
   // #80 の中身。ブックマークが https://user:pass@host/ 形式だとドキュメントの
   // URL に資格情報が残り、相対パスを解決した結果も資格情報付きになる。fetch は
-  // その URL から Request を作れず同期的に投げるため、ネットワークには 1 件も
   // 出ないまま失敗する。資格情報を持たない location.origin から組み立てる。
   it("資格情報を含まない絶対 URL へ要求する", async () => {
     respondWith(202);
@@ -117,7 +115,6 @@ describe("ActionIcons の更新ボタン", () => {
   });
 
   // #80。エッジの認証で弾かれると 401 が返る。fetch は Basic 認証の資格情報を
-  // 送らないので、押し直しても待っても復帰しない。再読み込みへ誘導する。
   it.for([401, 403])("%d なら認証切れとして扱い、待つよう案内しない", async (status) => {
     respondWith(status);
     render(<ActionIcons variant="header" />);

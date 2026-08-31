@@ -5,11 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // S3 上のデータベースを取得し、その中身を焼き込んだ静的サイトを発行する。
-// フロントは実行時の DB 接続を持たないため、データを変えるにはこの手順が要る。
-//
 // 接続先は環境変数を優先し、無ければ terraform output から読む。
-// AWS 上の site-builder タスクはタスク定義から環境変数で受け取り、
-// 手元から叩く場合は terraform output で解決される。
 
 const projectDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 const terraformDir = join(projectDir, "terraform", "aws");
@@ -51,7 +47,7 @@ console.log("Building the static site");
 run("pnpm", ["--filter", "@mf-dashboard/web", "build"], {
   env: {
     ...process.env,
-    // apps/web を作業ディレクトリとして next build が走るため、そこからの相対パス
+    // next build は apps/web を作業ディレクトリとして走る
     DB_PATH: "../../data/moneyforward.db",
     // next.config.ts はこのフラグで output: "export" に切り替わる。
     // DEMO_MODE は付けない。ここでビルドするのは本番データであり、デモではない。
