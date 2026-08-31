@@ -1,10 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { AccountNotificationsClient } from "./account-notifications.client";
 
-/**
- * データ取得側の `account-notifications.tsx` は Server Component なので、
- * 表示を受け持つクライアント側を story にする。
- */
 const meta = {
   title: "Info/AccountNotifications",
   component: AccountNotificationsClient,
@@ -49,7 +45,6 @@ export const Updating: Story = {
   },
 };
 
-/** 残高が足りなくなる見込みの口座。金額は負なので balance-negative。 */
 export const BalanceAlerts: Story = {
   args: {
     errorAccounts: [],

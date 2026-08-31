@@ -20,7 +20,6 @@ export const Expense: Story = {
   },
   beforeEach() {
     mocked(getMonthlyCategoryTotals).mockImplementation(async (month: string) => {
-      // 先月データなし（空配列を返す）
       if (month !== "2025-04") return [];
       return [
         {
@@ -229,7 +228,6 @@ export const Income: Story = {
   },
   beforeEach() {
     mocked(getMonthlyCategoryTotals).mockImplementation(async (month: string) => {
-      // 先月データなし（空配列を返す）
       if (month !== "2025-04") return [];
       return [
         {

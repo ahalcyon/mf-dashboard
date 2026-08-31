@@ -54,7 +54,6 @@ describe("getOrCreateInstitutionCategory", () => {
 
 describe("getAllInstitutionCategories", () => {
   test("すべてのカテゴリーを取得する", async () => {
-    // カテゴリーを作成
     await getOrCreateInstitutionCategory(db, "銀行");
     await getOrCreateInstitutionCategory(db, "証券");
     await getOrCreateInstitutionCategory(db, "カード");

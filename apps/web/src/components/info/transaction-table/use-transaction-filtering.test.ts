@@ -227,7 +227,6 @@ describe("useTransactionFiltering", () => {
     it("transferはKPIから除外される", () => {
       const { result } = renderHook(() => useTransactionFiltering(defaultOptions));
 
-      // count: income 1件 + expense 3件 = 4件（transferは除外）
       expect(result.current.kpi.count).toBe(4);
     });
 

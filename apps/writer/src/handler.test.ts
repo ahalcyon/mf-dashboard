@@ -16,7 +16,6 @@ const { putEvents } = vi.hoisted(() => ({
 }));
 
 // s3.ts ごと差し替えず SDK を差し替える。NoSuchKey の扱いや
-// ストリームの受け渡しも writer 自身のコードで通したいため。
 vi.mock("@aws-sdk/client-s3", () => ({
   S3Client: class {
     private readonly delegate = createFakeS3Client(store);
@@ -166,7 +165,6 @@ afterEach(() => {
 });
 
 describe("初回クロール", () => {
-  // データベースがまだ無い状態。NoSuchKey を例外にしてしまうと
   // 一度もクロールできない。
   test("S3 に DB が無くてもマイグレーションから作って書き戻す", async () => {
     const response = await handler(asEvent([goodRecord("m1", "g1", "Group A")]));
@@ -268,11 +266,6 @@ describe("既存のデータベースを引き継ぐ", () => {
   });
 });
 
-/**
- * 静的サイトの再ビルドは、このイベント 1 本だけを起点にする。
- * 以前は S3 の Object Created だったため、履歴を月ごとに送るクロール 1 回で
- * site-builder が 3 本、バックフィルなら 21 本走っていた。
- */
 describe("再ビルドの合図", () => {
   test("印が届いたら 1 回だけ知らせる", async () => {
     await handler(

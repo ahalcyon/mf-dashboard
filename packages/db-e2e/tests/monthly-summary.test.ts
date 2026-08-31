@@ -48,7 +48,6 @@ describe("Monthly Summary比較: スクレイピング vs DB", () => {
 
     const db = getDb();
 
-    // DBからグループを取得
     const dbGroups = await getDbGroups(db);
     if (dbGroups.length === 0) {
       throw new Error("DBにグループが存在しません");
@@ -63,11 +62,9 @@ describe("Monthly Summary比較: スクレイピング vs DB", () => {
       // グループを切り替え
       await switchGroup(page, group.id);
 
-      // スクレイピングで月次サマリーを取得
       const scrapedSummaries = await scrapeMonthlySummary(page);
 
       for (const scraped of scrapedSummaries) {
-        // DBから同じ月のサマリーを取得
         const dbSummary = await getMonthlySummaryByMonth(scraped.month, group.id, db);
         totalChecks += 2;
 

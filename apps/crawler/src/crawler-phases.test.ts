@@ -40,7 +40,6 @@ vi.mock("@mf-dashboard/db/repository/save-scraped-data", () => ({
 }));
 
 // assertNonOverlappingTransactionRanges は純粋関数で、月ごとの保存が
-// 期間の重なりを見逃さないことを確かめたいので本物を使う。
 vi.mock("@mf-dashboard/db/repository/transactions", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@mf-dashboard/db/repository/transactions")>()),
   hasCashFlowPeriod: vi.fn<() => Promise<boolean>>(),
@@ -213,7 +212,6 @@ describe("runSavePhase", () => {
 
   // ローカルへ先に適用してから発行する、という順序が要点。逆にすると
   // 後続の分析フェーズが古い複製を読む。publisher を渡さない形では
-  // 「発行しない」ことを観測できないので、順序はここで見る。
   test("ローカルへ適用してから同期キューへ発行する", async () => {
     const order: string[] = [];
     vi.mocked(saveScrapedDataBatch).mockImplementation(async () => {
@@ -466,7 +464,6 @@ describe("runCashFlowHistoryPhase", () => {
 
   test("後続月で失敗しても、取り終えた月はすでに保存されている", async () => {
     // まとめて保存していた頃は、途中で落ちると 1 か月も残らなかった。
-    // データベースが空のままなので次回もまた history モードで同じ月数を
     // 取りに行き、同じところで落ちる。
     const publishMonth = vi.fn<(month: TransactionPeriodReplacement) => Promise<number>>();
     publishMonth.mockResolvedValue(1);

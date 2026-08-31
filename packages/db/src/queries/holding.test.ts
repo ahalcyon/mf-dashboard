@@ -149,7 +149,6 @@ async function createHoldingValue(data: {
 // 内部関数のユニットテスト
 // ============================================================
 
-// drizzle の and(...) は引数が何であれ真値のオブジェクトを返すため、
 // toBeDefined() では eq を消しても inArray を反転させても気づけない。
 // 生成される SQL とパラメーターで見る。
 describe("buildHoldingWhereCondition", () => {
@@ -174,7 +173,6 @@ describe("buildHoldingWhereCondition", () => {
 
   // accountIds が空のときは inArray が false に畳まれ、条件全体が
   // 何にも一致しなくなる。グループが無い、または口座が 0 件のときに
-  // 全件返さないための挙動なので、意図として固定しておく。
   it("accountIdsが空なら何にも一致しない条件になる", () => {
     const { where } = compile(buildHoldingWhereCondition(1, []));
 

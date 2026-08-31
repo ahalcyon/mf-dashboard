@@ -7,7 +7,6 @@ const holding = (categoryName: string | null, amount: number | null) => ({
 });
 
 describe("sumInvestmentHoldings", () => {
-  // #72 の中身。以前は「投資信託」だけを数えていたため、株式・債券・暗号資産が
   // 丸ごと落ちて初期投資額が過小になっていた。
   it("投資カテゴリをすべて合計する", () => {
     const total = sumInvestmentHoldings([

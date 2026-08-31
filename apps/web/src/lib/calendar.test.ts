@@ -47,7 +47,6 @@ describe("getIntensityLevel", () => {
   });
 
   it("handles max of 0 gracefully", () => {
-    // When max is 0, any non-zero amount should give highest level
     expect(getIntensityLevel(10, 0)).toBe(4);
   });
 });
@@ -61,7 +60,6 @@ describe("buildCalendarGrid", () => {
     expect(grid[0].cells[1]).toBe(null);
     expect(grid[0].cells[2]).toEqual({ day: 1, date: "2025-04-01", amount: 0 });
 
-    // Check that we have all 30 days
     const allDays = grid.flatMap((w) => w.cells).filter((c) => c !== null);
     expect(allDays).toHaveLength(30);
   });

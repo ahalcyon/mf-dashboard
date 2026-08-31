@@ -100,7 +100,6 @@ describe("資産カテゴリの投資判定", () => {
     expect(isInvestmentAssetCategory("")).toBe(false);
   });
 
-  // 以前は categoryName.includes("投資信託") で判定していた。部分一致だと
   // 「投資信託」を含む別名も拾うし、「株式(現物)」は拾えない。
   test("部分一致では判定しない", () => {
     expect(isInvestmentAssetCategory("投資信託（特定口座）")).toBe(false);

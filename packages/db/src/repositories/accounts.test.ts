@@ -138,7 +138,6 @@ describe("updateAccountCategory", () => {
     expect(account).toBeDefined();
     expect(account!.categoryId).toBeGreaterThan(0);
 
-    // カテゴリーテーブルにも作成されていることを確認
     const category = await db
       .select()
       .from(schema.institutionCategories)

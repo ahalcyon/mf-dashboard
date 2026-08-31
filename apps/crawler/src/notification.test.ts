@@ -119,7 +119,6 @@ describe("buildNotificationPayload", () => {
   });
 
   test("名前ではなく ID で判定する", () => {
-    // 実グループに「グループ選択なし」と付けることもできる。名前で弾くと消えてしまう。
     const groupData = makeGroupData("group-a", "グループ選択なし");
 
     expect(buildNotificationPayload(groupData).groupName).toBe("グループ選択なし");

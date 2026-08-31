@@ -128,7 +128,6 @@ describe("グループ-アカウント紐付け", () => {
       .all();
 
     const allAccounts = await db.select().from(schema.accounts).all();
-    // unknownアカウントを除外した数と比較
     const realAccounts = allAccounts.filter((a) => a.mfId !== "unknown");
     expect(noGroupAccounts.length).toBe(realAccounts.length);
   });

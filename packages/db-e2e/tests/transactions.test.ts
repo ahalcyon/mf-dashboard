@@ -56,10 +56,8 @@ describe.skipIf(!hasAuthState())("Transaction比較: スクレイピング vs DB
 
     const db = getDb();
 
-    // ページからグループを取得（グループセレクタがない場合は空配列）
     const pageGroups = await getPageGroups(page);
 
-    // DBからグループを取得
     const dbGroups = await getDbGroups(db);
 
     if (dbGroups.length === 0) {
@@ -171,7 +169,6 @@ describe.skipIf(!hasAuthState())("Transaction比較: スクレイピング vs DB
       JSON.stringify(debugOutput, null, 2),
     );
 
-    // 全て一致していることを確認
     expect(failures).toEqual([]);
   });
 });

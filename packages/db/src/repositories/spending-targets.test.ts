@@ -131,7 +131,6 @@ describe("グループ分離", () => {
   };
 
   beforeEach(async () => {
-    // 複数グループを作成
     const ts = new Date().toISOString();
     await db
       .insert(schema.groups)
@@ -173,7 +172,6 @@ describe("グループ分離", () => {
     await saveSpendingTargets(db, GROUP_A, dataA);
     await saveSpendingTargets(db, GROUP_B, dataB);
 
-    // グループAを更新
     const updatedDataA: SpendingTargetsData = {
       categories: [
         {
@@ -185,7 +183,6 @@ describe("グループ分離", () => {
     };
     await saveSpendingTargets(db, GROUP_A, updatedDataA);
 
-    // グループBは変更されていないことを確認
     const targetsB = await getSpendingTargets(db, GROUP_B);
     expect(targetsB.find((t) => t.largeCategoryId === 11)?.type).toBe("fixed");
   });

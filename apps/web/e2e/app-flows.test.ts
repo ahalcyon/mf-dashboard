@@ -81,7 +81,6 @@ test.describe("App flows", () => {
         await expect(dialog.getByText("予測").first()).toBeVisible();
         await expect(dialog.getByText(/取引後残高:/).first()).toBeVisible();
         await dialog.getByRole("button", { name: "明細を閉じる" }).click();
-        // 閉じる際にフォーカス復帰とスクロールロック解除でレイアウトが動くため、
         // 閉じ切るまで待たないと次のトリガーが stable にならない
         await expect(dialog).toBeHidden();
 

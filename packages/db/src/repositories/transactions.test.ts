@@ -54,7 +54,6 @@ describe("saveTransaction", () => {
   });
 
   test("accountIdMapでaccount_idが設定される", async () => {
-    // まずアカウントを作成
     const accountResult = await db
       .insert(schema.accounts)
       .values({
@@ -92,7 +91,6 @@ describe("saveTransaction", () => {
   });
 
   test("accountIdMapで部分一致でaccount_idが設定される", async () => {
-    // まずアカウントを作成
     const accountResult = await db
       .insert(schema.accounts)
       .values({
@@ -130,7 +128,6 @@ describe("saveTransaction", () => {
   });
 
   test("振替トランザクションでtransferTargetAccountIdが設定される", async () => {
-    // 送金元アカウントを作成
     const sourceResult = await db
       .insert(schema.accounts)
       .values({
@@ -144,7 +141,6 @@ describe("saveTransaction", () => {
       .get();
     const sourceAccountId = sourceResult.id;
 
-    // 送金先アカウントを作成
     const targetResult = await db
       .insert(schema.accounts)
       .values({
@@ -184,7 +180,6 @@ describe("saveTransaction", () => {
   });
 
   test("振替トランザクションでtransferTargetが部分一致でも解決される", async () => {
-    // 送金元アカウントを作成（フルネーム）
     const sourceResult = await db
       .insert(schema.accounts)
       .values({
@@ -198,7 +193,6 @@ describe("saveTransaction", () => {
       .get();
     const sourceAccountId = sourceResult.id;
 
-    // 送金先アカウントを作成
     const targetResult = await db
       .insert(schema.accounts)
       .values({

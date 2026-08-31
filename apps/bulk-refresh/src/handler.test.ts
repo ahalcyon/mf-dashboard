@@ -44,7 +44,6 @@ describe("runBulkRefresh", () => {
     expect(order).toEqual(["login", "refresh"]);
   });
 
-  // 完了を待たないことがこのジョブの要点。待つと 1 口座のために 20 分残る。
   test("完了を待たない", async () => {
     await runBulkRefresh(session);
 
@@ -59,7 +58,6 @@ describe("runBulkRefresh", () => {
     expect(Number.isNaN(Date.parse(result.startedAt))).toBe(false);
   });
 
-  // 0 件は「更新が始まっていない」疑いを意味するので、握りつぶさずそのまま返す。
   test("1 件も動き出さなくても失敗にはしない", async () => {
     vi.mocked(getRefreshStatus).mockResolvedValue({ incompleteAccounts: [], remainingCount: 0 });
 

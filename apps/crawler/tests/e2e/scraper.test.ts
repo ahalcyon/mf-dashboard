@@ -17,7 +17,6 @@ let data: ScrapedData;
 beforeAll(async () => {
   ({ browser, context } = await launchLoggedInContext());
   data = await withNewPage(context, async (page) => {
-    // auth state で既にログイン済みなので、直接 ME に遷移
     await gotoHome(page);
     await saveScreenshot(page, "scraper-test-before-scrape.png");
 

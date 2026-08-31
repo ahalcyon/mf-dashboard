@@ -2,16 +2,6 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { TransactionMobileView } from "./transaction-mobile-view";
 import type { Transaction } from "./types";
 
-/**
- * このコンポーネントの根は `md:hidden` なので、Storybook のテストが固定して
- * いる 1280x800 では `display: none` の部分木に入り、axe が丸ごと飛ばす。
- * 親の transaction-table.stories.tsx 経由でも同じで、モバイル表示の
- * コントラストとラベルは一度も検査されていなかった。
- *
- * ここでは表示だけを復帰させて axe に見せる。幅はデスクトップのままなので、
- * 「狭い画面での折り返し」までは見ていない。ビューポートを分けて実行する
- * 話は別途。
- */
 const forceVisible = `
 @media (min-width: 768px) {
   .sb-force-mobile > * {

@@ -1,10 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { TransactionKpiSummary } from "./transaction-kpi-summary";
 
-/**
- * 金額の色分けを扱う面なのに視覚的な検証が無かった。収支は符号で
- * balance-positive / balance-negative が入れ替わるので、両方を出しておく。
- */
 const meta = {
   title: "Info/TransactionTable/TransactionKpiSummary",
   component: TransactionKpiSummary,
