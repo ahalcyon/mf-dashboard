@@ -2,23 +2,28 @@ import { mfUrls } from "@mf-dashboard/meta/urls";
 import type { Page } from "playwright";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-const { debug, getCredentials, log } = vi.hoisted(() => ({
+const { debug, getCredentials, getOTP, info, log } = vi.hoisted(() => ({
   debug: vi.fn<(...args: unknown[]) => void>(),
   getCredentials: vi.fn<() => Promise<{ password: string; username: string }>>(),
+  getOTP: vi.fn<() => Promise<string>>(),
+  info: vi.fn<(...args: unknown[]) => void>(),
   log: vi.fn<(...args: unknown[]) => void>(),
 }));
 
-vi.mock("../logger.js", () => ({ debug, log }));
-vi.mock("./credentials.js", () => ({
-  getCredentials,
-  getOTP: vi.fn<() => Promise<string>>(),
-}));
+vi.mock("../logger.js", () => ({ debug, info, log }));
+vi.mock("./credentials.js", () => ({ getCredentials, getOTP }));
 
 import { login } from "./login.js";
 
+type OtpBehaviour = "none" | "accepted" | "rejected";
+
 function createPage(
   finalUrl: string,
-  { abortAccountsOnce = false, viaPassword = false } = {},
+  {
+    abortAccountsOnce = false,
+    otp = "none",
+    viaPassword = false,
+  }: { abortAccountsOnce?: boolean; otp?: OtpBehaviour; viaPassword?: boolean } = {},
 ): Page {
   let currentUrl: string = mfUrls.auth.signIn;
   let accountsNavigationAborted = false;
@@ -33,7 +38,14 @@ function createPage(
   const otpLocator = {
     ...locator,
     first: vi.fn<() => unknown>(),
-    waitFor: vi.fn<() => Promise<void>>().mockRejectedValue(new Error("OTP input is not visible")),
+    waitFor: vi.fn<(options: { state: string }) => Promise<void>>(async ({ state }) => {
+      if (state === "visible" && otp === "none") {
+        throw new Error("OTP input is not visible");
+      }
+      if (state === "hidden" && otp === "rejected") {
+        throw new Error("OTP input is still visible");
+      }
+    }),
   };
   otpLocator.first.mockReturnValue(otpLocator);
 
@@ -59,7 +71,9 @@ function createPage(
     waitForTimeout: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     waitForURL: vi.fn<(matcher: unknown) => Promise<void>>((matcher) => {
       if (typeof matcher === "function") {
-        return Promise.reject(new Error("URL did not change"));
+        return (matcher as (url: URL) => boolean)(new URL(currentUrl))
+          ? Promise.resolve()
+          : Promise.reject(new Error("URL did not match"));
       }
       if (typeof matcher === "string") {
         currentUrl = finalUrl;
@@ -76,6 +90,7 @@ describe("login", () => {
       username: "user-a@example.com",
       password: "test-password",
     });
+    getOTP.mockResolvedValue("123456");
   });
 
   test("rejects when the browser remains on the MFID sign-in page", async () => {
@@ -107,6 +122,21 @@ describe("login", () => {
 
     await expect(login(page)).resolves.toBeUndefined();
     expect(log).toHaveBeenCalledWith("Login successful!");
+  });
+
+  test("submits the one-time code and waits for the form to go away", async () => {
+    const page = createPage(mfUrls.accounts, { otp: "accepted", viaPassword: true });
+
+    await expect(login(page)).resolves.toBeUndefined();
+    expect(info).toHaveBeenCalledWith("MFID OTP accepted");
+  });
+
+  // 認証の送信中に遷移すると、二段階認証は成立しないまま打ち切られる
+  test("stops before leaving the page when the one-time code is refused", async () => {
+    const page = createPage(mfUrls.accounts, { otp: "rejected", viaPassword: true });
+
+    await expect(login(page)).rejects.toThrow("MFID OTP was rejected");
+    expect(page.url()).toBe(mfUrls.auth.signIn);
   });
 
   test("rejects a lookalike Money Forward origin", async () => {
