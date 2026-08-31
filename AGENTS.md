@@ -32,6 +32,20 @@ This repository is a monorepo built with pnpm workspaces and Turborepo.
 - List local files a worktree needs in `.worktreeinclude`. The `post-checkout` hook copies them in from the primary worktree, so `git worktree add` picks them up on its own. Write one repo-root-relative path or glob per line; `!` excludes. Only files already missing at the destination are copied, and directories are skipped.
 - Keep generated files out of `.worktreeinclude` — the demo database comes from `^build:demo` and provider caches come from `terraform init`, so copying either just carries a stale snapshot along.
 
+### Waiting for a Merge
+
+A session has no inbound event channel. GitHub webhooks do not reach it, so after opening a pull request it stops until the user says the pull request merged.
+
+Start a backgrounded watch instead, so the merge itself resumes the session.
+
+```bash
+until [ "$(gh pr view <number> -R ahalcyon/mf-dashboard --json state -q .state)" = MERGED ]; do sleep 30; done
+```
+
+- Run it in the background. In the foreground it blocks every other command until the merge.
+- Pass `-R ahalcyon/mf-dashboard`. Without it `gh` resolves to a different repository.
+- The command exits on merge, and that exit resumes the session. A closed-without-merge pull request never exits it, so stop the watch by hand when abandoning the branch.
+
 ## Mandatory Engineering Rules
 
 ### Database Schema
