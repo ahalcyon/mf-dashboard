@@ -13,22 +13,46 @@ const { debug, getCredentials, getOTP, info, log } = vi.hoisted(() => ({
 vi.mock("../logger.js", () => ({ debug, info, log }));
 vi.mock("./credentials.js", () => ({ getCredentials, getOTP }));
 
-import { describeFailure, login, pageLocation } from "./login.js";
+import { describeFailure, isMfidAuthUrl, login, pageLocation } from "./login.js";
 
 type OtpBehaviour = "none" | "accepted" | "rejected";
+
+const MFID_PASSWORD_PAGE = "https://id.moneyforward.com/sign_in/password";
+const MFID_TOTP_PAGE = "https://id.moneyforward.com/two_factor_auth/totp";
+const MFID_DONE_PAGE = "https://id.moneyforward.com/me";
+const MFID_WEBAUTHN_PAGE = "https://id.moneyforward.com/webauthn/auto_upgrade";
 
 function createPage(
   finalUrl: string,
   {
     abortAccountsOnce = false,
     otp = "none",
+    stuckOnMfid = false,
     viaPassword = false,
-  }: { abortAccountsOnce?: boolean; otp?: OtpBehaviour; viaPassword?: boolean } = {},
+  }: {
+    abortAccountsOnce?: boolean;
+    otp?: OtpBehaviour;
+    stuckOnMfid?: boolean;
+    viaPassword?: boolean;
+  } = {},
 ): Page {
   let currentUrl: string = mfUrls.auth.signIn;
   let accountsNavigationAborted = false;
+
+  // 送信のたびに MFID が渡してくるページ。本番のログと同じ順序にしている。
+  const submitted: string[] = [MFID_PASSWORD_PAGE];
+  if (otp !== "none") submitted.push(MFID_TOTP_PAGE);
+  // 拒否されたコードは同じページに留まる
+  const exitPage =
+    otp === "rejected" ? undefined : stuckOnMfid ? MFID_WEBAUTHN_PAGE : MFID_DONE_PAGE;
+  let submits = 0;
+
   const locator = {
-    click: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    click: vi.fn<() => Promise<void>>(async () => {
+      const next = submitted[submits] ?? exitPage;
+      submits += 1;
+      if (next) currentUrl = next;
+    }),
     fill: vi.fn<(value: string) => Promise<void>>().mockResolvedValue(undefined),
     first: vi.fn<() => unknown>(),
     waitFor: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -138,10 +162,19 @@ describe("login", () => {
     const page = createPage(mfUrls.accounts, { otp: "rejected", viaPassword: true });
 
     await expect(login(page)).rejects.toThrow(
-      "Login failed at otp (at https://id.moneyforward.com/sign_in): " +
+      "Login failed at otp (at https://id.moneyforward.com/two_factor_auth/totp): " +
         "the code was refused; the one-time code form is still on screen",
     );
-    expect(page.url()).toBe(mfUrls.auth.signIn);
+    expect(page.url()).toBe("https://id.moneyforward.com/two_factor_auth/totp");
+  });
+
+  // /sign_in 配下を抜けても認証は終わっていない。そこで進ませない
+  test("stops at mfid-complete while still inside the MFID flow", async () => {
+    const page = createPage(mfUrls.accounts, { stuckOnMfid: true, viaPassword: true });
+
+    await expect(login(page)).rejects.toThrow(
+      "Login failed at mfid-complete (at https://id.moneyforward.com/webauthn/auto_upgrade)",
+    );
   });
 
   test("names the step and the page it stopped on", async () => {
@@ -161,9 +194,10 @@ describe("login", () => {
     expect(info.mock.calls.flat()).toEqual(
       expect.arrayContaining([
         "Auth mfid-sign-in: at https://id.moneyforward.com/sign_in",
-        "Auth email: at https://id.moneyforward.com/sign_in",
-        "Auth password: at https://id.moneyforward.com/sign_in",
-        "Auth mfid-complete: at https://id.moneyforward.com/sign_in",
+        "Auth email: at https://id.moneyforward.com/sign_in/password",
+        "Auth password: at https://id.moneyforward.com/two_factor_auth/totp",
+        "Auth otp: at https://id.moneyforward.com/me",
+        "Auth mfid-complete: at https://id.moneyforward.com/me",
         "Auth me-redirect: at https://id.moneyforward.com/sign_in/password",
         "Auth me-password: at https://moneyforward.com/accounts",
         "Auth accounts-probe: at https://moneyforward.com/accounts",
@@ -216,5 +250,34 @@ describe("describeFailure", () => {
 
   test("accepts a value that is not an Error", () => {
     expect(describeFailure("plain failure", [])).toBe("plain failure");
+  });
+});
+
+describe("isMfidAuthUrl", () => {
+  // #118 で入れた段階ログが示した、実際に通る認証ページ
+  test.for([
+    "https://id.moneyforward.com/sign_in",
+    "https://id.moneyforward.com/sign_in/password",
+    "https://id.moneyforward.com/two_factor_auth/totp",
+    "https://id.moneyforward.com/webauthn/auto_upgrade",
+  ])("%s は認証フローの途中", (url) => {
+    expect(isMfidAuthUrl(url)).toBe(true);
+  });
+
+  test.for([
+    "https://id.moneyforward.com/me",
+    "https://moneyforward.com/accounts",
+    "https://moneyforward.com/sign_in",
+  ])("%s は認証フローの外", (url) => {
+    expect(isMfidAuthUrl(url)).toBe(false);
+  });
+
+  // 前方一致だけで判定すると別のパスを認証ページと取り違える
+  test("パスの区切りまで一致させる", () => {
+    expect(isMfidAuthUrl("https://id.moneyforward.com/sign_in_history")).toBe(false);
+  });
+
+  test("解釈できない URL は認証ページとしない", () => {
+    expect(isMfidAuthUrl("")).toBe(false);
   });
 });
