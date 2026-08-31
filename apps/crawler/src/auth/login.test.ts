@@ -13,7 +13,7 @@ const { debug, getCredentials, getOTP, info, log } = vi.hoisted(() => ({
 vi.mock("../logger.js", () => ({ debug, info, log }));
 vi.mock("./credentials.js", () => ({ getCredentials, getOTP }));
 
-import { login } from "./login.js";
+import { describeFailure, login, pageLocation } from "./login.js";
 
 type OtpBehaviour = "none" | "accepted" | "rejected";
 
@@ -97,21 +97,21 @@ describe("login", () => {
     const page = createPage("https://id.moneyforward.com/sign_in");
 
     await expect(login(page)).rejects.toThrow("Login failed");
-    expect(log).not.toHaveBeenCalledWith("Login successful!");
+    expect(info).not.toHaveBeenCalledWith("Login successful!");
   });
 
   test("resolves when the browser reaches Money Forward ME", async () => {
     const page = createPage(mfUrls.accounts, { viaPassword: true });
 
     await expect(login(page)).resolves.toBeUndefined();
-    expect(log).toHaveBeenCalledWith("Login successful!");
+    expect(info).toHaveBeenCalledWith("Login successful!");
   });
 
   test("rejects the public Money Forward home page", async () => {
     const page = createPage(mfUrls.home);
 
     await expect(login(page)).rejects.toThrow("Login failed");
-    expect(log).not.toHaveBeenCalledWith("Login successful!");
+    expect(info).not.toHaveBeenCalledWith("Login successful!");
   });
 
   test("retries the authenticated-page probe after aborted navigation", async () => {
@@ -121,28 +121,100 @@ describe("login", () => {
     });
 
     await expect(login(page)).resolves.toBeUndefined();
-    expect(log).toHaveBeenCalledWith("Login successful!");
+    expect(info).toHaveBeenCalledWith("Login successful!");
   });
 
   test("submits the one-time code and waits for the form to go away", async () => {
     const page = createPage(mfUrls.accounts, { otp: "accepted", viaPassword: true });
 
     await expect(login(page)).resolves.toBeUndefined();
-    expect(info).toHaveBeenCalledWith("MFID OTP accepted");
+    expect(info.mock.calls.flat()).toEqual(
+      expect.arrayContaining(["Auth otp: requested", "Auth otp: submitted", "Auth otp: accepted"]),
+    );
   });
 
   // 認証の送信中に遷移すると、二段階認証は成立しないまま打ち切られる
   test("stops before leaving the page when the one-time code is refused", async () => {
     const page = createPage(mfUrls.accounts, { otp: "rejected", viaPassword: true });
 
-    await expect(login(page)).rejects.toThrow("MFID OTP was rejected");
+    await expect(login(page)).rejects.toThrow(
+      "Login failed at otp (at https://id.moneyforward.com/sign_in): " +
+        "the code was refused; the one-time code form is still on screen",
+    );
     expect(page.url()).toBe(mfUrls.auth.signIn);
+  });
+
+  test("names the step and the page it stopped on", async () => {
+    const page = createPage("https://id.moneyforward.com/sign_in");
+
+    await expect(login(page)).rejects.toThrow(
+      "Login failed at accounts-probe (at https://id.moneyforward.com/sign_in): " +
+        "the browser did not reach Money Forward ME",
+    );
+  });
+
+  test("records every step it passed", async () => {
+    const page = createPage(mfUrls.accounts, { otp: "accepted", viaPassword: true });
+
+    await login(page);
+
+    expect(info.mock.calls.flat()).toEqual(
+      expect.arrayContaining([
+        "Auth mfid-sign-in: at https://id.moneyforward.com/sign_in",
+        "Auth email: at https://id.moneyforward.com/sign_in",
+        "Auth password: at https://id.moneyforward.com/sign_in",
+        "Auth mfid-complete: at https://id.moneyforward.com/sign_in",
+        "Auth me-redirect: at https://id.moneyforward.com/sign_in/password",
+        "Auth me-password: at https://moneyforward.com/accounts",
+        "Auth accounts-probe: at https://moneyforward.com/accounts",
+      ]),
+    );
   });
 
   test("rejects a lookalike Money Forward origin", async () => {
     const page = createPage("https://moneyforward.com.attacker.example/");
 
     await expect(login(page)).rejects.toThrow("Login failed");
-    expect(log).not.toHaveBeenCalledWith("Login successful!");
+    expect(info).not.toHaveBeenCalledWith("Login successful!");
+  });
+});
+
+describe("pageLocation", () => {
+  test("keeps the origin and the path", () => {
+    expect(pageLocation("https://id.moneyforward.com/sign_in/password")).toBe(
+      "https://id.moneyforward.com/sign_in/password",
+    );
+  });
+
+  // クエリや fragment に識別子が載りうる
+  test("drops the query and the fragment", () => {
+    expect(pageLocation("https://moneyforward.com/accounts?token=abc#frag")).toBe(
+      "https://moneyforward.com/accounts",
+    );
+  });
+
+  test("falls back when the URL cannot be parsed", () => {
+    expect(pageLocation("")).toBe("about:blank");
+  });
+});
+
+describe("describeFailure", () => {
+  // Playwright は call log に画面の文字列を並べる
+  test("keeps only the first line", () => {
+    const error = new Error("Timeout 5000ms exceeded.\nCall log:\n  - waiting for locator");
+
+    expect(describeFailure(error, [])).toBe("Timeout 5000ms exceeded.");
+  });
+
+  test("hides the credentials", () => {
+    const error = new Error('waiting for button:has-text("user-a@example.com")');
+
+    expect(describeFailure(error, ["user-a@example.com", "test-password"])).toBe(
+      'waiting for button:has-text("[redacted]")',
+    );
+  });
+
+  test("accepts a value that is not an Error", () => {
+    expect(describeFailure("plain failure", [])).toBe("plain failure");
   });
 });
