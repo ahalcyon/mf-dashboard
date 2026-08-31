@@ -11,15 +11,23 @@ export interface CrawlSummary {
   status: "success";
 }
 
-export async function handler(): Promise<CrawlSummary> {
+export interface CrawlEvent {
+  source?: string;
+}
+
+export async function handler(event?: CrawlEvent): Promise<CrawlSummary> {
   // 重い import は実行時に読む。init は 10 秒で打ち切られる。
-  const [{ randomUUID }, { createCrawlerProgressReporter }, { loadCrawlerConfig }, { error }] =
-    await Promise.all([
-      import("node:crypto"),
-      import("./crawler-progress.js"),
-      import("./crawler-phases.js"),
-      import("./logger.js"),
-    ]);
+  const [
+    { randomUUID },
+    { createCrawlerProgressReporter },
+    { loadCrawlerConfig },
+    { error, info },
+  ] = await Promise.all([
+    import("node:crypto"),
+    import("./crawler-progress.js"),
+    import("./crawler-phases.js"),
+    import("./logger.js"),
+  ]);
 
   // history モードは ECS のバックフィルタスクが受け持つ。
   const config = loadCrawlerConfig();
@@ -30,22 +38,22 @@ export async function handler(): Promise<CrawlSummary> {
   }
 
   const runId = randomUUID();
+  const source = event?.source ?? process.env.CRAWLER_RUN_SOURCE ?? "scheduled";
+  info(`Crawl ${runId} started from ${source}`);
+
   const progress = await createCrawlerProgressReporter(
     process.env.CRAWLER_STATE_PATH ?? LAMBDA_STATE_PATH,
-    {
-      id: runId,
-      source: process.env.CRAWLER_RUN_SOURCE ?? "scheduled",
-      startedAt: new Date().toISOString(),
-    },
+    { id: runId, source, startedAt: new Date().toISOString() },
   );
 
   const { runCrawler } = await import("./run.js");
   try {
     await runCrawler(progress);
     await progress.finish("success");
+    info(`Crawl ${runId} finished from ${source}`);
     return { runId, status: "success" };
   } catch (err) {
-    error("Crawler failed:", err);
+    error(`Crawl ${runId} from ${source} failed:`, err);
     try {
       await progress.finish("failed");
     } catch (finishError) {

@@ -30,13 +30,23 @@ export async function runBulkRefresh(session: BrowserSession): Promise<BulkRefre
   return { startedAt, updatingCount: remainingCount };
 }
 
-export async function handler(): Promise<BulkRefreshResult> {
-  const { withBrowser } = await import("./browser.js");
+export interface BulkRefreshEvent {
+  source?: string;
+}
+
+export async function handler(event?: BulkRefreshEvent): Promise<BulkRefreshResult> {
+  const [{ withBrowser }, { error, info }] = await Promise.all([
+    import("./browser.js"),
+    import("@mf-dashboard/crawler/logger"),
+  ]);
+
+  const source = event?.source ?? "scheduled";
+  info(`Bulk refresh invoked from ${source}`);
+
   try {
     return await withBrowser(runBulkRefresh);
   } catch (err) {
-    const { error } = await import("@mf-dashboard/crawler/logger");
-    error("Bulk refresh failed:", err);
+    error(`Bulk refresh from ${source} failed:`, err);
     throw err;
   }
 }

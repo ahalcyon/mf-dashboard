@@ -1,6 +1,6 @@
 import { mfUrls } from "@mf-dashboard/meta/urls";
 import type { BrowserContext, Page } from "playwright";
-import { log, debug, info } from "../logger.js";
+import { debug, info } from "../logger.js";
 import { navigateToAccountsPage } from "../scrapers/refresh.js";
 import { getCredentials, getOTP } from "./credentials.js";
 import { hasAuthState, saveAuthState } from "./state.js";
@@ -26,6 +26,56 @@ const SELECTORS = {
   meSignIn: 'button:has-text("Sign in")',
 };
 
+type AuthStep =
+  | "session-probe"
+  | "mfid-sign-in"
+  | "email"
+  | "password"
+  | "otp"
+  | "mfid-complete"
+  | "me-redirect"
+  | "account-selector"
+  | "me-password"
+  | "accounts-probe";
+
+/** 認証情報が載らないよう、URL は origin と pathname だけを残す。 */
+export function pageLocation(url: string): string {
+  try {
+    const { origin, pathname } = new URL(url);
+    return `${origin}${pathname}`;
+  } catch {
+    return "about:blank";
+  }
+}
+
+/** Playwright は call log に画面上の文字列を載せる。1 行目だけを取り、秘密は伏せる。 */
+export function describeFailure(error: unknown, secrets: string[]): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  const firstLine = raw.split("\n")[0] ?? "";
+  return secrets.reduce(
+    (text, secret) => (secret ? text.split(secret).join("[redacted]") : text),
+    firstLine,
+  );
+}
+
+async function step<T>(
+  name: AuthStep,
+  page: Page,
+  secrets: string[],
+  run: () => Promise<T>,
+): Promise<T> {
+  try {
+    const value = await run();
+    info(`Auth ${name}: at ${pageLocation(page.url())}`);
+    return value;
+  } catch (error) {
+    throw new Error(
+      `Login failed at ${name} (at ${pageLocation(page.url())}): ${describeFailure(error, secrets)}`,
+      { cause: error },
+    );
+  }
+}
+
 function isLoggedInUrl(url: string): boolean {
   try {
     const currentUrl = new URL(url);
@@ -50,87 +100,53 @@ async function waitForUrlChange(page: Page, timeout: number = TIMEOUTS.redirect)
   } catch {}
 }
 
-async function maybeHandleOtp(
-  page: Page,
-  {
-    inputSelector,
-    submitSelector,
-    label,
-    timeout = TIMEOUTS.short,
-  }: {
-    inputSelector: string;
-    submitSelector: string;
-    label: string;
-    timeout?: number;
-  },
-): Promise<void> {
-  const otpInput = page.locator(inputSelector).first();
+async function handleOtp(page: Page): Promise<void> {
+  const otpInput = page.locator(SELECTORS.mfidOtpInput).first();
 
   try {
-    await otpInput.waitFor({ state: "visible", timeout });
+    await otpInput.waitFor({ state: "visible", timeout: TIMEOUTS.short });
   } catch {
-    debug(`${label} OTP not required`);
+    info("Auth otp: not requested");
     return;
   }
 
-  info(`${label} OTP required`);
-  const otp = await getOTP();
-  await otpInput.fill(otp);
-  await page.locator(submitSelector).first().click();
+  info("Auth otp: requested");
+  await otpInput.fill(await getOTP());
+  await page.locator(SELECTORS.mfidOtpSubmit).first().click();
+  info("Auth otp: submitted");
 
   try {
     await otpInput.waitFor({ state: "hidden", timeout: TIMEOUTS.long });
   } catch {
-    throw new Error(`${label} OTP was rejected`);
+    throw new Error("the code was refused; the one-time code form is still on screen");
   }
 
-  info(`${label} OTP accepted`);
+  info("Auth otp: accepted");
 }
 
-/**
- * Check if the current session is valid by navigating to Money Forward
- * and checking if we're redirected to login page
- */
 async function isSessionValid(page: Page): Promise<boolean> {
-  debug("Checking if session is valid...");
-
   try {
     await navigateToAccountsPage(page);
-
     await waitForUrlChange(page);
 
-    const currentUrl = page.url();
-    debug("Current URL after navigation:", currentUrl);
-
-    if (isLoggedInUrl(currentUrl)) {
-      log("Session is valid!");
+    if (isLoggedInUrl(page.url())) {
+      info(`Auth session-probe: reusing the saved session at ${pageLocation(page.url())}`);
       return true;
     }
 
-    debug("Session is invalid, need to login");
+    info(`Auth session-probe: saved session rejected at ${pageLocation(page.url())}`);
     return false;
-  } catch (err) {
-    debug("Error checking session:", err);
+  } catch (error) {
+    info(`Auth session-probe: failed with ${describeFailure(error, [])}`);
     return false;
   }
 }
 
-/**
- * Login with auth state if available, otherwise perform full login
- */
 export async function loginWithAuthState(page: Page, context: BrowserContext): Promise<void> {
   if (hasAuthState()) {
-    debug("Auth state found, checking session validity...");
-
-    const valid = await isSessionValid(page);
-    if (valid) {
-      debug("Using existing session from auth state");
-      return;
-    }
-
-    debug("Session expired, performing full login...");
+    if (await isSessionValid(page)) return;
   } else {
-    debug("No auth state found, performing full login...");
+    info("Auth session-probe: no saved session");
   }
 
   await login(page);
@@ -140,101 +156,85 @@ export async function loginWithAuthState(page: Page, context: BrowserContext): P
 
 export async function login(page: Page): Promise<void> {
   const { username, password } = await getCredentials();
+  const secrets = [username, password];
 
-  debug("Navigating to login page...");
-  await page.goto(mfUrls.auth.signIn, {
-    waitUntil: "domcontentloaded",
+  await step("mfid-sign-in", page, secrets, () =>
+    page.goto(mfUrls.auth.signIn, { waitUntil: "domcontentloaded" }),
+  );
+
+  await step("email", page, secrets, async () => {
+    const emailInput = page.locator(SELECTORS.mfidEmail);
+    await emailInput.waitFor({ state: "visible", timeout: TIMEOUTS.medium });
+    await emailInput.fill(username);
+    await page.locator(SELECTORS.mfidSubmit).click();
   });
 
-  debug("Entering email...");
-  const emailInput = page.locator(SELECTORS.mfidEmail);
-  await emailInput.waitFor({ state: "visible", timeout: TIMEOUTS.medium });
-  await emailInput.fill(username);
-
-  debug("Clicking Sign in button...");
-  await page.locator(SELECTORS.mfidSubmit).click();
-
-  debug("Waiting for password page...");
-  const passwordInput = page.locator(SELECTORS.mfidPassword);
-  await passwordInput.waitFor({ state: "visible", timeout: TIMEOUTS.medium });
-
-  debug("Entering password...");
-  await passwordInput.fill(password);
-  debug("Clicking Sign in button...");
-  await page.locator(SELECTORS.mfidSubmit).click();
-
-  await maybeHandleOtp(page, {
-    inputSelector: SELECTORS.mfidOtpInput,
-    submitSelector: SELECTORS.mfidOtpSubmit,
-    label: "MFID",
+  await step("password", page, secrets, async () => {
+    const passwordInput = page.locator(SELECTORS.mfidPassword);
+    await passwordInput.waitFor({ state: "visible", timeout: TIMEOUTS.medium });
+    await passwordInput.fill(password);
+    await page.locator(SELECTORS.mfidSubmit).click();
   });
 
-  debug("Waiting for login to complete...");
-  await page.waitForURL((url) => !url.toString().startsWith(mfUrls.auth.password), {
-    timeout: TIMEOUTS.login,
+  await step("otp", page, secrets, () => handleOtp(page));
+
+  await step("mfid-complete", page, secrets, () =>
+    page.waitForURL((url) => !url.toString().startsWith(mfUrls.auth.password), {
+      timeout: TIMEOUTS.login,
+    }),
+  );
+
+  let currentUrl = await step("me-redirect", page, secrets, async () => {
+    await page.goto(mfUrls.signIn);
+    await waitForUrlChange(page);
+
+    if (page.url().startsWith(mfUrls.signIn)) {
+      await page.waitForURL(/id\.moneyforward\.com/, { timeout: TIMEOUTS.long });
+    }
+    return page.url();
   });
-
-  debug("Navigating to Money Forward ME...");
-  await page.goto(mfUrls.signIn);
-
-  await waitForUrlChange(page);
-
-  let currentUrl = page.url();
-  debug("URL after initial wait:", currentUrl);
-  if (currentUrl.startsWith(mfUrls.signIn)) {
-    debug("Waiting for MFID redirect...");
-    await page.waitForURL(/id\.moneyforward\.com/, {
-      timeout: TIMEOUTS.long,
-    });
-    currentUrl = page.url();
-  }
-
-  debug("Current URL:", currentUrl);
 
   if (isLoggedInUrl(currentUrl)) {
-    debug("Already logged in to ME!");
+    info("Login successful!");
     return;
   }
 
   if (currentUrl.includes("account_selector")) {
-    debug("Account selector found, clicking account...");
-    const accountButton = page.locator(buildAccountSelector(username)).first();
-    await accountButton.waitFor({ state: "visible", timeout: TIMEOUTS.short });
+    currentUrl = await step("account-selector", page, secrets, async () => {
+      const accountButton = page.locator(buildAccountSelector(username)).first();
+      await accountButton.waitFor({ state: "visible", timeout: TIMEOUTS.short });
+      await accountButton.click();
 
-    debug("Clicking account and waiting for navigation...");
-    await accountButton.click();
-
-    await page.waitForURL(/id\.moneyforward\.com\/sign_in\/password|moneyforward\.com\//, {
-      timeout: TIMEOUTS.long,
+      await page.waitForURL(/id\.moneyforward\.com\/sign_in\/password|moneyforward\.com\//, {
+        timeout: TIMEOUTS.long,
+      });
+      return page.url();
     });
-    currentUrl = page.url();
   }
 
   if (currentUrl.includes(mfUrls.auth.password)) {
-    debug("Waiting for ME password page...");
-    const mePasswordInput = page.locator(SELECTORS.mePassword).first();
-    await mePasswordInput.waitFor({ state: "visible", timeout: TIMEOUTS.medium });
+    await step("me-password", page, secrets, async () => {
+      const mePasswordInput = page.locator(SELECTORS.mePassword).first();
+      await mePasswordInput.waitFor({ state: "visible", timeout: TIMEOUTS.medium });
+      await mePasswordInput.fill(password);
+      await page.locator(SELECTORS.meSignIn).click();
 
-    debug("Entering ME password...");
-    await mePasswordInput.fill(password);
-
-    debug("Clicking Sign in button...");
-    await page.locator(SELECTORS.meSignIn).click();
-
-    debug("Waiting for ME redirect...");
-    await page.waitForURL(`${mfUrls.home}**`, { timeout: TIMEOUTS.login });
+      await page.waitForURL(`${mfUrls.home}**`, { timeout: TIMEOUTS.login });
+    });
   } else {
     debug("Already redirected to ME (session exists)");
   }
 
   // Recheck against an authenticated-only page. moneyforward.com/ itself is
   // publicly accessible and therefore cannot be used as proof of login.
-  await navigateToAccountsPage(page);
-  await waitForUrlChange(page);
+  await step("accounts-probe", page, secrets, async () => {
+    await navigateToAccountsPage(page);
+    await waitForUrlChange(page);
 
-  if (!isLoggedInUrl(page.url())) {
-    throw new Error("Login failed: browser did not reach Money Forward ME");
-  }
+    if (!isLoggedInUrl(page.url())) {
+      throw new Error("the browser did not reach Money Forward ME");
+    }
+  });
 
-  log("Login successful!");
+  info("Login successful!");
 }

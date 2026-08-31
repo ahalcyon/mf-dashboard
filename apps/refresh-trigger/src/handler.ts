@@ -12,6 +12,9 @@ import { isRefreshPath, toResponse, type RefreshOutcome } from "./result.js";
  * 認証は CloudFront の viewer-request 関数が担う。
  * Function URL は OAC で CloudFront からのみ到達する。
  */
+/** クロールのログに、定時実行ではなくボタン起動だと残す。 */
+const REFRESH_SOURCE = "refresh-button";
+
 export async function handler(event: LambdaFunctionURLEvent): Promise<LambdaFunctionURLResult> {
   // CloudFront は /api/* をまとめてこのオリジンへ回す。パスを先に確かめる。
   if (!isRefreshPath(event.requestContext.http.path)) {
@@ -47,6 +50,7 @@ async function startBulkRefresh(
       new InvokeCommand({
         FunctionName: config.bulkRefreshFunction,
         InvocationType: "Event",
+        Payload: JSON.stringify({ source: REFRESH_SOURCE }),
       }),
     );
     console.info("Requested the bulk account refresh");
@@ -78,6 +82,7 @@ async function startRefresh(
         FunctionName: config.crawlFunction,
         // 完了を待つと 80 秒かかる。ボタンは「開始しました」を返す作り。
         InvocationType: "Event",
+        Payload: JSON.stringify({ source: REFRESH_SOURCE }),
       }),
     );
 

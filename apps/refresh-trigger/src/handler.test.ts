@@ -74,6 +74,16 @@ describe("起動するもの", () => {
     expect(invokedFunctions()).toEqual(["mf-dashboard-bulk-refresh", "mf-dashboard-crawl"]);
   });
 
+  // どちらのログにも、定時実行ではなくボタン起動だと残す
+  test("どちらにも起動元を渡す", async () => {
+    await handler(buildEvent("/api/refresh/"));
+
+    for (const [c] of lambdaSend.mock.calls) {
+      const { Payload } = (c as { input: { Payload: string } }).input;
+      expect(JSON.parse(Payload)).toEqual({ source: "refresh-button" });
+    }
+  });
+
   // 完了を待つと 80 秒かかる。ボタンは「開始しました」を返す作り。
   test("どちらも完了を待たない", async () => {
     await handler(buildEvent("/api/refresh/"));
