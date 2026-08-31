@@ -1,6 +1,6 @@
 import { mfUrls } from "@mf-dashboard/meta/urls";
 import type { BrowserContext, Page } from "playwright";
-import { log, debug } from "../logger.js";
+import { log, debug, info } from "../logger.js";
 import { navigateToAccountsPage } from "../scrapers/refresh.js";
 import { getCredentials, getOTP } from "./credentials.js";
 import { hasAuthState, saveAuthState } from "./state.js";
@@ -64,19 +64,27 @@ async function maybeHandleOtp(
     timeout?: number;
   },
 ): Promise<void> {
-  try {
-    debug(`Checking for ${label} OTP...`);
-    const otpInput = page.locator(inputSelector).first();
-    await otpInput.waitFor({ state: "visible", timeout });
+  const otpInput = page.locator(inputSelector).first();
 
-    debug(`${label} OTP required, generating code...`);
-    const otp = await getOTP();
-    await otpInput.fill(otp);
-    debug("Clicking verify button...");
-    await page.locator(submitSelector).first().click();
+  try {
+    await otpInput.waitFor({ state: "visible", timeout });
   } catch {
     debug(`${label} OTP not required`);
+    return;
   }
+
+  info(`${label} OTP required`);
+  const otp = await getOTP();
+  await otpInput.fill(otp);
+  await page.locator(submitSelector).first().click();
+
+  try {
+    await otpInput.waitFor({ state: "hidden", timeout: TIMEOUTS.long });
+  } catch {
+    throw new Error(`${label} OTP was rejected`);
+  }
+
+  info(`${label} OTP accepted`);
 }
 
 /**
@@ -162,7 +170,7 @@ export async function login(page: Page): Promise<void> {
   });
 
   debug("Waiting for login to complete...");
-  await page.waitForURL(/https:\/\/(id\.)?moneyforward\.com\/.*/, {
+  await page.waitForURL((url) => !url.toString().startsWith(mfUrls.auth.password), {
     timeout: TIMEOUTS.login,
   });
 
