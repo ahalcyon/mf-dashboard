@@ -15,6 +15,8 @@ const TIMEOUTS = {
 
 const MONEY_FORWARD_ME_ORIGIN = new URL(mfUrls.home).origin;
 const AUTHENTICATED_PATHNAME = new URL(mfUrls.accounts).pathname;
+const MFID_ORIGIN = new URL(mfUrls.auth.signIn).origin;
+const MFID_AUTH_PATHNAMES = ["/sign_in", "/two_factor_auth", "/webauthn"];
 
 const SELECTORS = {
   mfidEmail: 'input[name="mfid_user[email]"]',
@@ -73,6 +75,19 @@ async function step<T>(
       `Login failed at ${name} (at ${pageLocation(page.url())}): ${describeFailure(error, secrets)}`,
       { cause: error },
     );
+  }
+}
+
+/** MFID の認証フロー配下かどうか。ここを離れて初めて認証が終わる。 */
+export function isMfidAuthUrl(url: string): boolean {
+  try {
+    const { origin, pathname } = new URL(url);
+    return (
+      origin === MFID_ORIGIN &&
+      MFID_AUTH_PATHNAMES.some((base) => pathname === base || pathname.startsWith(`${base}/`))
+    );
+  } catch {
+    return false;
   }
 }
 
@@ -179,9 +194,7 @@ export async function login(page: Page): Promise<void> {
   await step("otp", page, secrets, () => handleOtp(page));
 
   await step("mfid-complete", page, secrets, () =>
-    page.waitForURL((url) => !url.toString().startsWith(mfUrls.auth.password), {
-      timeout: TIMEOUTS.login,
-    }),
+    page.waitForURL((url) => !isMfidAuthUrl(url.toString()), { timeout: TIMEOUTS.login }),
   );
 
   let currentUrl = await step("me-redirect", page, secrets, async () => {
