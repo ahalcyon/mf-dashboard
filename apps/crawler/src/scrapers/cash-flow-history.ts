@@ -3,7 +3,7 @@ import type { CashFlowSummary, CashFlowItem } from "@mf-dashboard/db/types";
 import { mfUrls } from "@mf-dashboard/meta/urls";
 import type { Locator, Page } from "playwright";
 import { getHistoryMonth } from "../history-months.js";
-import { log, debug } from "../logger.js";
+import { log, debug, info } from "../logger.js";
 import { parseJapaneseNumber, convertDateToIso } from "../parsers.js";
 import type { CashFlowHistoryResult } from "../types.js";
 
@@ -40,12 +40,20 @@ export async function verifyCashFlowRowsComplete(
   page: Page,
   detailCount: number,
   totals: readonly number[],
+  month: string,
 ): Promise<void> {
   if (detailCount > 0) return;
 
-  const hasCsvLink = (await page.locator("a[href*='/cf/csv']").count()) > 0;
-  if (hasCsvLink || totals.some((total) => total !== 0)) {
-    throw new Error("Could not verify an explicit empty cash flow period");
+  const csvLinkCount = await page.locator("a[href*='/cf/csv']").count();
+  const nonZeroTotals = totals.filter((total) => total !== 0).length;
+  info(
+    `Cash flow ${month}: 0 rows, ${nonZeroTotals} non-zero total(s), ${csvLinkCount} csv link(s)`,
+  );
+
+  if (nonZeroTotals > 0) {
+    throw new Error(
+      `Could not verify an explicit empty cash flow period (${month}: 0 rows but ${nonZeroTotals} non-zero total(s))`,
+    );
   }
 }
 
@@ -403,7 +411,7 @@ export async function extractCashFlowFromPage(
 
   const detailRows = page.locator("#cf-detail-table tbody > tr");
   const detailCount = await detailRows.count();
-  await verifyCashFlowRowsComplete(page, detailCount, [totalIncome, totalExpense, balance]);
+  await verifyCashFlowRowsComplete(page, detailCount, [totalIncome, totalExpense, balance], month);
   const items: CashFlowItem[] = [];
 
   for (let i = 0; i < detailCount; i++) {
