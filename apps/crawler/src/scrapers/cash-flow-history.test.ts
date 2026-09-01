@@ -1,5 +1,6 @@
 import type { Locator, Page } from "playwright";
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
+import { info } from "../logger.js";
 import {
   buildMonthRange,
   extractCashFlowFromPage,
@@ -67,29 +68,54 @@ describe("isSupportedCashFlowAmount", () => {
 });
 
 describe("verifyCashFlowRowsComplete", () => {
-  test("0件でもCSVリンクがなく集計値が0なら明示的な空期間として受け入れる", async () => {
-    const page = {
-      locator: vi.fn<() => { count: () => Promise<number> }>().mockReturnValue({
-        count: vi.fn<() => Promise<number>>().mockResolvedValue(0),
-      }),
-    } as unknown as Page;
+  function createPage(csvLinkCount: number): {
+    page: Page;
+    locator: ReturnType<typeof vi.fn<() => { count: () => Promise<number> }>>;
+  } {
+    const locator = vi.fn<() => { count: () => Promise<number> }>().mockReturnValue({
+      count: vi.fn<() => Promise<number>>().mockResolvedValue(csvLinkCount),
+    });
+    return { page: { locator } as unknown as Page, locator };
+  }
 
-    await expect(verifyCashFlowRowsComplete(page, 0, [0, 0, 0])).resolves.toBeUndefined();
+  beforeEach(() => {
+    vi.mocked(info).mockClear();
+  });
+
+  // #124: MF は取引の有無にかかわらず CSV リンクを出す。月初はこれで毎回落ちていた
+  test.each([0, 1])("CSVリンク数 %i でも集計値が0なら空期間として受け入れる", async (csvLinks) => {
+    await expect(
+      verifyCashFlowRowsComplete(createPage(csvLinks).page, 0, [0, 0, 0], "2026-09"),
+    ).resolves.toBeUndefined();
   });
 
   test.each([
-    [1, [0, 0, 0]],
-    [0, [1, 0, 1]],
-  ])("CSVリンク数 %i と集計値 %j の0件表示を完全とは扱わない", async (csvLinks, totals) => {
-    const page = {
-      locator: vi.fn<() => { count: () => Promise<number> }>().mockReturnValue({
-        count: vi.fn<() => Promise<number>>().mockResolvedValue(csvLinks),
-      }),
-    } as unknown as Page;
-
-    await expect(verifyCashFlowRowsComplete(page, 0, totals)).rejects.toThrow(
-      "explicit empty cash flow period",
+    [[1, 0, 1], 2],
+    [[0, 5, 0], 1],
+  ])("集計値 %j の0件表示を完全とは扱わない", async (totals, nonZero) => {
+    await expect(
+      verifyCashFlowRowsComplete(createPage(1).page, 0, totals, "2026-09"),
+    ).rejects.toThrow(
+      `Could not verify an explicit empty cash flow period (2026-09: 0 rows but ${nonZero} non-zero total(s))`,
     );
+  });
+
+  test("判定に使ったシグナルを残す", async () => {
+    await verifyCashFlowRowsComplete(createPage(1).page, 0, [0, 0, 0], "2026-09");
+
+    expect(info).toHaveBeenCalledWith(
+      "Cash flow 2026-09: 0 rows, 0 non-zero total(s), 1 csv link(s)",
+    );
+  });
+
+  test("明細があるときはページを読まない", async () => {
+    const { page, locator } = createPage(1);
+
+    await expect(
+      verifyCashFlowRowsComplete(page, 3, [1, 1, 0], "2026-09"),
+    ).resolves.toBeUndefined();
+    expect(locator).not.toHaveBeenCalled();
+    expect(info).not.toHaveBeenCalled();
   });
 });
 
