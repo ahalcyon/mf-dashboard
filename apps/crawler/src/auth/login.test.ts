@@ -2,20 +2,22 @@ import { mfUrls } from "@mf-dashboard/meta/urls";
 import type { Page } from "playwright";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-const { debug, getCredentials, getOTP, info, log } = vi.hoisted(() => ({
+const { debug, getCredentials, getOTP, info, log, warn, waitForNextOtpWindow } = vi.hoisted(() => ({
   debug: vi.fn<(...args: unknown[]) => void>(),
   getCredentials: vi.fn<() => Promise<{ password: string; username: string }>>(),
   getOTP: vi.fn<() => Promise<string>>(),
   info: vi.fn<(...args: unknown[]) => void>(),
   log: vi.fn<(...args: unknown[]) => void>(),
+  warn: vi.fn<(...args: unknown[]) => void>(),
+  waitForNextOtpWindow: vi.fn<() => Promise<void>>(),
 }));
 
-vi.mock("../logger.js", () => ({ debug, info, log }));
-vi.mock("./credentials.js", () => ({ getCredentials, getOTP }));
+vi.mock("../logger.js", () => ({ debug, info, log, warn }));
+vi.mock("./credentials.js", () => ({ getCredentials, getOTP, waitForNextOtpWindow }));
 
 import { describeFailure, isMfidAuthUrl, login, pageLocation } from "./login.js";
 
-type OtpBehaviour = "none" | "accepted" | "rejected";
+type OtpBehaviour = "none" | "accepted" | "rejected" | "rejected-once";
 
 const MFID_PASSWORD_PAGE = "https://id.moneyforward.com/sign_in/password";
 const MFID_TOTP_PAGE = "https://id.moneyforward.com/two_factor_auth/totp";
@@ -42,6 +44,8 @@ function createPage(
   // 送信のたびに MFID が渡してくるページ。本番のログと同じ順序にしている。
   const submitted: string[] = [MFID_PASSWORD_PAGE];
   if (otp !== "none") submitted.push(MFID_TOTP_PAGE);
+  // 拒否された1回目の送信は同じページに留まり、2回目で先へ進む
+  if (otp === "rejected-once") submitted.push(MFID_TOTP_PAGE);
   // 拒否されたコードは同じページに留まる
   const exitPage =
     otp === "rejected" ? undefined : stuckOnMfid ? MFID_WEBAUTHN_PAGE : MFID_DONE_PAGE;
@@ -59,6 +63,7 @@ function createPage(
   };
   locator.first.mockReturnValue(locator);
 
+  let otpSubmits = 0;
   const otpLocator = {
     ...locator,
     first: vi.fn<() => unknown>(),
@@ -66,7 +71,10 @@ function createPage(
       if (state === "visible" && otp === "none") {
         throw new Error("OTP input is not visible");
       }
-      if (state === "hidden" && otp === "rejected") {
+      if (state !== "hidden") return;
+
+      otpSubmits += 1;
+      if (otp === "rejected" || (otp === "rejected-once" && otpSubmits === 1)) {
         throw new Error("OTP input is still visible");
       }
     }),
@@ -115,6 +123,7 @@ describe("login", () => {
       password: "test-password",
     });
     getOTP.mockResolvedValue("123456");
+    waitForNextOtpWindow.mockResolvedValue(undefined);
   });
 
   test("rejects when the browser remains on the MFID sign-in page", async () => {
@@ -166,6 +175,24 @@ describe("login", () => {
         "the code was refused; the one-time code form is still on screen",
     );
     expect(page.url()).toBe("https://id.moneyforward.com/two_factor_auth/totp");
+  });
+
+  // 同じ30秒のコードを別のログインが使い切っていることがある
+  test("retries with the next window when the one-time code is refused once", async () => {
+    const page = createPage(mfUrls.accounts, { otp: "rejected-once", viaPassword: true });
+
+    await expect(login(page)).resolves.toBeUndefined();
+    expect(waitForNextOtpWindow).toHaveBeenCalledOnce();
+    expect(getOTP).toHaveBeenCalledTimes(2);
+    expect(info.mock.calls.flat()).toEqual(expect.arrayContaining(["Auth otp: accepted"]));
+  });
+
+  test("waits for the next window only once before giving up", async () => {
+    const page = createPage(mfUrls.accounts, { otp: "rejected", viaPassword: true });
+
+    await expect(login(page)).rejects.toThrow("the code was refused");
+    expect(waitForNextOtpWindow).toHaveBeenCalledOnce();
+    expect(getOTP).toHaveBeenCalledTimes(2);
   });
 
   // /sign_in 配下を抜けても認証は終わっていない。そこで進ませない
