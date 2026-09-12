@@ -13,11 +13,11 @@ resource "aws_ecr_lifecycle_policy" "writer" {
   policy = jsonencode({
     rules = [{
       rulePriority = 1
-      description  = "Keep the deployed image and the one before it"
+      description  = "Keep the deployed image"
       selection = {
         tagStatus   = "any"
         countType   = "imageCountMoreThan"
-        countNumber = 2
+        countNumber = 1
       }
       action = { type = "expire" }
     }]
