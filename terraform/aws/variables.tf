@@ -121,8 +121,8 @@ variable "database_object_key" {
 variable "schedule_expression" {
   description = <<-DESC
     EventBridge Scheduler cron for the crawler, evaluated in schedule_timezone.
-    Runs half an hour after bulk_refresh_schedule_expression so the institutions
-    have had time to update. The crawl does not wait for them.
+    Runs half an hour after a bulk refresh so the institutions have had time to
+    update. The crawl does not wait for them.
   DESC
   type        = string
   default     = "cron(30 0,6,12,18 * * ? *)"
@@ -215,9 +215,13 @@ variable "bulk_refresh_ephemeral_storage" {
 }
 
 variable "bulk_refresh_schedule_expression" {
-  description = "EventBridge Scheduler cron for the bulk refresh, evaluated in schedule_timezone"
+  description = <<-DESC
+    EventBridge Scheduler cron for the bulk refresh, evaluated in schedule_timezone.
+    Runs more often than the crawl so that a button-started crawl, which only
+    reads what Money Forward already holds, finds recent values.
+  DESC
   type        = string
-  default     = "cron(0 0,6,12,18 * * ? *)"
+  default     = "cron(0 0/2 * * ? *)"
 }
 
 variable "enable_bulk_refresh_schedule" {

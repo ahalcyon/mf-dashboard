@@ -47,12 +47,9 @@ data "aws_iam_policy_document" "refresh_trigger" {
   }
 
   statement {
-    sid     = "StartRefreshAndCrawl"
-    actions = ["lambda:InvokeFunction"]
-    resources = [
-      aws_lambda_function.bulk_refresh.arn,
-      aws_lambda_function.crawl.arn,
-    ]
+    sid       = "StartCrawl"
+    actions   = ["lambda:InvokeFunction"]
+    resources = [aws_lambda_function.crawl.arn]
   }
 }
 
@@ -74,9 +71,8 @@ resource "aws_lambda_function" "refresh_trigger" {
 
   environment {
     variables = {
-      TZ                    = "Asia/Tokyo"
-      BULK_REFRESH_FUNCTION = aws_lambda_function.bulk_refresh.function_name
-      CRAWL_FUNCTION        = aws_lambda_function.crawl.function_name
+      TZ             = "Asia/Tokyo"
+      CRAWL_FUNCTION = aws_lambda_function.crawl.function_name
     }
   }
 

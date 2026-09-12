@@ -33,7 +33,6 @@ function invokedFunctions() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv("BULK_REFRESH_FUNCTION", "mf-dashboard-bulk-refresh");
   vi.stubEnv("CRAWL_FUNCTION", "mf-dashboard-crawl");
   lambdaSend.mockResolvedValue({ StatusCode: 202 });
 });
@@ -67,48 +66,33 @@ describe("メソッドの検証", () => {
 
 // 起動して初めて名前どおりになる。
 describe("起動するもの", () => {
-  test("一括更新を先に、クロールを後に起動する", async () => {
+  test("クロールを起動する", async () => {
     const response = await handler(buildEvent("/api/refresh/"));
 
     expect(response).toMatchObject({ statusCode: 202 });
-    expect(invokedFunctions()).toEqual(["mf-dashboard-bulk-refresh", "mf-dashboard-crawl"]);
+    expect(invokedFunctions()).toEqual(["mf-dashboard-crawl"]);
   });
 
-  // どちらのログにも、定時実行ではなくボタン起動だと残す
-  test("どちらにも起動元を渡す", async () => {
+  // クロールのログに、定時実行ではなくボタン起動だと残す
+  test("起動元を渡す", async () => {
     await handler(buildEvent("/api/refresh/"));
 
-    for (const [c] of lambdaSend.mock.calls) {
-      const { Payload } = (c as { input: { Payload: string } }).input;
-      expect(JSON.parse(Payload)).toEqual({ source: "refresh-button" });
-    }
+    const { Payload } = (lambdaSend.mock.calls[0]![0] as { input: { Payload: string } }).input;
+    expect(JSON.parse(Payload)).toEqual({ source: "refresh-button" });
   });
 
   // 完了を待つと 80 秒かかる。ボタンは「開始しました」を返す作り。
-  test("どちらも完了を待たない", async () => {
+  test("完了を待たない", async () => {
     await handler(buildEvent("/api/refresh/"));
 
-    for (const [c] of lambdaSend.mock.calls) {
-      expect((c as { input: { InvocationType: string } }).input.InvocationType).toBe("Event");
-    }
-  });
-
-  // 更新が始まらなくても、取り込みは前回の更新結果に対して成立する
-  test("一括更新に失敗してもクロールは起動する", async () => {
-    lambdaSend
-      .mockRejectedValueOnce(new Error("Lambda unavailable"))
-      .mockResolvedValueOnce({ StatusCode: 202 });
-
-    const response = await handler(buildEvent("/api/refresh/"));
-
-    expect(response).toMatchObject({ statusCode: 202 });
-    expect(invokedFunctions()).toContain("mf-dashboard-crawl");
+    const { InvocationType } = (
+      lambdaSend.mock.calls[0]![0] as { input: { InvocationType: string } }
+    ).input;
+    expect(InvocationType).toBe("Event");
   });
 
   test("クロールの起動に失敗したら 502 を返す", async () => {
-    lambdaSend
-      .mockResolvedValueOnce({ StatusCode: 202 })
-      .mockRejectedValueOnce(new Error("Invoke denied"));
+    lambdaSend.mockRejectedValueOnce(new Error("Invoke denied"));
 
     const response = await handler(buildEvent("/api/refresh/"));
 
@@ -120,9 +104,7 @@ describe("起動するもの", () => {
 
   // 202 以外を成功として返すと、起動していないのに「開始しました」になる
   test("Lambda が 2xx 以外を返したら失敗として扱う", async () => {
-    lambdaSend.mockResolvedValueOnce({ StatusCode: 202 }).mockResolvedValueOnce({
-      StatusCode: 429,
-    });
+    lambdaSend.mockResolvedValueOnce({ StatusCode: 429 });
 
     expect(await handler(buildEvent("/api/refresh/"))).toMatchObject({ statusCode: 502 });
   });
