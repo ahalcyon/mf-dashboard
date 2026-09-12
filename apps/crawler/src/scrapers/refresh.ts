@@ -8,6 +8,7 @@ const POLL_INTERVAL_MS = 30000; // 30 seconds
 const NAVIGATION_RETRY_DELAY_MS = 1000;
 const REFRESH_START_SETTLE_MS = 3000;
 const NAVIGATION_TIMEOUT_MS = 60000;
+const IN_APP_MESSAGE_SELECTOR = ".ab-iam-root";
 
 interface NavigationOptions {
   retryDelayMs?: number;
@@ -118,6 +119,19 @@ export function getMaxWaitMinutes(env: NodeJS.ProcessEnv = process.env): number 
     : DEFAULT_MAX_WAIT_MINUTES;
 }
 
+export function isPointerInterceptedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("intercepts pointer events");
+}
+
+async function dismissInAppMessage(page: Page): Promise<void> {
+  await page.evaluate((selector) => {
+    for (const root of document.querySelectorAll(selector)) {
+      root.remove();
+    }
+  }, IN_APP_MESSAGE_SELECTOR);
+}
+
 /** 金融機関の一括更新を開始する。完了は待たない。 */
 export async function startBulkRefresh(page: Page): Promise<void> {
   debug("Looking for refresh button...");
@@ -126,7 +140,16 @@ export async function startBulkRefresh(page: Page): Promise<void> {
   await page.waitForLoadState("networkidle");
 
   const refreshButton = page.locator('a:has-text("一括更新")').first();
-  await refreshButton.click();
+  try {
+    await refreshButton.click();
+  } catch (err) {
+    if (!isPointerInterceptedError(err)) {
+      throw err;
+    }
+    warn("Refresh button was covered by an in-app message. Dismissing it and retrying.");
+    await dismissInAppMessage(page);
+    await refreshButton.click();
+  }
 
   info("Refreshing accounts...");
 
