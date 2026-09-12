@@ -1,8 +1,8 @@
 import { mfUrls } from "@mf-dashboard/meta/urls";
-import type { BrowserContext, Page } from "playwright";
-import { debug, info } from "../logger.js";
+import type { BrowserContext, Locator, Page } from "playwright";
+import { debug, info, warn } from "../logger.js";
 import { navigateToAccountsPage } from "../scrapers/refresh.js";
-import { getCredentials, getOTP } from "./credentials.js";
+import { getCredentials, getOTP, waitForNextOtpWindow } from "./credentials.js";
 import { hasAuthState, saveAuthState } from "./state.js";
 
 const TIMEOUTS = {
@@ -115,6 +115,19 @@ async function waitForUrlChange(page: Page, timeout: number = TIMEOUTS.redirect)
   } catch {}
 }
 
+async function submitOtp(page: Page, otpInput: Locator): Promise<boolean> {
+  await otpInput.fill(await getOTP());
+  await page.locator(SELECTORS.mfidOtpSubmit).first().click();
+  info("Auth otp: submitted");
+
+  try {
+    await otpInput.waitFor({ state: "hidden", timeout: TIMEOUTS.long });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function handleOtp(page: Page): Promise<void> {
   const otpInput = page.locator(SELECTORS.mfidOtpInput).first();
 
@@ -126,14 +139,15 @@ async function handleOtp(page: Page): Promise<void> {
   }
 
   info("Auth otp: requested");
-  await otpInput.fill(await getOTP());
-  await page.locator(SELECTORS.mfidOtpSubmit).first().click();
-  info("Auth otp: submitted");
 
-  try {
-    await otpInput.waitFor({ state: "hidden", timeout: TIMEOUTS.long });
-  } catch {
-    throw new Error("the code was refused; the one-time code form is still on screen");
+  if (!(await submitOtp(page, otpInput))) {
+    // 同じ 30 秒のコードを別のログインが使い切っていることがある
+    warn("Auth otp: refused, retrying with the code of the next window");
+    await waitForNextOtpWindow();
+
+    if (!(await submitOtp(page, otpInput))) {
+      throw new Error("the code was refused; the one-time code form is still on screen");
+    }
   }
 
   info("Auth otp: accepted");

@@ -114,6 +114,11 @@ export async function getOTP(): Promise<string> {
   return generateTotp(totpSecret);
 }
 
+/** 次のウィンドウまで待つ。同じコードを二度送らないために使う。 */
+export async function waitForNextOtpWindow(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, secondsUntilNextWindow() * 1000 + 500));
+}
+
 /**
  * テスト用: 解決済みの値を破棄する
  */
