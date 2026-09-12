@@ -155,7 +155,7 @@ variable "payload_retention_days" {
 variable "noncurrent_version_retention_days" {
   description = "How long superseded SQLite database versions are kept. Versioning is the only rollback for whole-file rewrites."
   type        = number
-  default     = 30
+  default     = 1
 }
 
 # --- 定期クロール ---------------------------------------------------------
