@@ -6,8 +6,8 @@ import { isRefreshPath, toResponse, type RefreshOutcome } from "./result.js";
 /**
  * ダッシュボードの「金融機関データを更新」に応じる。
  *
- * クロールだけを起こす。金融機関への一括更新は 6 時間おきの定時実行が
- * 受け持ち、クロールはその時点で MF が持っている値を取り込む。
+ * クロールを起こす。クロールはその時点で Money Forward が持っている値を
+ * 取り込む。金融機関への一括更新は定時実行が受け持つ。
  *
  * 認証は CloudFront の viewer-request 関数が担う。
  * Function URL は OAC で CloudFront からのみ到達する。

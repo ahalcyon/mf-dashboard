@@ -66,7 +66,7 @@ describe("メソッドの検証", () => {
 
 // 起動して初めて名前どおりになる。
 describe("起動するもの", () => {
-  test("クロールだけを起動する", async () => {
+  test("クロールを起動する", async () => {
     const response = await handler(buildEvent("/api/refresh/"));
 
     expect(response).toMatchObject({ statusCode: 202 });
