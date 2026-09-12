@@ -95,23 +95,22 @@ export function resampleByGranularity<T extends { date: string }>(
   return granularity === "monthly" ? collapseToMonthly(data) : data;
 }
 
-/** 年は両端の目盛りにだけ付ける。 */
-export function formatChartDateLabel(
-  date: string,
-  granularity: Granularity,
-  withYear: boolean,
-): string {
-  const [year, month, day] = date.split("-");
-  if (granularity === "monthly") {
-    return withYear ? `${year}/${month}` : `${month}`;
-  }
-  return withYear ? `${year}/${month}/${day}` : `${month}/${day}`;
+export function formatChartDateLabel(date: string, granularity: Granularity): string {
+  const [, month, day] = date.split("-");
+  return granularity === "monthly" ? `${month}` : `${month}/${day}`;
 }
 
-/**
- * 目盛りラベルの文言。両端は年を付け、間は等間隔に間引く。
- * 両端に寄りすぎた目盛りは、年付きラベルとぶつかるので落とす。
- */
+/** 年をまたぐときだけ、軸の下に出す両端の年を返す。 */
+export function chartYearMarkers(dates: readonly string[]): { start: string; end: string } | null {
+  if (dates.length === 0) return null;
+
+  const start = dates[0]!.slice(0, 4);
+  const end = dates[dates.length - 1]!.slice(0, 4);
+
+  return start === end ? null : { start, end };
+}
+
+/** 目盛りラベルの文言。両端は必ず出し、間は等間隔に間引く。 */
 export function axisDateLabel(
   date: string,
   index: number,
@@ -119,14 +118,14 @@ export function axisDateLabel(
   granularity: Granularity,
 ): string {
   if (index === 0 || index === lastIndex) {
-    return formatChartDateLabel(date, granularity, true);
+    return formatChartDateLabel(date, granularity);
   }
 
   const interval = CHART_LABEL_INTERVAL[granularity];
   if (index % interval !== 0) return "";
   if (index < interval / 2 || lastIndex - index < interval / 2) return "";
 
-  return formatChartDateLabel(date, granularity, false);
+  return formatChartDateLabel(date, granularity);
 }
 
 /** 全点を並べるのに要する幅。 */

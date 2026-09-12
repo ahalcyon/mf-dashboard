@@ -18,6 +18,7 @@ import {
   CHART_PERIOD_OPTIONS,
   axisDateLabel,
   chartScrollWidth,
+  chartYearMarkers,
   filterDataByPeriod,
   resampleByGranularity,
   type Granularity,
@@ -30,6 +31,9 @@ import { ChartTooltipContent } from "../charts/chart-tooltip";
 import { AmountDisplay } from "../ui/amount-display";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { PeriodToggle } from "../ui/period-toggle";
+
+/** Recharts の YAxis の既定幅。軸の下に出す年をプロット領域の端に合わせる */
+const YAXIS_WIDTH = 60;
 
 interface AssetHistoryPoint {
   date: string;
@@ -149,6 +153,7 @@ export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChar
   );
 
   const lastIndex = filteredData.length - 1;
+  const yearMarkers = chartYearMarkers(filteredData.map((d) => d.date));
   const formatDateLabel = (dateStr: string, index: number) =>
     axisDateLabel(dateStr, index, lastIndex, granularity);
 
@@ -238,7 +243,7 @@ export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChar
             >
               <RechartsLineChart
                 data={filteredData}
-                margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
+                margin={{ top: 5, right: 24, left: 10, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis
@@ -273,6 +278,15 @@ export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChar
                   ))}
               </RechartsLineChart>
             </ResponsiveContainer>
+            {yearMarkers && (
+              <div
+                className="flex justify-between text-xs text-muted-foreground"
+                style={{ paddingLeft: YAXIS_WIDTH, paddingRight: 24 }}
+              >
+                <span>{yearMarkers.start}年</span>
+                <span>{yearMarkers.end}年</span>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>

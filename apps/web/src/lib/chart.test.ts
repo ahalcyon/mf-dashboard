@@ -7,6 +7,7 @@ import {
   resampleByGranularity,
   formatChartDateLabel,
   axisDateLabel,
+  chartYearMarkers,
   chartScrollWidth,
 } from "./chart";
 
@@ -163,12 +164,31 @@ describe("resampleByGranularity", () => {
 
 describe("formatChartDateLabel", () => {
   it.each([
-    { granularity: "daily" as const, withYear: false, expected: "09/04" },
-    { granularity: "daily" as const, withYear: true, expected: "2026/09/04" },
-    { granularity: "monthly" as const, withYear: false, expected: "09" },
-    { granularity: "monthly" as const, withYear: true, expected: "2026/09" },
-  ])("$granularity withYear=$withYear -> $expected", ({ granularity, withYear, expected }) => {
-    expect(formatChartDateLabel("2026-09-04", granularity, withYear)).toBe(expected);
+    { granularity: "daily" as const, expected: "09/04" },
+    { granularity: "monthly" as const, expected: "09" },
+  ])("$granularity -> $expected", ({ granularity, expected }) => {
+    expect(formatChartDateLabel("2026-09-04", granularity)).toBe(expected);
+  });
+});
+
+describe("chartYearMarkers", () => {
+  it("年をまたぐときだけ両端の年を返す", () => {
+    expect(chartYearMarkers(["2025-11-01", "2026-01-15", "2026-03-01"])).toEqual({
+      start: "2025",
+      end: "2026",
+    });
+  });
+
+  it("同じ年に収まるならnullを返す", () => {
+    expect(chartYearMarkers(["2026-01-15", "2026-03-01"])).toBeNull();
+  });
+
+  it("1点でもその年に収まるのでnullを返す", () => {
+    expect(chartYearMarkers(["2026-01-15"])).toBeNull();
+  });
+
+  it("空ならnullを返す", () => {
+    expect(chartYearMarkers([])).toBeNull();
   });
 });
 
@@ -176,9 +196,9 @@ describe("axisDateLabel", () => {
   const daily = (index: number, lastIndex: number) =>
     axisDateLabel("2026-06-07", index, lastIndex, "daily");
 
-  it("両端には年を付ける", () => {
-    expect(daily(0, 30)).toBe("2026/06/07");
-    expect(daily(30, 30)).toBe("2026/06/07");
+  it("両端は必ずラベルを出す", () => {
+    expect(daily(0, 30)).toBe("06/07");
+    expect(daily(30, 30)).toBe("06/07");
   });
 
   it("日次は1週間おきにだけラベルを出す", () => {
@@ -197,11 +217,11 @@ describe("axisDateLabel", () => {
   it("月次は毎月ラベルを出す", () => {
     expect(axisDateLabel("2026-06-30", 1, 5, "monthly")).toBe("06");
     expect(axisDateLabel("2026-06-30", 2, 5, "monthly")).toBe("06");
-    expect(axisDateLabel("2026-06-30", 0, 5, "monthly")).toBe("2026/06");
+    expect(axisDateLabel("2026-06-30", 0, 5, "monthly")).toBe("06");
   });
 
-  it("点が1つだけなら年付きで出す", () => {
-    expect(daily(0, 0)).toBe("2026/06/07");
+  it("点が1つだけでもラベルを出す", () => {
+    expect(daily(0, 0)).toBe("06/07");
   });
 });
 

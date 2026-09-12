@@ -92,6 +92,17 @@ export const DailyOverSixMonths: Story = {
   },
 };
 
+export const YearMarkersTest: Story = {
+  beforeEach() {
+    mocked(getAssetHistoryWithCategories).mockResolvedValue(generateMockData());
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByText("全期間"));
+  },
+};
+
 export const Empty: Story = {
   beforeEach() {
     mocked(getAssetHistoryWithCategories).mockResolvedValue([]);
