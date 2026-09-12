@@ -3,7 +3,9 @@ import { describe, expect, test, vi } from "vitest";
 import {
   getMaxWaitMinutes,
   getRefreshStatus,
+  isPointerInterceptedError,
   navigateToAccountsPage,
+  startBulkRefresh,
   summarizeRefreshRows,
   type RefreshStatusRow,
 } from "./refresh.js";
@@ -145,5 +147,84 @@ describe("navigateToAccountsPage", () => {
 
     await expect(navigateToAccountsPage(page, { retryDelayMs: 0 })).rejects.toBe(error);
     expect(goto).toHaveBeenCalledOnce();
+  });
+});
+
+const INTERCEPTED_CLICK_ERROR = `locator.click: Timeout 5000ms exceeded.
+Call log:
+  - waiting for locator('a:has-text("一括更新")').first()
+  - attempting click action
+    - <iframe title="Modal Message" class="ab-in-app-message"></iframe> from <div role="complementary" class="ab-iam-root v3 ab-show">…</div> subtree intercepts pointer events`;
+
+describe("isPointerInterceptedError", () => {
+  test.each([
+    { name: "覆われたクリックのエラー", error: new Error(INTERCEPTED_CLICK_ERROR), expected: true },
+    {
+      name: "要素が見つからないタイムアウト",
+      error: new Error("locator.click: Timeout 5000ms exceeded."),
+      expected: false,
+    },
+    { name: "Errorではない値", error: "intercepts pointer events", expected: true },
+    { name: "null", error: null, expected: false },
+  ])("$name", ({ error, expected }) => {
+    expect(isPointerInterceptedError(error)).toBe(expected);
+  });
+});
+
+describe("startBulkRefresh", () => {
+  function createPage(click: ReturnType<typeof vi.fn>) {
+    const evaluate = vi.fn<(...args: any[]) => any>().mockResolvedValue(undefined);
+    const page = {
+      evaluate,
+      goto: vi.fn<(...args: any[]) => any>().mockResolvedValue(null),
+      locator: vi.fn<(...args: any[]) => any>().mockReturnValue({
+        first: vi.fn<(...args: any[]) => any>().mockReturnValue({ click }),
+      }),
+      waitForLoadState: vi.fn<(...args: any[]) => any>().mockResolvedValue(undefined),
+      waitForTimeout: vi.fn<(...args: any[]) => any>().mockResolvedValue(undefined),
+    };
+    return { evaluate, page: page as unknown as Page };
+  }
+
+  test("アプリ内メッセージに覆われたら取り除いて1回だけ再試行する", async () => {
+    const click = vi
+      .fn<(...args: any[]) => any>()
+      .mockRejectedValueOnce(new Error(INTERCEPTED_CLICK_ERROR))
+      .mockResolvedValueOnce(undefined);
+    const { evaluate, page } = createPage(click);
+
+    await startBulkRefresh(page);
+
+    expect(click).toHaveBeenCalledTimes(2);
+    expect(evaluate).toHaveBeenCalledWith(expect.any(Function), ".ab-iam-root");
+  });
+
+  test("覆われていなければ取り除かない", async () => {
+    const click = vi.fn<(...args: any[]) => any>().mockResolvedValue(undefined);
+    const { evaluate, page } = createPage(click);
+
+    await startBulkRefresh(page);
+
+    expect(click).toHaveBeenCalledOnce();
+    expect(evaluate).not.toHaveBeenCalled();
+  });
+
+  test("他のクリック失敗は再試行せず元のエラーを返す", async () => {
+    const error = new Error("locator.click: Timeout 5000ms exceeded.");
+    const click = vi.fn<(...args: any[]) => any>().mockRejectedValue(error);
+    const { evaluate, page } = createPage(click);
+
+    await expect(startBulkRefresh(page)).rejects.toBe(error);
+    expect(click).toHaveBeenCalledOnce();
+    expect(evaluate).not.toHaveBeenCalled();
+  });
+
+  test("取り除いても覆われたままなら失敗させる", async () => {
+    const error = new Error(INTERCEPTED_CLICK_ERROR);
+    const click = vi.fn<(...args: any[]) => any>().mockRejectedValue(error);
+    const { page } = createPage(click);
+
+    await expect(startBulkRefresh(page)).rejects.toBe(error);
+    expect(click).toHaveBeenCalledTimes(2);
   });
 });
