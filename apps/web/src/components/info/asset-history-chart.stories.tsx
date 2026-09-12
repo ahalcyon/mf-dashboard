@@ -67,6 +67,42 @@ export const PeriodToggleTest: Story = {
   },
 };
 
+export const GranularityToggleTest: Story = {
+  beforeEach() {
+    mocked(getAssetHistoryWithCategories).mockResolvedValue(generateMockData());
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByText("日次"));
+    await userEvent.click(canvas.getByText("3ヶ月"));
+    await userEvent.click(canvas.getByText("月次"));
+  },
+};
+
+export const DailyOverSixMonths: Story = {
+  beforeEach() {
+    mocked(getAssetHistoryWithCategories).mockResolvedValue(generateMockData());
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByText("日次"));
+    await userEvent.click(canvas.getByText("6ヶ月"));
+  },
+};
+
+export const YearMarkersTest: Story = {
+  beforeEach() {
+    mocked(getAssetHistoryWithCategories).mockResolvedValue(generateMockData());
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByText("全期間"));
+  },
+};
+
 export const Empty: Story = {
   beforeEach() {
     mocked(getAssetHistoryWithCategories).mockResolvedValue([]);

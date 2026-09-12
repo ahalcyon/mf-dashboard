@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { type GainFilter, useHoldingsFilter } from "../../contexts/holdings-filter-context";
 import { sortByAmountDescending } from "../../lib/amount-order";
@@ -192,12 +192,6 @@ function CategoryCard({
   const totalPages = Math.ceil(items.length / PAGE_SIZE);
   const lastPage = Math.max(0, totalPages - 1);
   const visiblePage = Math.min(currentPage, lastPage);
-
-  useEffect(() => {
-    if (currentPage > lastPage) {
-      setCurrentPage(lastPage);
-    }
-  }, [currentPage, lastPage]);
 
   // Colors are generated for all items (for chart consistency)
   const colors = getChartColorArray(items.length);

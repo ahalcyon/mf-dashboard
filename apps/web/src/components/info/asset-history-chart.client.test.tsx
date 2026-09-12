@@ -10,7 +10,7 @@ describe("AssetHistoryTooltip", () => {
       <AssetHistoryTooltip
         active
         label="2026-07-26"
-        period="1m"
+        granularity="daily"
         payload={[
           { dataKey: "totalAssets", name: "総資産", value: 1000 },
           { dataKey: "投資信託", name: "投資信託", value: 400 },
@@ -30,7 +30,7 @@ describe("AssetHistoryTooltip", () => {
       <AssetHistoryTooltip
         active
         label="2026-07-26"
-        period="1m"
+        granularity="daily"
         payload={[{ dataKey: "投資信託", name: "投資信託", value: 400 }]}
       />,
     );
@@ -41,12 +41,26 @@ describe("AssetHistoryTooltip", () => {
     expect(screen.queryByText("1,000円")).toBeNull();
   });
 
+  it("月次では年月だけを表示する", () => {
+    render(
+      <AssetHistoryTooltip
+        active
+        label="2026-07-26"
+        granularity="monthly"
+        payload={[{ dataKey: "totalAssets", name: "総資産", value: 1000 }]}
+      />,
+    );
+
+    expect(screen.getByText("2026/7")).toBeTruthy();
+    expect(screen.queryByText("2026/7/26")).toBeNull();
+  });
+
   it("カテゴリを金額の降順で表示する", () => {
     render(
       <AssetHistoryTooltip
         active
         label="2026-07-26"
-        period="1m"
+        granularity="daily"
         payload={[
           { dataKey: "預金・現金", name: "預金・現金", value: 100 },
           { dataKey: "暗号資産", name: "暗号資産", value: 300 },

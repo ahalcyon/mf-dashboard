@@ -21,6 +21,96 @@ import { buildGroupPath } from "../../lib/url";
 import { ChartTooltipContent } from "../charts/chart-tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
+const LEGEND_ENTRIES = [
+  { label: "収入", color: semanticColors.income },
+  { label: "支出", color: semanticColors.expense },
+  { label: "収支", color: semanticColors.balancePositive },
+];
+
+function CustomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ value: number; dataKey: string }>;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const income = payload.find((p) => p.dataKey === "収入")?.value ?? 0;
+  const expense = Math.abs(payload.find((p) => p.dataKey === "支出")?.value ?? 0);
+  const balance = payload.find((p) => p.dataKey === "収支")?.value ?? 0;
+
+  const formatValue = (val: number) => {
+    const manEn = val / 10000;
+    // Show decimal if less than 1万円
+    if (Math.abs(manEn) < 1 && manEn !== 0) {
+      return manEn.toFixed(1);
+    }
+    return Math.round(manEn).toLocaleString();
+  };
+
+  return (
+    <ChartTooltipContent>
+      <div className="flex justify-between gap-4">
+        <span className="text-muted-foreground font-bold">収入</span>
+        <span className="font-bold" style={{ color: semanticColors.income }}>
+          {formatValue(income)}
+          <span className="text-sm">万円</span>
+        </span>
+      </div>
+      <div className="flex justify-between gap-4">
+        <span className="text-muted-foreground font-bold">支出</span>
+        <span className="font-bold" style={{ color: semanticColors.expense }}>
+          {formatValue(expense)}
+          <span className="text-sm">万円</span>
+        </span>
+      </div>
+      <div className="flex justify-between gap-4 mt-1 pt-1 border-t">
+        <span className="text-muted-foreground font-bold">収支</span>
+        <span
+          className="font-bold"
+          style={{
+            color: balance >= 0 ? semanticColors.balancePositive : semanticColors.balanceNegative,
+          }}
+        >
+          {balance >= 0 ? "" : "-"}
+          {formatValue(Math.abs(balance))}
+          <span className="text-sm">万円</span>
+        </span>
+      </div>
+    </ChartTooltipContent>
+  );
+}
+
+function ChartLegend() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        gap: 16,
+        fontSize: 12,
+        fontWeight: 700,
+      }}
+    >
+      {LEGEND_ENTRIES.map(({ label, color }) => (
+        <span key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              backgroundColor: color,
+              borderRadius: label === "収支" ? "50%" : 0,
+              display: "inline-block",
+            }}
+          />
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 interface MonthlySummary {
   month: string;
   totalIncome: number;
@@ -80,62 +170,6 @@ export function MonthlyIncomeExpenseChartClient({ data, groupId }: MonthlyIncome
     return `${manEn.toFixed(0)}万円`;
   };
 
-  // Custom tooltip
-  const CustomTooltip = ({
-    active,
-    payload,
-  }: {
-    active?: boolean;
-    payload?: Array<{ value: number; dataKey: string }>;
-  }) => {
-    if (!active || !payload || payload.length === 0) return null;
-
-    const income = payload.find((p) => p.dataKey === "収入")?.value ?? 0;
-    const expense = Math.abs(payload.find((p) => p.dataKey === "支出")?.value ?? 0);
-    const balance = payload.find((p) => p.dataKey === "収支")?.value ?? 0;
-
-    const formatValue = (val: number) => {
-      const manEn = val / 10000;
-      // Show decimal if less than 1万円
-      if (Math.abs(manEn) < 1 && manEn !== 0) {
-        return manEn.toFixed(1);
-      }
-      return Math.round(manEn).toLocaleString();
-    };
-
-    return (
-      <ChartTooltipContent>
-        <div className="flex justify-between gap-4">
-          <span className="text-muted-foreground font-bold">収入</span>
-          <span className="font-bold" style={{ color: semanticColors.income }}>
-            {formatValue(income)}
-            <span className="text-sm">万円</span>
-          </span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-muted-foreground font-bold">支出</span>
-          <span className="font-bold" style={{ color: semanticColors.expense }}>
-            {formatValue(expense)}
-            <span className="text-sm">万円</span>
-          </span>
-        </div>
-        <div className="flex justify-between gap-4 mt-1 pt-1 border-t">
-          <span className="text-muted-foreground font-bold">収支</span>
-          <span
-            className="font-bold"
-            style={{
-              color: balance >= 0 ? semanticColors.balancePositive : semanticColors.balanceNegative,
-            }}
-          >
-            {balance >= 0 ? "" : "-"}
-            {formatValue(Math.abs(balance))}
-            <span className="text-sm">万円</span>
-          </span>
-        </div>
-      </ChartTooltipContent>
-    );
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -162,40 +196,7 @@ export function MonthlyIncomeExpenseChartClient({ data, groupId }: MonthlyIncome
               domain={[yAxisMin, yAxisMax]}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Legend
-              align="right"
-              verticalAlign="bottom"
-              content={() => (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "flex-end",
-                    gap: 16,
-                    fontSize: 12,
-                    fontWeight: 700,
-                  }}
-                >
-                  {[
-                    { label: "収入", color: semanticColors.income },
-                    { label: "支出", color: semanticColors.expense },
-                    { label: "収支", color: semanticColors.balancePositive },
-                  ].map(({ label, color }) => (
-                    <span key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <span
-                        style={{
-                          width: 10,
-                          height: 10,
-                          backgroundColor: color,
-                          borderRadius: label === "収支" ? "50%" : 0,
-                          display: "inline-block",
-                        }}
-                      />
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              )}
-            />
+            <Legend align="right" verticalAlign="bottom" content={<ChartLegend />} />
             <ReferenceLine y={0} stroke="#4B5563" strokeWidth={1} />
             <Bar
               dataKey="収入"
