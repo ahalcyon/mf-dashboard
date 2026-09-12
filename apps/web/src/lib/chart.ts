@@ -17,10 +17,16 @@ export const CHART_GRANULARITY_OPTIONS: { value: Granularity; label: string }[] 
   { value: "monthly", label: "月次" },
 ];
 
-/** 縦書きラベルが重ならない 1 点あたりの幅。下回るとチャートを横スクロールさせる */
+/** 1 点あたりの幅。下回るとチャートを横スクロールさせる */
 const CHART_POINT_WIDTH: Record<Granularity, number> = {
-  daily: 26,
+  daily: 10,
   monthly: 40,
+};
+
+/** 目盛りラベルを何点おきに出すか。日次は 1 週間おき */
+const CHART_LABEL_INTERVAL: Record<Granularity, number> = {
+  daily: 7,
+  monthly: 1,
 };
 
 export type ComparisonPeriod = "daily" | "weekly" | "monthly";
@@ -102,7 +108,28 @@ export function formatChartDateLabel(
   return withYear ? `${year}/${month}/${day}` : `${month}/${day}`;
 }
 
-/** 全点を縦書きラベル付きで並べるのに要する幅。 */
+/**
+ * 目盛りラベルの文言。両端は年を付け、間は等間隔に間引く。
+ * 両端に寄りすぎた目盛りは、年付きラベルとぶつかるので落とす。
+ */
+export function axisDateLabel(
+  date: string,
+  index: number,
+  lastIndex: number,
+  granularity: Granularity,
+): string {
+  if (index === 0 || index === lastIndex) {
+    return formatChartDateLabel(date, granularity, true);
+  }
+
+  const interval = CHART_LABEL_INTERVAL[granularity];
+  if (index % interval !== 0) return "";
+  if (index < interval / 2 || lastIndex - index < interval / 2) return "";
+
+  return formatChartDateLabel(date, granularity, false);
+}
+
+/** 全点を並べるのに要する幅。 */
 export function chartScrollWidth(pointCount: number, granularity: Granularity): number {
   return pointCount * CHART_POINT_WIDTH[granularity];
 }

@@ -6,6 +6,7 @@ import {
   collapseToMonthly,
   resampleByGranularity,
   formatChartDateLabel,
+  axisDateLabel,
   chartScrollWidth,
 } from "./chart";
 
@@ -171,10 +172,43 @@ describe("formatChartDateLabel", () => {
   });
 });
 
+describe("axisDateLabel", () => {
+  const daily = (index: number, lastIndex: number) =>
+    axisDateLabel("2026-06-07", index, lastIndex, "daily");
+
+  it("両端には年を付ける", () => {
+    expect(daily(0, 30)).toBe("2026/06/07");
+    expect(daily(30, 30)).toBe("2026/06/07");
+  });
+
+  it("日次は1週間おきにだけラベルを出す", () => {
+    expect(daily(7, 30)).toBe("06/07");
+    expect(daily(14, 30)).toBe("06/07");
+    expect(daily(1, 30)).toBe("");
+    expect(daily(6, 30)).toBe("");
+    expect(daily(13, 30)).toBe("");
+  });
+
+  it("両端に寄りすぎた目盛りは落とす", () => {
+    expect(daily(28, 30)).toBe("");
+    expect(daily(28, 40)).toBe("06/07");
+  });
+
+  it("月次は毎月ラベルを出す", () => {
+    expect(axisDateLabel("2026-06-30", 1, 5, "monthly")).toBe("06");
+    expect(axisDateLabel("2026-06-30", 2, 5, "monthly")).toBe("06");
+    expect(axisDateLabel("2026-06-30", 0, 5, "monthly")).toBe("2026/06");
+  });
+
+  it("点が1つだけなら年付きで出す", () => {
+    expect(daily(0, 0)).toBe("2026/06/07");
+  });
+});
+
 describe("chartScrollWidth", () => {
   it("grows with the number of points", () => {
     expect(chartScrollWidth(0, "daily")).toBe(0);
-    expect(chartScrollWidth(180, "daily")).toBe(180 * 26);
+    expect(chartScrollWidth(180, "daily")).toBe(180 * 10);
     expect(chartScrollWidth(24, "monthly")).toBe(24 * 40);
   });
 

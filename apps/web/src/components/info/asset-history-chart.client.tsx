@@ -16,9 +16,9 @@ import {
   CHART_GRANULARITY_OPTIONS,
   CHART_INITIAL_DIMENSION,
   CHART_PERIOD_OPTIONS,
+  axisDateLabel,
   chartScrollWidth,
   filterDataByPeriod,
-  formatChartDateLabel,
   resampleByGranularity,
   type Granularity,
   type Period,
@@ -30,9 +30,6 @@ import { ChartTooltipContent } from "../charts/chart-tooltip";
 import { AmountDisplay } from "../ui/amount-display";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { PeriodToggle } from "../ui/period-toggle";
-
-/** 縦書きにした日付ラベルの高さ。両端は年が付くぶん長い */
-const XAXIS_HEIGHT = 72;
 
 interface AssetHistoryPoint {
   date: string;
@@ -153,7 +150,7 @@ export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChar
 
   const lastIndex = filteredData.length - 1;
   const formatDateLabel = (dateStr: string, index: number) =>
-    formatChartDateLabel(dateStr, granularity, index === 0 || index === lastIndex);
+    axisDateLabel(dateStr, index, lastIndex, granularity);
 
   const categoryDiffs =
     filteredData.length < 2
@@ -250,9 +247,6 @@ export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChar
                   tickLine={false}
                   axisLine={false}
                   interval={0}
-                  angle={-90}
-                  textAnchor="end"
-                  height={XAXIS_HEIGHT}
                   tickFormatter={formatDateLabel}
                 />
                 <YAxis
