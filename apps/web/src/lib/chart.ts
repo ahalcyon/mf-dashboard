@@ -10,6 +10,19 @@ export const CHART_PERIOD_OPTIONS: { value: Period; label: string }[] = [
   { value: "all", label: "全期間" },
 ];
 
+export type Granularity = "daily" | "monthly";
+
+export const CHART_GRANULARITY_OPTIONS: { value: Granularity; label: string }[] = [
+  { value: "daily", label: "日次" },
+  { value: "monthly", label: "月次" },
+];
+
+/** 縦書きラベルが重ならない 1 点あたりの幅。下回るとチャートを横スクロールさせる */
+const CHART_POINT_WIDTH: Record<Granularity, number> = {
+  daily: 26,
+  monthly: 40,
+};
+
 export type ComparisonPeriod = "daily" | "weekly" | "monthly";
 
 export const COMPARISON_PERIOD_OPTIONS: { value: ComparisonPeriod; label: string }[] = [
@@ -52,20 +65,44 @@ export function filterDataByPeriod<T extends { date: string }>(
 ): T[] {
   const cutoffDate = getCutoffDate(period, now);
 
-  let filtered = cutoffDate ? data.filter((d) => new Date(d.date) >= cutoffDate) : data;
+  return cutoffDate ? data.filter((d) => new Date(d.date) >= cutoffDate) : data;
+}
 
-  if (period !== "1m") {
-    const monthlyData = new Map<string, T>();
+/** 各月の最終日だけを残す。 */
+export function collapseToMonthly<T extends { date: string }>(data: T[]): T[] {
+  const monthlyData = new Map<string, T>();
 
-    for (const point of filtered) {
-      const monthKey = point.date.slice(0, 7);
-      if (!monthlyData.has(monthKey) || point.date > monthlyData.get(monthKey)!.date) {
-        monthlyData.set(monthKey, point);
-      }
+  for (const point of data) {
+    const monthKey = point.date.slice(0, 7);
+    if (!monthlyData.has(monthKey) || point.date > monthlyData.get(monthKey)!.date) {
+      monthlyData.set(monthKey, point);
     }
-
-    filtered = Array.from(monthlyData.values()).sort((a, b) => a.date.localeCompare(b.date));
   }
 
-  return filtered;
+  return Array.from(monthlyData.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function resampleByGranularity<T extends { date: string }>(
+  data: T[],
+  granularity: Granularity,
+): T[] {
+  return granularity === "monthly" ? collapseToMonthly(data) : data;
+}
+
+/** 年は両端の目盛りにだけ付ける。 */
+export function formatChartDateLabel(
+  date: string,
+  granularity: Granularity,
+  withYear: boolean,
+): string {
+  const [year, month, day] = date.split("-");
+  if (granularity === "monthly") {
+    return withYear ? `${year}/${month}` : `${month}`;
+  }
+  return withYear ? `${year}/${month}/${day}` : `${month}/${day}`;
+}
+
+/** 全点を縦書きラベル付きで並べるのに要する幅。 */
+export function chartScrollWidth(pointCount: number, granularity: Granularity): number {
+  return pointCount * CHART_POINT_WIDTH[granularity];
 }

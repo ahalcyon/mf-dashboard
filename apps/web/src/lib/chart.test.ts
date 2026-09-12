@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { roundToNice, getCutoffDate, filterDataByPeriod } from "./chart";
+import {
+  roundToNice,
+  getCutoffDate,
+  filterDataByPeriod,
+  collapseToMonthly,
+  resampleByGranularity,
+  formatChartDateLabel,
+  chartScrollWidth,
+} from "./chart";
 
 describe("roundToNice", () => {
   it("returns minimum value for zero or negative", () => {
@@ -82,33 +90,24 @@ describe("filterDataByPeriod", () => {
 
   const now = new Date(2025, 4, 15); // May 15, 2025
 
-  it("returns all data for 'all' period", () => {
+  it("returns every point for 'all' period", () => {
     const result = filterDataByPeriod(testData, "all", now);
-    // Should keep last day of each month
-    expect(result).toHaveLength(6); // 6 months
-    expect(result[0].date).toBe("2024-12-20"); // Last day in December data
-    expect(result[1].date).toBe("2025-01-28");
+    expect(result).toEqual(testData);
   });
 
   it("filters by 1 month and keeps all days", () => {
     const result = filterDataByPeriod(testData, "1m", now);
-    // 1m keeps all days, not just last of month
     expect(result.every((d) => new Date(d.date) >= new Date(2025, 3, 15))).toBe(true);
   });
 
-  it("filters by 3 months and aggregates to monthly", () => {
+  it("keeps every day inside the cutoff for longer periods", () => {
     const result = filterDataByPeriod(testData, "3m", now);
-    // Should include February, March, April, May
-    expect(result.length).toBeGreaterThan(0);
-    expect(result.every((d) => new Date(d.date) >= new Date(2025, 1, 15))).toBe(true);
-  });
-
-  it("keeps only last day of each month for non-1m periods", () => {
-    const result = filterDataByPeriod(testData, "6m", now);
-
-    const months = result.map((d) => d.date.slice(0, 7));
-    const uniqueMonths = new Set(months);
-    expect(months.length).toBe(uniqueMonths.size);
+    expect(result.map((d) => d.date)).toEqual([
+      "2025-02-15",
+      "2025-03-10",
+      "2025-04-20",
+      "2025-05-10",
+    ]);
   });
 
   it("handles empty data", () => {
@@ -123,5 +122,63 @@ describe("filterDataByPeriod", () => {
     ];
     const result = filterDataByPeriod(dataWithExtra, "1m", now);
     expect(result[0]).toHaveProperty("extra");
+  });
+});
+
+describe("collapseToMonthly", () => {
+  it("keeps the last point of each month in ascending order", () => {
+    const result = collapseToMonthly([
+      { date: "2025-01-28", value: 130 },
+      { date: "2024-12-15", value: 100 },
+      { date: "2025-01-10", value: 120 },
+      { date: "2024-12-20", value: 110 },
+    ]);
+
+    expect(result).toEqual([
+      { date: "2024-12-20", value: 110 },
+      { date: "2025-01-28", value: 130 },
+    ]);
+  });
+
+  it("handles empty data", () => {
+    expect(collapseToMonthly([])).toEqual([]);
+  });
+});
+
+describe("resampleByGranularity", () => {
+  const data = [
+    { date: "2025-01-10", value: 1 },
+    { date: "2025-01-28", value: 2 },
+  ];
+
+  it("returns every point for daily", () => {
+    expect(resampleByGranularity(data, "daily")).toEqual(data);
+  });
+
+  it("collapses to the last point of the month for monthly", () => {
+    expect(resampleByGranularity(data, "monthly")).toEqual([{ date: "2025-01-28", value: 2 }]);
+  });
+});
+
+describe("formatChartDateLabel", () => {
+  it.each([
+    { granularity: "daily" as const, withYear: false, expected: "09/04" },
+    { granularity: "daily" as const, withYear: true, expected: "2026/09/04" },
+    { granularity: "monthly" as const, withYear: false, expected: "09" },
+    { granularity: "monthly" as const, withYear: true, expected: "2026/09" },
+  ])("$granularity withYear=$withYear -> $expected", ({ granularity, withYear, expected }) => {
+    expect(formatChartDateLabel("2026-09-04", granularity, withYear)).toBe(expected);
+  });
+});
+
+describe("chartScrollWidth", () => {
+  it("grows with the number of points", () => {
+    expect(chartScrollWidth(0, "daily")).toBe(0);
+    expect(chartScrollWidth(180, "daily")).toBe(180 * 26);
+    expect(chartScrollWidth(24, "monthly")).toBe(24 * 40);
+  });
+
+  it("gives a monthly point more room than a daily one", () => {
+    expect(chartScrollWidth(1, "monthly")).toBeGreaterThan(chartScrollWidth(1, "daily"));
   });
 });

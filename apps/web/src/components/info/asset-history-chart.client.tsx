@@ -13,9 +13,14 @@ import {
 } from "recharts";
 import { sortByAmountDescending } from "../../lib/amount-order";
 import {
+  CHART_GRANULARITY_OPTIONS,
   CHART_INITIAL_DIMENSION,
   CHART_PERIOD_OPTIONS,
+  chartScrollWidth,
   filterDataByPeriod,
+  formatChartDateLabel,
+  resampleByGranularity,
+  type Granularity,
   type Period,
 } from "../../lib/chart";
 import { getAssetCategoryColor, semanticColors } from "../../lib/colors";
@@ -25,6 +30,9 @@ import { ChartTooltipContent } from "../charts/chart-tooltip";
 import { AmountDisplay } from "../ui/amount-display";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { PeriodToggle } from "../ui/period-toggle";
+
+/** 縦書きにした日付ラベルの高さ。両端は年が付くぶん長い */
+const XAXIS_HEIGHT = 72;
 
 interface AssetHistoryPoint {
   date: string;
@@ -70,15 +78,22 @@ interface AssetHistoryTooltipProps {
     name?: string;
     value?: number;
   }>;
-  period: Period;
+  granularity: Granularity;
 }
 
-export function AssetHistoryTooltip({ active, label, payload, period }: AssetHistoryTooltipProps) {
+export function AssetHistoryTooltip({
+  active,
+  granularity,
+  label,
+  payload,
+}: AssetHistoryTooltipProps) {
   if (!active || !label || !payload?.length) return null;
 
   const [year, month, day] = label.split("-");
   const formattedDate =
-    period === "1m" ? `${year}/${Number(month)}/${Number(day)}` : `${year}/${Number(month)}`;
+    granularity === "daily"
+      ? `${year}/${Number(month)}/${Number(day)}`
+      : `${year}/${Number(month)}`;
   const totalAssets = payload.find((item) => item.dataKey === "totalAssets")?.value;
   const categories = payload.filter((item) => item.dataKey !== "totalAssets");
   const orderedCategories = sortByAmountDescending(
@@ -118,6 +133,7 @@ export function AssetHistoryTooltip({ active, label, payload, period }: AssetHis
 
 export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChartProps) {
   const [period, setPeriod] = useState<Period>("6m");
+  const [granularity, setGranularity] = useState<Granularity>("monthly");
   const [visibleLines, setVisibleLines] = useState<Set<string>>(() => new Set(["totalAssets"]));
 
   const categoryLines = getAssetHistoryCategoryLines(data);
@@ -127,25 +143,17 @@ export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChar
     setVisibleLines(new Set(categoryLines.map((l) => l.dataKey)));
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filteredData = filterDataByPeriod(data, period).map((d) => ({
-    ...d.categories,
-    totalAssets: d.totalAssets,
-    date: d.date,
-  }));
+  const filteredData = resampleByGranularity(filterDataByPeriod(data, period), granularity).map(
+    (d) => ({
+      ...d.categories,
+      totalAssets: d.totalAssets,
+      date: d.date,
+    }),
+  );
 
-  const formatDateLabel = (dateStr: string) => {
-    const [year, month, day] = dateStr.split("-");
-    const m = Number(month);
-    const d = Number(day);
-    if (period === "1m") {
-      return `${m}/${d}`;
-    }
-    if (period === "3m" || period === "6m") {
-      return `${m}月`;
-    }
-    // 1y, all: 年をまたぐので年も表示
-    return `${year}/${m}`;
-  };
+  const lastIndex = filteredData.length - 1;
+  const formatDateLabel = (dateStr: string, index: number) =>
+    formatChartDateLabel(dateStr, granularity, index === 0 || index === lastIndex);
 
   const categoryDiffs =
     filteredData.length < 2
@@ -180,12 +188,14 @@ export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChar
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <CardTitle icon={LineChartIcon}>資産推移</CardTitle>
-          <PeriodToggle
-            options={CHART_PERIOD_OPTIONS}
-            value={period}
-            onChange={setPeriod}
-            className="self-end sm:self-auto"
-          />
+          <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+            <PeriodToggle
+              options={CHART_GRANULARITY_OPTIONS}
+              value={granularity}
+              onChange={setGranularity}
+            />
+            <PeriodToggle options={CHART_PERIOD_OPTIONS} value={period} onChange={setPeriod} />
+          </div>
         </div>
         <div className="flex gap-2 mt-3 overflow-x-auto pb-2">
           {categoryLines.map((line) => {
@@ -222,48 +232,55 @@ export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChar
         </div>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer
-          width="100%"
-          height={height}
-          initialDimension={CHART_INITIAL_DIMENSION}
-        >
-          <RechartsLineChart
-            data={filteredData}
-            margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 11 }}
-              tickLine={false}
-              axisLine={false}
-              interval="preserveStartEnd"
-              tickFormatter={formatDateLabel}
-            />
-            <YAxis
-              tick={{ fontSize: 11 }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={formatAxisAmount}
-            />
-            <Tooltip content={<AssetHistoryTooltip period={period} />} />
-            {categoryLines
-              .filter((line) => visibleLines.has(line.dataKey))
-              .map((line) => (
-                <Line
-                  key={line.dataKey}
-                  type="monotone"
-                  dataKey={line.dataKey}
-                  name={line.name}
-                  stroke={line.color}
-                  strokeWidth={line.dataKey === "totalAssets" ? 2.5 : 1.5}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                  animationDuration={300}
+        <div className="overflow-x-auto">
+          <div style={{ minWidth: chartScrollWidth(filteredData.length, granularity) }}>
+            <ResponsiveContainer
+              width="100%"
+              height={height}
+              initialDimension={CHART_INITIAL_DIMENSION}
+            >
+              <RechartsLineChart
+                data={filteredData}
+                margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                  interval={0}
+                  angle={-90}
+                  textAnchor="end"
+                  height={XAXIS_HEIGHT}
+                  tickFormatter={formatDateLabel}
                 />
-              ))}
-          </RechartsLineChart>
-        </ResponsiveContainer>
+                <YAxis
+                  tick={{ fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={formatAxisAmount}
+                />
+                <Tooltip content={<AssetHistoryTooltip granularity={granularity} />} />
+                {categoryLines
+                  .filter((line) => visibleLines.has(line.dataKey))
+                  .map((line) => (
+                    <Line
+                      key={line.dataKey}
+                      type="monotone"
+                      dataKey={line.dataKey}
+                      name={line.name}
+                      stroke={line.color}
+                      strokeWidth={line.dataKey === "totalAssets" ? 2.5 : 1.5}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                      animationDuration={300}
+                    />
+                  ))}
+              </RechartsLineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
