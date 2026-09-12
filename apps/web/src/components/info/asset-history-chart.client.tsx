@@ -1,7 +1,7 @@
 "use client";
 
 import { LineChart as LineChartIcon } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   LineChart as RechartsLineChart,
   Line,
@@ -135,14 +135,9 @@ export function AssetHistoryTooltip({
 export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChartProps) {
   const [period, setPeriod] = useState<Period>("6m");
   const [granularity, setGranularity] = useState<Granularity>("monthly");
-  const [visibleLines, setVisibleLines] = useState<Set<string>>(() => new Set(["totalAssets"]));
+  const [hiddenLines, setHiddenLines] = useState<Set<string>>(() => new Set());
 
   const categoryLines = getAssetHistoryCategoryLines(data);
-
-  // When data changes, update visible lines to show all categories
-  useEffect(() => {
-    setVisibleLines(new Set(categoryLines.map((l) => l.dataKey)));
-  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredData = resampleByGranularity(filterDataByPeriod(data, period), granularity).map(
     (d) => ({
@@ -174,7 +169,7 @@ export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChar
         );
 
   const toggleLine = (dataKey: string) => {
-    setVisibleLines((prev) => {
+    setHiddenLines((prev) => {
       const next = new Set(prev);
       if (next.has(dataKey)) {
         next.delete(dataKey);
@@ -208,15 +203,15 @@ export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChar
                 onClick={() => toggleLine(line.dataKey)}
                 className={cn(
                   "shrink-0 px-2 py-0.5 text-sm rounded-full border transition-colors whitespace-nowrap",
-                  visibleLines.has(line.dataKey)
-                    ? "text-foreground"
-                    : "border-muted-foreground/30 text-muted-foreground bg-transparent",
+                  hiddenLines.has(line.dataKey)
+                    ? "border-muted-foreground/30 text-muted-foreground bg-transparent"
+                    : "text-foreground",
                 )}
                 style={{
-                  backgroundColor: visibleLines.has(line.dataKey)
-                    ? `color-mix(in srgb, ${line.color} 20%, transparent)`
-                    : undefined,
-                  borderColor: visibleLines.has(line.dataKey) ? line.color : undefined,
+                  backgroundColor: hiddenLines.has(line.dataKey)
+                    ? undefined
+                    : `color-mix(in srgb, ${line.color} 20%, transparent)`,
+                  borderColor: hiddenLines.has(line.dataKey) ? undefined : line.color,
                 }}
               >
                 {line.name}
@@ -262,7 +257,7 @@ export function AssetHistoryChartClient({ data, height = 350 }: AssetHistoryChar
                 />
                 <Tooltip content={<AssetHistoryTooltip granularity={granularity} />} />
                 {categoryLines
-                  .filter((line) => visibleLines.has(line.dataKey))
+                  .filter((line) => !hiddenLines.has(line.dataKey))
                   .map((line) => (
                     <Line
                       key={line.dataKey}
