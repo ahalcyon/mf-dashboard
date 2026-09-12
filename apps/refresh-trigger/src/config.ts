@@ -1,5 +1,4 @@
 export interface RefreshTriggerConfig {
-  bulkRefreshFunction: string;
   crawlFunction: string;
 }
 
@@ -11,7 +10,6 @@ function required(name: string): string {
 
 export function loadConfig(): RefreshTriggerConfig {
   return {
-    bulkRefreshFunction: required("BULK_REFRESH_FUNCTION"),
     crawlFunction: required("CRAWL_FUNCTION"),
   };
 }

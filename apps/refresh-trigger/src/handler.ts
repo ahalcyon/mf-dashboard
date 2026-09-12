@@ -6,8 +6,8 @@ import { isRefreshPath, toResponse, type RefreshOutcome } from "./result.js";
 /**
  * ダッシュボードの「金融機関データを更新」に応じる。
  *
- * 金融機関の一括更新を始め、その時点の状態を取り込むクロールを走らせる。
- * クロールは更新の完了を待たない。
+ * クロールだけを起こす。金融機関への一括更新は 6 時間おきの定時実行が
+ * 受け持ち、クロールはその時点で MF が持っている値を取り込む。
  *
  * 認証は CloudFront の viewer-request 関数が担う。
  * Function URL は OAC で CloudFront からのみ到達する。
@@ -36,31 +36,7 @@ export async function handler(event: LambdaFunctionURLEvent): Promise<LambdaFunc
 }
 
 /**
- * 一括更新を非同期で開始する。応答も完了も待たない。
- *
- * ここで失敗してもクロールは続ける。取り込まれる値が前回の更新のままに
- * なるだけで、何も見えなくなるよりはよい。
- */
-async function startBulkRefresh(
-  lambda: LambdaClient,
-  config: ReturnType<typeof loadConfig>,
-): Promise<void> {
-  try {
-    await lambda.send(
-      new InvokeCommand({
-        FunctionName: config.bulkRefreshFunction,
-        InvocationType: "Event",
-        Payload: JSON.stringify({ source: REFRESH_SOURCE }),
-      }),
-    );
-    console.info("Requested the bulk account refresh");
-  } catch (error) {
-    console.error("Failed to request the bulk account refresh:", error);
-  }
-}
-
-/**
- * 一括更新を投げてからクロールを起動する。
+ * クロールを起動する。
  *
  * ECS の頃は ListTasks で実行中を調べて 409 を返していたが、Lambda には
  * 同じ問い合わせが無い。予約同時実行数で止める手も、このアカウントの
@@ -75,8 +51,6 @@ async function startRefresh(
   config: ReturnType<typeof loadConfig>,
 ): Promise<RefreshOutcome> {
   try {
-    await startBulkRefresh(lambda, config);
-
     const result = await lambda.send(
       new InvokeCommand({
         FunctionName: config.crawlFunction,
